@@ -1,6 +1,10 @@
 {
   "name": "My World",
   "description": "A calm, 100% local-first personal sanctuary for notes, encrypted vault, quotes, tasks, birthdays, private gallery, calendar, alarms, creative ideas, and Event Calm Mode.",
-  "requestFramePermissions": ["microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
