@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Navigation, Wind, X } from 'lucide-react';
-import type { EventCalmSession } from '../types/sanctuary';
+import type { CustomAudioTone, EventCalmSession } from '../types/sanctuary';
 import { buildGoogleMapsDirectionsUrl } from '../lib/dateUtils';
-import { playSanctuaryChime } from '../lib/sound';
+import { playNotificationSound } from '../lib/sound';
 
 interface EventCheckInOverlayProps {
   session: EventCalmSession;
   promptMessage: string;
+  customAudioTones: CustomAudioTone[];
+  notificationSoundId: string;
   onClose: () => void;
 }
 
 export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
   session,
   promptMessage,
+  customAudioTones,
+  notificationSoundId,
   onClose,
 }) => {
   const [phaseIndex, setPhaseIndex] = useState(0);
@@ -23,11 +27,12 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
   ];
 
   useEffect(() => {
-    playSanctuaryChime('calm');
+    playNotificationSound(customAudioTones, notificationSoundId);
     const timer = window.setInterval(() => {
       setPhaseIndex((prev) => (prev + 1) % 3);
     }, 4000);
     return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const currentPhase = phases[phaseIndex];

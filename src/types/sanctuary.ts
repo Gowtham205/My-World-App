@@ -114,6 +114,9 @@ export interface TaskReminderItem {
   completed: boolean;
   completedAt?: string;
   linkedAlarmId?: string;
+  soundId?: string;
+  soundName?: string;
+  lastNotifiedMinute?: string;
   createdAt: string;
 }
 
@@ -178,7 +181,21 @@ export interface AlarmItem {
   linkedReminderId?: string;
   linkedReminderTitle?: string;
   linkedReminderNotes?: string;
+  soundId?: string;
+  soundName?: string;
   lastTriggeredMinute?: string; // YYYY-MM-DDTHH:MM
+  createdAt: string;
+}
+
+export type AudioToneCategory = 'alarm' | 'reminder' | 'notification';
+
+export interface CustomAudioTone {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  blob: Blob;
+  category: AudioToneCategory;
   createdAt: string;
 }
 

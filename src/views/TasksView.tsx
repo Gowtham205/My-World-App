@@ -1,7 +1,18 @@
-import React, { useMemo, useState } from 'react';
-import { AlarmClock, Bell, CheckCircle2, Circle, Plus, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlarmClock,
+  Bell,
+  CheckCircle2,
+  Circle,
+  Play,
+  Plus,
+  Square,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import type {
   AlarmItem,
+  CustomAudioTone,
   RecurrencePattern,
   TaskCategory,
   TaskPriority,
@@ -9,12 +20,21 @@ import type {
 } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { formatShortDate, formatTime12h, getTodayStr } from '../lib/dateUtils';
+import {
+  BUILTIN_TONES,
+  previewSoundTone,
+  resolveSoundName,
+  stopSoundPreview,
+} from '../lib/sound';
 
 interface TasksViewProps {
   tasks: TaskReminderItem[];
+  customAudioTones: CustomAudioTone[];
+  defaultNotificationSoundId: string;
   onSaveTask: (task: TaskReminderItem) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onCreateLinkedAlarm: (alarm: AlarmItem) => Promise<void>;
+  onSaveCustomTone: (tone: CustomAudioTone) => Promise<void>;
 }
 
 const PRIORITIES: TaskPriority[] = ['High', 'Medium', 'Low'];
@@ -23,9 +43,12 @@ const RECURRENCES: RecurrencePattern[] = ['Once', 'Daily', 'Weekly', 'Monthly', 
 
 export const TasksView: React.FC<TasksViewProps> = ({
   tasks,
+  customAudioTones,
+  defaultNotificationSoundId,
   onSaveTask,
   onDeleteTask,
   onCreateLinkedAlarm,
+  onSaveCustomTone,
 }) => {
   const [filterStatus, setFilterStatus] = useState<'active' | 'completed' | 'all'>('active');
   const [categoryFilter, setCategoryFilter] = useState<TaskCategory | 'All'>('All');
@@ -42,10 +65,17 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [recurrence, setRecurrence] = useState<RecurrencePattern>('Once');
   const [customRecurrenceNote, setCustomRecurrenceNote] = useState('');
 
-  // Smart Reminder-to-Alarm Bridge state
+  // Smart Reminder-to-Alarm Bridge & Sound state
   const [askAlarmBridge, setAskAlarmBridge] = useState(false);
   const [pendingSavedTask, setPendingSavedTask] = useState<TaskReminderItem | null>(null);
   const [linkAlarmOnCreate, setLinkAlarmOnCreate] = useState(true);
+  const [selectedSoundId, setSelectedSoundId] = useState(defaultNotificationSoundId);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const audioUploadRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    return () => stopSoundPreview();
+  }, []);
 
   const filteredTasks = useMemo(() => {
     return [...tasks]
@@ -70,6 +100,10 @@ export const TasksView: React.FC<TasksViewProps> = ({
     if (!title.trim()) return;
 
     const taskId = createId('task');
+    const resolvedSoundName = dueTime
+      ? resolveSoundName(customAudioTones, selectedSoundId)
+      : undefined;
+
     const newTask: TaskReminderItem = {
       id: taskId,
       title: title.trim(),
@@ -82,6 +116,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
       recurrence,
       customRecurrenceNote: recurrence === 'Custom' ? customRecurrenceNote.trim() : undefined,
       completed: false,
+      soundId: dueTime ? selectedSoundId : undefined,
+      soundName: resolvedSoundName,
       createdAt: new Date().toISOString(),
     };
 
@@ -99,6 +135,21 @@ export const TasksView: React.FC<TasksViewProps> = ({
     setDueTime('');
     setEndTime('');
     setShowAdd(false);
+  };
+
+  const handleUploadReminderAudio = async (file: File | undefined) => {
+    if (!file) return;
+    const tone: CustomAudioTone = {
+      id: createId('tone'),
+      name: file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim() || 'Reminder Audio',
+      mimeType: file.type || 'audio/mpeg',
+      sizeBytes: file.size,
+      blob: file,
+      category: 'reminder',
+      createdAt: new Date().toISOString(),
+    };
+    await onSaveCustomTone(tone);
+    setSelectedSoundId(tone.id);
   };
 
   const confirmLinkAlarm = async () => {
@@ -120,6 +171,10 @@ export const TasksView: React.FC<TasksViewProps> = ({
       linkedReminderId: pendingSavedTask.id,
       linkedReminderTitle: pendingSavedTask.title,
       linkedReminderNotes: pendingSavedTask.notes,
+      soundId: pendingSavedTask.soundId || selectedSoundId,
+      soundName:
+        pendingSavedTask.soundName ||
+        resolveSoundName(customAudioTones, pendingSavedTask.soundId || selectedSoundId),
       createdAt: new Date().toISOString(),
     };
 
@@ -349,17 +404,87 @@ export const TasksView: React.FC<TasksViewProps> = ({
           </div>
 
           {dueTime && (
-            <label className="flex items-center gap-3 pt-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={linkAlarmOnCreate}
-                onChange={(e) => setLinkAlarmOnCreate(e.target.checked)}
-                className="w-4 h-4 accent-[#9EC5AB]"
-              />
-              <span className="text-xs text-[#D0D5DD]">
-                Prompt me to link a dedicated Alarm at {formatTime12h(dueTime)}
-              </span>
-            </label>
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="block text-xs text-[#98A2B3] mb-1">
+                  Reminder / Alert Sound
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedSoundId}
+                    onChange={(e) => setSelectedSoundId(e.target.value)}
+                    className="flex-1 min-w-0 min-h-[44px] px-3.5 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6]"
+                  >
+                    <optgroup label="Built-In Tones">
+                      {BUILTIN_TONES.map((tone) => (
+                        <option key={tone.id} value={tone.id}>
+                          {tone.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {customAudioTones.length > 0 && (
+                      <optgroup label="Your Uploaded Audio">
+                        {customAudioTones.map((tone) => (
+                          <option key={tone.id} value={tone.id}>
+                            {tone.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isPreviewing) {
+                        stopSoundPreview();
+                        setIsPreviewing(false);
+                      } else {
+                        setIsPreviewing(true);
+                        previewSoundTone(customAudioTones, selectedSoundId, () =>
+                          setIsPreviewing(false)
+                        );
+                      }
+                    }}
+                    aria-label="Preview reminder sound"
+                    className="min-w-[44px] min-h-[44px] rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-[#9EC5AB] flex items-center justify-center shrink-0"
+                  >
+                    {isPreviewing ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => audioUploadRef.current?.click()}
+                    className="min-h-[44px] px-3 rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-[#9BC4E2] inline-flex items-center gap-1.5 shrink-0"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span className="hidden sm:inline">Upload</span>
+                  </button>
+                  <input
+                    ref={audioUploadRef}
+                    type="file"
+                    accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac"
+                    onChange={(e) => {
+                      void handleUploadReminderAudio(e.target.files?.[0]);
+                      e.target.value = '';
+                    }}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={linkAlarmOnCreate}
+                  onChange={(e) => setLinkAlarmOnCreate(e.target.checked)}
+                  className="w-4 h-4 accent-[#9EC5AB]"
+                />
+                <span className="text-xs text-[#D0D5DD]">
+                  Prompt me to link a dedicated Alarm at {formatTime12h(dueTime)}
+                </span>
+              </label>
+            </div>
           )}
 
           <div className="flex justify-end gap-2.5 pt-2">
@@ -457,6 +582,12 @@ export const TasksView: React.FC<TasksViewProps> = ({
                           <Bell className="w-3 h-3" />
                           Alarm linked
                         </span>
+                      </>
+                    )}
+                    {task.soundName && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span>{task.soundName}</span>
                       </>
                     )}
                   </p>

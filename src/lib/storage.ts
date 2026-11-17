@@ -3,6 +3,7 @@ import type {
   BirthdayEntry,
   CalendarEventItem,
   CreativeIdeaCard,
+  CustomAudioTone,
   EventCalmSession,
   MediaAlbum,
   MotivationalQuote,
@@ -14,7 +15,7 @@ import type {
 } from '../types/sanctuary';
 
 const DB_NAME = 'my_world_sanctuary_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export type StoreName =
   | 'notes'
@@ -28,7 +29,8 @@ export type StoreName =
   | 'alarms'
   | 'ideas'
   | 'events'
-  | 'settings';
+  | 'settings'
+  | 'custom_audio';
 
 const ALL_STORES: StoreName[] = [
   'notes',
@@ -43,6 +45,7 @@ const ALL_STORES: StoreName[] = [
   'ideas',
   'events',
   'settings',
+  'custom_audio',
 ];
 
 function openDB(): Promise<IDBDatabase> {
@@ -475,6 +478,26 @@ export function recordCalmMinutes(dateStr: string, minutes: number): Record<stri
   return updated;
 }
 
+const DEFAULT_NOTIF_SOUND_KEY = 'my_world_default_notif_sound_v1';
+
+export function getDefaultNotificationSoundId(): string {
+  if (typeof window === 'undefined') return 'builtin:calm-chime';
+  try {
+    return localStorage.getItem(DEFAULT_NOTIF_SOUND_KEY) || 'builtin:calm-chime';
+  } catch {
+    return 'builtin:calm-chime';
+  }
+}
+
+export function setDefaultNotificationSoundId(soundId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DEFAULT_NOTIF_SOUND_KEY, soundId);
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
 export type {
   PersonalNote,
   EncryptedVaultRecord,
@@ -488,4 +511,5 @@ export type {
   CreativeIdeaCard,
   EventCalmSession,
   SecuritySettings,
+  CustomAudioTone,
 };

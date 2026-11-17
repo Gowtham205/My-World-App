@@ -24,6 +24,7 @@ import {
 } from '../lib/dateUtils';
 
 interface HomeViewProps {
+  userName?: string;
   quotes: MotivationalQuote[];
   tasks: TaskReminderItem[];
   birthdays: BirthdayEntry[];
@@ -36,6 +37,7 @@ interface HomeViewProps {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
+  userName,
   quotes,
   tasks,
   birthdays,
@@ -91,7 +93,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
               {formattedDate} · Local Sanctuary
             </p>
             <h1 className="font-display text-3xl sm:text-4xl lg:text-[2.75rem] font-medium text-[#F1F3F6] leading-tight text-balance">
-              {greeting}
+              {userName?.trim()
+                ? `${greeting}, ${userName.trim().split(/\s+/)[0]}`
+                : greeting}
             </h1>
             <p className="text-sm sm:text-base text-[#D0D5DD] mt-2.5 leading-relaxed max-w-xl">
               {subMessage}

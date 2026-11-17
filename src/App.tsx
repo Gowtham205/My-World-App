@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   Lightbulb,
   Lock,
+  LogOut,
   MapPin,
   MessageSquareHeart,
   Mic,
@@ -22,6 +23,8 @@ import {
   Square,
   Wind,
 } from 'lucide-react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import type {
   AlarmItem,
   AppRoute,
@@ -29,6 +32,7 @@ import type {
   BottomTab,
   CalendarEventItem,
   CreativeIdeaCard,
+  CustomAudioTone,
   EncryptedVaultRecord,
   EventCalmSession,
   MediaAlbum,
@@ -41,14 +45,30 @@ import {
   deleteFromStore,
   getAllFromStore,
   getCalmMinutesByDate,
+  getDefaultNotificationSoundId,
   putInStore,
   recordCalmMinutes,
   seedInitialSanctuaryDataIfNeeded,
+  setDefaultNotificationSoundId as persistDefaultNotificationSoundId,
 } from './lib/storage';
 import { getTodayStr } from './lib/dateUtils';
-import { startAlarmRinging, stopAlarmRinging } from './lib/sound';
+import {
+  playNotificationSound,
+  startAlarmRinging,
+  stopAlarmRinging,
+} from './lib/sound';
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
+import { AuthGate } from './components/AuthGate';
 import { EventCheckInOverlay } from './components/EventCheckInOverlay';
+import {
+  auth,
+  db,
+  handleFirestoreError,
+  OperationType,
+  signOutSanctuary,
+  upsertUserProfile,
+  type UserProfileRecord,
+} from './lib/firebase';
 import { HomeView } from './views/HomeView';
 import { ExploreHubView } from './views/ExploreHubView';
 import { NotesView } from './views/NotesView';
@@ -113,6 +133,9 @@ function parseMinutes(hhmm: string): number {
 }
 
 export function App() {
+  const [authReady, setAuthReady] = useState(false);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfileRecord | null>(null);
   const [route, setRoute] = useState<AppRoute>('home');
   const [ready, setReady] = useState(false);
   const [mapsQuotaExceeded, setMapsQuotaExceeded] = useState(false);
@@ -130,12 +153,17 @@ export function App() {
   const [alarms, setAlarms] = useState<AlarmItem[]>([]);
   const [ideas, setIdeas] = useState<CreativeIdeaCard[]>([]);
   const [eventSessions, setEventSessions] = useState<EventCalmSession[]>([]);
+  const [customAudioTones, setCustomAudioTones] = useState<CustomAudioTone[]>([]);
+  const [defaultNotificationSoundId, setDefaultNotificationSoundId] = useState<string>(() =>
+    getDefaultNotificationSoundId()
+  );
 
   // In-memory cryptographic key (cleared immediately on background/visibility hidden)
   const [vaultKey, setVaultKey] = useState<CryptoKey | null>(null);
 
-  // Active overlays (Alarms & Event Calm Check-In)
+  // Active overlays (Alarms, Reminder Notification Toast, & Event Calm Check-In)
   const [ringingAlarm, setRingingAlarm] = useState<AlarmItem | null>(null);
+  const [activeReminderNotice, setActiveReminderNotice] = useState<TaskReminderItem | null>(null);
   const [breathingPromptState, setBreathingPromptState] = useState<{
     session: EventCalmSession;
     prompt: string;
@@ -167,7 +195,7 @@ export function App() {
 
   const loadAll = useCallback(async () => {
     await seedInitialSanctuaryDataIfNeeded();
-    const [n, v, q, t, b, al, m, c, arm, id, ev] = await Promise.all([
+    const [n, v, q, t, b, al, m, c, arm, id, ev, tones] = await Promise.all([
       getAllFromStore<PersonalNote>('notes'),
       getAllFromStore<EncryptedVaultRecord>('vault'),
       getAllFromStore<MotivationalQuote>('quotes'),
@@ -179,6 +207,7 @@ export function App() {
       getAllFromStore<AlarmItem>('alarms'),
       getAllFromStore<CreativeIdeaCard>('ideas'),
       getAllFromStore<EventCalmSession>('events'),
+      getAllFromStore<CustomAudioTone>('custom_audio'),
     ]);
     setNotes(n);
     setVaultRecords(v);
@@ -191,12 +220,49 @@ export function App() {
     setAlarms(arm);
     setIdeas(id);
     setEventSessions(ev);
+    setCustomAudioTones(tones);
     setReady(true);
   }, []);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Firebase Auth listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+      if (!user) {
+        setUserProfile(null);
+      }
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync & subscribe to user profile only when authenticated
+  useEffect(() => {
+    if (!authReady || !authUser) return;
+
+    void upsertUserProfile(authUser).catch((err) => {
+      console.error('Profile sync error:', err);
+    });
+
+    const profilePath = `users/${authUser.uid}`;
+    const unsubscribe = onSnapshot(
+      doc(db, 'users', authUser.uid),
+      (snap) => {
+        if (snap.exists()) {
+          setUserProfile(snap.data() as UserProfileRecord);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, profilePath);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [authReady, authUser]);
 
   // Listen for Google Maps Platform Case A quota exhaustion events globally
   useEffect(() => {
@@ -289,11 +355,41 @@ export function App() {
         await putInStore('alarms', updatedAlarm);
 
         setRingingAlarm(updatedAlarm);
-        startAlarmRinging();
+        const matchedTone = alarm.soundId
+          ? customAudioTones.find((t) => t.id === alarm.soundId)
+          : undefined;
+        startAlarmRinging(matchedTone, alarm.soundId);
 
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification(alarm.linkedReminderTitle || alarm.label, {
             body: alarm.linkedReminderNotes || `Alarm for ${currentHHMM}`,
+          });
+        }
+        break;
+      }
+
+      // 1b. Check Unlinked Smart Task Reminders for custom reminder/notification sound
+      for (const task of tasks) {
+        if (task.completed || task.linkedAlarmId) continue;
+        if (!task.dueTime || task.dueDate !== today || task.dueTime !== currentHHMM) continue;
+        if (task.lastNotifiedMinute === minuteKey) continue;
+
+        const updatedTask: TaskReminderItem = {
+          ...task,
+          lastNotifiedMinute: minuteKey,
+        };
+        setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
+        await putInStore('tasks', updatedTask);
+
+        playNotificationSound(
+          customAudioTones,
+          task.soundId || defaultNotificationSoundId
+        );
+        setActiveReminderNotice(updatedTask);
+
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(task.title, {
+            body: task.notes || `Scheduled reminder at ${currentHHMM}`,
           });
         }
         break;
@@ -343,7 +439,7 @@ export function App() {
 
     const interval = window.setInterval(tick, 4000);
     return () => window.clearInterval(interval);
-  }, [ready, alarms, activeEventSession]);
+  }, [ready, alarms, tasks, activeEventSession, customAudioTones, defaultNotificationSoundId]);
 
   // Persistence Handlers
   const saveNote = async (note: PersonalNote) => {
@@ -481,6 +577,24 @@ export function App() {
     setEventSessions((prev) => prev.filter((s) => s.id !== id));
   };
 
+  const saveCustomTone = async (tone: CustomAudioTone) => {
+    await putInStore('custom_audio', tone);
+    setCustomAudioTones((prev) => {
+      const exists = prev.some((t) => t.id === tone.id);
+      return exists ? prev.map((t) => (t.id === tone.id ? tone : t)) : [tone, ...prev];
+    });
+  };
+
+  const deleteCustomTone = async (id: string) => {
+    await deleteFromStore('custom_audio', id);
+    setCustomAudioTones((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleChangeDefaultNotificationSound = (soundId: string) => {
+    setDefaultNotificationSoundId(soundId);
+    persistDefaultNotificationSoundId(soundId);
+  };
+
   const handleShuffleHomeQuote = async () => {
     if (quotes.length <= 1) return;
     const currentPinned = quotes.find((q) => q.pinnedToHome);
@@ -597,12 +711,32 @@ export function App() {
 
   const activeBottomTab: BottomTab = isSecondaryRoute ? 'explore' : route;
 
-  if (!ready) {
+  const handleSignOut = async () => {
+    setVaultKey(null);
+    soundscapeEngine.stopAll();
+    setActiveSoundscapes({
+      rain: false,
+      forest: false,
+      ocean: false,
+      'white-noise': false,
+      'brown-noise': false,
+      hearth: false,
+    });
+    setSoundTimerRemainingSec(null);
+    await signOutSanctuary();
+    setRoute('home');
+  };
+
+  if (!authReady || !ready) {
     return (
       <div className="min-h-screen bg-[#0F1115] flex items-center justify-center p-6">
         <p className="font-display text-lg text-[#98A2B3]">Opening My World...</p>
       </div>
     );
+  }
+
+  if (!authUser) {
+    return <AuthGate />;
   }
 
   return (
@@ -714,6 +848,37 @@ export function App() {
               </div>
             </div>
           )}
+          <div className="rounded-2xl bg-[#171A21] border border-white/[0.07] p-3 flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {authUser.photoURL ? (
+                <img
+                  src={authUser.photoURL}
+                  alt={authUser.displayName || 'Account avatar'}
+                  referrerPolicy="no-referrer"
+                  className="w-8 h-8 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-[#9EC5AB]/20 text-[#9EC5AB] text-xs font-semibold flex items-center justify-center shrink-0">
+                  {(authUser.displayName || authUser.email || 'M')[0]?.toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-[#F1F3F6] truncate">
+                  {userProfile?.displayName || authUser.displayName || 'My World'}
+                </p>
+                <p className="text-[11px] text-[#98A2B3] truncate">{authUser.email}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              aria-label="Sign out"
+              title="Sign out"
+              className="min-w-[36px] min-h-[36px] rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center shrink-0 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
           <p className="text-xs text-[#98A2B3]">Offline storage · Zero tracking</p>
         </div>
       </aside>
@@ -721,9 +886,9 @@ export function App() {
       {/* Main Content Canvas */}
       <main className="flex-1 min-w-0 pb-24 lg:pb-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
-          {/* Mobile Back Navigation when inside a sub-module */}
-          {isSecondaryRoute && (
-            <div className="mb-4 lg:hidden">
+          {/* Mobile Account & Navigation Header (non-sticky) */}
+          <div className="mb-4 lg:hidden flex items-center justify-between gap-3">
+            {isSecondaryRoute ? (
               <button
                 type="button"
                 onClick={() => setRoute('explore')}
@@ -732,8 +897,20 @@ export function App() {
                 <ArrowLeft className="w-4 h-4" />
                 Back to Explore Hub
               </button>
-            </div>
-          )}
+            ) : (
+              <span className="text-xs text-[#98A2B3] truncate">
+                {authUser.email}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              className="min-h-[44px] px-3 rounded-2xl bg-[#171A21] border border-white/[0.07] text-xs font-medium text-[#98A2B3] hover:text-[#F2B8A2] inline-flex items-center gap-1.5 shrink-0"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign Out
+            </button>
+          </div>
 
           {/* Mobile Inline Active Soundscapes Bar */}
           {activeSoundscapeIds.length > 0 && route !== 'soundscapes' && (
@@ -764,6 +941,12 @@ export function App() {
 
           {route === 'home' && (
             <HomeView
+              userName={
+                userProfile?.preferredName ||
+                userProfile?.displayName ||
+                authUser.displayName ||
+                undefined
+              }
               quotes={quotes}
               tasks={tasks}
               birthdays={birthdays}
@@ -826,9 +1009,12 @@ export function App() {
           {route === 'tasks' && (
             <TasksView
               tasks={tasks}
+              customAudioTones={customAudioTones}
+              defaultNotificationSoundId={defaultNotificationSoundId}
               onSaveTask={saveTask}
               onDeleteTask={deleteTask}
               onCreateLinkedAlarm={saveAlarm}
+              onSaveCustomTone={saveCustomTone}
             />
           )}
 
@@ -866,12 +1052,20 @@ export function App() {
           {route === 'alarms' && (
             <AlarmsView
               alarms={alarms}
+              customAudioTones={customAudioTones}
+              defaultNotificationSoundId={defaultNotificationSoundId}
               onSaveAlarm={saveAlarm}
               onDeleteAlarm={deleteAlarm}
               onTestRingAlarm={(alarm) => {
                 setRingingAlarm(alarm);
-                startAlarmRinging();
+                const matchedTone = alarm.soundId
+                  ? customAudioTones.find((t) => t.id === alarm.soundId)
+                  : undefined;
+                startAlarmRinging(matchedTone, alarm.soundId);
               }}
+              onSaveCustomTone={saveCustomTone}
+              onDeleteCustomTone={deleteCustomTone}
+              onChangeDefaultNotificationSound={handleChangeDefaultNotificationSound}
             />
           )}
 
@@ -976,11 +1170,40 @@ export function App() {
         />
       )}
 
+      {/* Scheduled Reminder Notification Banner */}
+      {activeReminderNotice && (
+        <div
+          role="status"
+          className="fixed bottom-20 lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-[#171A21] border border-[#9EC5AB]/40 p-4 shadow-xl flex items-start justify-between gap-3"
+        >
+          <div className="min-w-0">
+            <p className="text-xs text-[#9EC5AB] font-medium">Scheduled Reminder</p>
+            <p className="text-sm font-medium text-[#F1F3F6] mt-0.5 truncate">
+              {activeReminderNotice.title}
+            </p>
+            {activeReminderNotice.notes && (
+              <p className="text-xs text-[#98A2B3] mt-1 line-clamp-2">
+                {activeReminderNotice.notes}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveReminderNotice(null)}
+            className="min-h-[36px] px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-xs font-medium text-[#F1F3F6] shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Event Calm Mode Breathing & Grounding Modal */}
       {breathingPromptState && (
         <EventCheckInOverlay
           session={breathingPromptState.session}
           promptMessage={breathingPromptState.prompt}
+          customAudioTones={customAudioTones}
+          notificationSoundId={defaultNotificationSoundId}
           onClose={() => {
             const elapsedMinutes = Math.max(
               1,

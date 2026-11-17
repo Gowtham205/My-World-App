@@ -38,6 +38,12 @@ export const ActiveAlarmOverlay: React.FC<ActiveAlarmOverlayProps> = ({
           {alarm.linkedReminderTitle || alarm.label}
         </h2>
 
+        {alarm.soundName && (
+          <p className="text-xs text-[#9EC5AB] mt-2">
+            Sound · {alarm.soundName}
+          </p>
+        )}
+
         {alarm.linkedReminderNotes && (
           <div className="mt-4 p-4 rounded-2xl bg-[#1D212A] border border-white/[0.06] text-left">
             <p className="text-xs text-[#98A2B3] mb-1">Reminder Notes</p>
