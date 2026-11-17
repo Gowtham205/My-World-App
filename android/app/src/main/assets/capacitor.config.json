@@ -1,0 +1,12 @@
+{
+	"appId": "com.myworld.sanctuary",
+	"appName": "My World",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	},
+	"android": {
+		"backgroundColor": "#0F1115",
+		"allowMixedContent": false
+	}
+}

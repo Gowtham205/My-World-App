@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
+import { getApiUrl } from '../lib/api';
 
 interface ChatMessage {
   id: string;
@@ -130,7 +131,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
     setIsStreaming(true);
 
     try {
-      const res = await fetch('/api/gemini/chat', {
+      const res = await fetch(getApiUrl('/api/gemini/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

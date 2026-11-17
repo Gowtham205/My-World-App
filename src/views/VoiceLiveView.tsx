@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpen, Mic, MicOff, Phone, PhoneOff, Volume2 } from 'lucide-react';
 import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
+import { getLiveWsUrl } from '../lib/api';
 
 interface TranscriptEntry {
   id: string;
@@ -254,11 +255,8 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
       streamRef.current = stream;
       nextStartTimeRef.current = outputCtx.currentTime;
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/live?voice=${encodeURIComponent(
-        voice
-      )}&persona=${encodeURIComponent(persona)}`;
-      const ws = new WebSocket(wsUrl);
+      const params = new URLSearchParams({ voice, persona });
+      const ws = new WebSocket(getLiveWsUrl(params));
       wsRef.current = ws;
 
       ws.onopen = () => {

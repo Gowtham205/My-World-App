@@ -50,6 +50,25 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: '25mb' }));
 
+  // Allow Capacitor Android WebView origins (https://localhost / capacitor://localhost)
+  // when a standalone APK connects to a hosted Express backend.
+  app.use('/api', (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, hasGeminiKey: Boolean(process.env.GEMINI_API_KEY) });
   });

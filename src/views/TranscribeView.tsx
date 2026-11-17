@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
+import { getApiUrl } from '../lib/api';
 
 interface TranscribeViewProps {
   onSaveToNote: (note: PersonalNote) => Promise<void>;
@@ -185,7 +186,7 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
         PROMPT_MODES[0].prompt;
 
       const mimeType = audioBlob.type || 'audio/webm';
-      const res = await fetch('/api/gemini/transcribe', {
+      const res = await fetch(getApiUrl('/api/gemini/transcribe'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
