@@ -5,9 +5,11 @@ import {
   ArrowLeft,
   AudioLines,
   BarChart3,
+  Bell,
   Cake,
   Calendar,
   CheckSquare,
+  ChevronRight,
   Compass,
   FileText,
   Gamepad2,
@@ -15,20 +17,22 @@ import {
   Image as ImageIcon,
   Lightbulb,
   Lock,
-  LogOut,
   MapPin,
   MessageSquareHeart,
   Mic,
   PhoneCall,
   Quote,
+  Settings,
   Square,
   Wind,
 } from 'lucide-react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
+import { onAuthStateChanged, updateProfile, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import type {
   AlarmItem,
+  AppNotificationItem,
   AppRoute,
+  AppTheme,
   BirthdayEntry,
   BottomTab,
   CalendarEventItem,
@@ -45,13 +49,20 @@ import type {
   VaultSecretPayload,
 } from './types/sanctuary';
 import {
+  createId,
   deleteFromStore,
   getAllFromStore,
   getCalmMinutesByDate,
   getDefaultNotificationSoundId,
+  getLocalPreferredName,
+  getNotificationHistory,
+  getSavedTheme,
   getSetting,
   putInStore,
   recordCalmMinutes,
+  saveLocalPreferredName,
+  saveNotificationHistory,
+  saveTheme,
   seedInitialSanctuaryDataIfNeeded,
   setDefaultNotificationSoundId as persistDefaultNotificationSoundId,
 } from './lib/storage';
@@ -64,7 +75,8 @@ import {
 } from './lib/crypto';
 import { getTodayStr } from './lib/dateUtils';
 import {
-  attachNotificationTapListener,
+  attachNotificationListeners,
+  collectMissedAndTodayInboxItems,
   ensureNotificationSetup,
   sendSystemNotification,
   syncScheduledNativeNotifications,
@@ -77,6 +89,8 @@ import {
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
 import { EventCheckInOverlay } from './components/EventCheckInOverlay';
+import { NotificationsDrawer } from './components/NotificationsDrawer';
+import { ProfileSettingsDrawer } from './components/ProfileSettingsDrawer';
 import {
   auth,
   db,
@@ -159,6 +173,15 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [mapsQuotaExceeded, setMapsQuotaExceeded] = useState(false);
   const [mapsInitialQuery, setMapsInitialQuery] = useState<string>('');
+  const [theme, setTheme] = useState<AppTheme>(() => getSavedTheme());
+  const [localPreferredName, setLocalPreferredName] = useState<string>(() =>
+    getLocalPreferredName()
+  );
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [notificationsDrawerOpen, setNotificationsDrawerOpen] = useState(false);
+  const [inboxNotifications, setInboxNotifications] = useState<AppNotificationItem[]>(() =>
+    getNotificationHistory()
+  );
 
   // Local-first state hydrated from IndexedDB
   const [notes, setNotes] = useState<PersonalNote[]>([]);
@@ -203,6 +226,32 @@ export function App() {
   activeReminderNoticeRef.current = activeReminderNotice;
   const breathingPromptStateRef = useRef(breathingPromptState);
   breathingPromptStateRef.current = breathingPromptState;
+  const profileDrawerOpenRef = useRef(profileDrawerOpen);
+  profileDrawerOpenRef.current = profileDrawerOpen;
+  const notificationsDrawerOpenRef = useRef(notificationsDrawerOpen);
+  notificationsDrawerOpenRef.current = notificationsDrawerOpen;
+
+  // Sync Dark / Light theme class on <html>
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    saveTheme(theme);
+  }, [theme]);
+
+  const pushInboxNotification = useCallback(
+    (incoming: Omit<AppNotificationItem, 'id'> | AppNotificationItem) => {
+      setInboxNotifications((prev) => {
+        if (prev.some((n) => n.dedupeKey === incoming.dedupeKey)) {
+          return prev;
+        }
+        const entry: AppNotificationItem =
+          'id' in incoming ? incoming : { ...incoming, id: createId('notif') };
+        const next = [entry, ...prev].slice(0, 80);
+        saveNotificationHistory(next);
+        return next;
+      });
+    },
+    []
+  );
 
   const navigateTo = useCallback(
     (nextRoute: AppRoute, options?: { pushHistory?: boolean }) => {
@@ -346,42 +395,68 @@ export function App() {
     return () => window.removeEventListener('gmp-quota-exceeded', handleQuota);
   }, []);
 
-  // Immediate AppState / visibilitychange auto-lock for Vault & Private Gallery
+  const reconcileMissedNotifications = useCallback(() => {
+    if (!ready) return;
+    setInboxNotifications((prev) => {
+      const additions = collectMissedAndTodayInboxItems({
+        alarms,
+        tasks,
+        eventSessions,
+        birthdays,
+        existingHistory: prev,
+      });
+      if (additions.length === 0) return prev;
+      const next = [...additions, ...prev].slice(0, 80);
+      saveNotificationHistory(next);
+      return next;
+    });
+  }, [ready, alarms, tasks, eventSessions, birthdays]);
+
   useEffect(() => {
-    const lockSensitiveAreas = () => {
+    reconcileMissedNotifications();
+  }, [reconcileMissedNotifications]);
+
+  // Immediate AppState / visibilitychange auto-lock + foreground missed-alert reconciliation
+  useEffect(() => {
+    const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
         setVaultKey(null);
+      } else if (document.visibilityState === 'visible') {
+        reconcileMissedNotifications();
       }
     };
     const handlePageHide = () => setVaultKey(null);
 
-    document.addEventListener('visibilitychange', lockSensitiveAreas);
+    document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('pagehide', handlePageHide);
 
     const appStateHandle = CapApp.addListener('appStateChange', ({ isActive }) => {
       if (!isActive) {
         setVaultKey(null);
+      } else {
+        reconcileMissedNotifications();
       }
     }).catch(() => null);
 
     return () => {
-      document.removeEventListener('visibilitychange', lockSensitiveAreas);
+      document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', handlePageHide);
       void appStateHandle.then((h) => h?.remove());
     };
-  }, []);
+  }, [reconcileMissedNotifications]);
 
   // Setup Android notification channels, tap routing, & scheduled local notifications
   useEffect(() => {
     if (!ready || !authUser) return;
     void ensureNotificationSetup();
-    const detach = attachNotificationTapListener((targetRoute) => {
-      navigateTo(targetRoute);
+    const detach = attachNotificationListeners({
+      onNavigate: (targetRoute) => navigateTo(targetRoute),
+      onNativeReceived: (item) => pushInboxNotification(item),
     });
     return () => {
       detach();
     };
-  }, [ready, authUser, navigateTo]);
+  }, [ready, authUser, navigateTo, pushInboxNotification]);
 
   useEffect(() => {
     if (!ready || !authUser) return;
@@ -460,8 +535,27 @@ export function App() {
           : undefined;
         startAlarmRinging(matchedTone, alarm.soundId);
 
+        const alarmDedupeKey = `alarm:${alarm.id}:${minuteKey}`;
+        const alarmSlotSeed =
+          alarm.repeatDays.length > 0 && alarm.repeatDays.length < 7
+            ? `alarm:${alarm.id}:w:${weekday}`
+            : `alarm:${alarm.id}`;
+
+        pushInboxNotification({
+          dedupeKey: alarmDedupeKey,
+          kind: 'alarm',
+          status: 'delivered',
+          title: alarm.linkedReminderTitle || alarm.label,
+          body: alarm.linkedReminderNotes || `Alarm for ${currentHHMM}`,
+          scheduledAt: now.toISOString(),
+          createdAt: now.toISOString(),
+          read: true,
+          route: 'alarms',
+        });
+
         void sendSystemNotification({
-          key: `alarm-${alarm.id}-${minuteKey}`,
+          dedupeKey: alarmDedupeKey,
+          slotSeed: alarmSlotSeed,
           title: alarm.linkedReminderTitle || alarm.label,
           body: alarm.linkedReminderNotes || `Alarm for ${currentHHMM}`,
           channel: 'alarm',
@@ -489,8 +583,22 @@ export function App() {
         );
         setActiveReminderNotice(updatedTask);
 
+        const taskDedupeKey = `task:${task.id}:${minuteKey}`;
+        pushInboxNotification({
+          dedupeKey: taskDedupeKey,
+          kind: 'reminder',
+          status: 'delivered',
+          title: task.title,
+          body: task.notes || `Scheduled reminder at ${currentHHMM}`,
+          scheduledAt: now.toISOString(),
+          createdAt: now.toISOString(),
+          read: false,
+          route: 'tasks',
+        });
+
         void sendSystemNotification({
-          key: `task-${task.id}-${minuteKey}`,
+          dedupeKey: taskDedupeKey,
+          slotSeed: `task:${task.id}`,
           title: task.title,
           body: task.notes || `Scheduled reminder at ${currentHHMM}`,
           channel: 'reminder',
@@ -538,8 +646,22 @@ export function App() {
             startedAtMs: Date.now(),
           });
 
+          const calmDedupeKey = `calm:${updatedSession.id}:${minuteKey}`;
+          pushInboxNotification({
+            dedupeKey: calmDedupeKey,
+            kind: 'calm',
+            status: 'delivered',
+            title: `${updatedSession.eventName} · Event Calm`,
+            body: prompt,
+            scheduledAt: now.toISOString(),
+            createdAt: now.toISOString(),
+            read: false,
+            route: 'event-calm',
+          });
+
           void sendSystemNotification({
-            key: `calm-${updatedSession.id}-${minuteKey}`,
+            dedupeKey: calmDedupeKey,
+            slotSeed: `calm:${updatedSession.id}`,
             title: `${updatedSession.eventName} · Event Calm`,
             body: prompt,
             channel: 'calm',
@@ -551,7 +673,7 @@ export function App() {
 
     const interval = window.setInterval(tick, 4000);
     return () => window.clearInterval(interval);
-  }, [ready, alarms, tasks, activeEventSession, customAudioTones, defaultNotificationSoundId]);
+  }, [ready, alarms, tasks, activeEventSession, customAudioTones, defaultNotificationSoundId, pushInboxNotification]);
 
   // Persistence Handlers
   const saveNote = async (note: PersonalNote) => {
@@ -763,6 +885,14 @@ export function App() {
   // Android hardware Back button & browser popstate navigation handler
   useEffect(() => {
     const backHandle = CapApp.addListener('backButton', () => {
+      if (notificationsDrawerOpenRef.current) {
+        setNotificationsDrawerOpen(false);
+        return;
+      }
+      if (profileDrawerOpenRef.current) {
+        setProfileDrawerOpen(false);
+        return;
+      }
       if (breathingPromptStateRef.current) {
         handleCloseBreathingOverlay();
         return;
@@ -945,9 +1075,85 @@ export function App() {
 
   const activeBottomTab: BottomTab = isSecondaryRoute ? 'explore' : route;
 
+  const handleUpdateDisplayName = useCallback(
+    async (newName: string): Promise<{ ok: boolean; error?: string }> => {
+      const clean = newName.trim().slice(0, 60);
+      if (!clean) {
+        return { ok: false, error: 'Name cannot be empty.' };
+      }
+
+      setLocalPreferredName(clean);
+      saveLocalPreferredName(clean);
+
+      if (authUser) {
+        try {
+          await updateProfile(authUser, { displayName: clean });
+        } catch {
+          // Non-blocking offline
+        }
+        if (isEmailVerified) {
+          try {
+            await upsertUserProfile(authUser, clean);
+            setUserProfile((prev) =>
+              prev ? { ...prev, displayName: clean, preferredName: clean } : prev
+            );
+          } catch {
+            // Keep local name even if offline
+          }
+        }
+      }
+      return { ok: true };
+    },
+    [authUser, isEmailVerified]
+  );
+
+  const handleMarkNotificationRead = useCallback((id: string) => {
+    setInboxNotifications((prev) => {
+      const next = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+      saveNotificationHistory(next);
+      return next;
+    });
+  }, []);
+
+  const handleMarkAllNotificationsRead = useCallback(() => {
+    setInboxNotifications((prev) => {
+      const next = prev.map((n) => ({ ...n, read: true }));
+      saveNotificationHistory(next);
+      return next;
+    });
+  }, []);
+
+  const handleDismissInboxNotification = useCallback((id: string) => {
+    setInboxNotifications((prev) => {
+      const next = prev.filter((n) => n.id !== id);
+      saveNotificationHistory(next);
+      return next;
+    });
+  }, []);
+
+  const handleClearAllInboxNotifications = useCallback(() => {
+    setInboxNotifications([]);
+    saveNotificationHistory([]);
+  }, []);
+
+  const unreadNotificationCount = useMemo(
+    () => inboxNotifications.filter((n) => !n.read).length,
+    [inboxNotifications]
+  );
+
+  const activeDisplayName =
+    localPreferredName ||
+    userProfile?.preferredName ||
+    userProfile?.displayName ||
+    authUser?.displayName ||
+    authUser?.email?.split('@')[0] ||
+    'My World';
+
   const handleSignOut = async () => {
     setVaultKey(null);
     historyRef.current = [];
+    setProfileDrawerOpen(false);
+    setNotificationsDrawerOpen(false);
     soundscapeEngine.stopAll();
     setActiveSoundscapes({
       rain: false,
@@ -964,8 +1170,8 @@ export function App() {
 
   if (!authReady || !ready) {
     return (
-      <div className="min-h-screen bg-[#0F1115] flex items-center justify-center p-6">
-        <p className="font-display text-lg text-[#98A2B3]">Opening My World...</p>
+      <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0F1115] flex items-center justify-center p-6">
+        <p className="font-display text-lg text-[#5B6472] dark:text-[#98A2B3]">Opening My World...</p>
       </div>
     );
   }
@@ -975,7 +1181,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1115] text-[#F1F3F6] flex flex-col">
+    <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex flex-col transition-colors">
       {mapsQuotaExceeded && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
           <span>
@@ -995,18 +1201,35 @@ export function App() {
 
       <div className="flex flex-1 min-h-0">
       {/* Desktop Left Sanctuary Rail */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 border-r border-white/[0.06] bg-[#13161C] p-6 sticky top-0 h-screen justify-between">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 border-r border-slate-900/[0.08] dark:border-white/[0.06] bg-white dark:bg-[#13161C] p-6 sticky top-0 h-screen justify-between transition-colors">
         <div className="space-y-8 overflow-y-auto pr-1">
-          <div>
+          <div className="flex items-start justify-between gap-2">
             <button
               type="button"
               onClick={() => navigateTo('home')}
               className="text-left focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
             >
-              <span className="font-display text-2xl font-medium text-[#F1F3F6] tracking-tight block">
+              <span className="font-display text-2xl font-medium text-[#111827] dark:text-[#F1F3F6] tracking-tight block">
                 My World
               </span>
-              <span className="text-xs text-[#98A2B3]">Local Personal Sanctuary</span>
+              <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
+                Personal Sanctuary
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setNotificationsDrawerOpen(true)}
+              aria-label="Open notifications"
+              title="Notifications"
+              className="relative min-w-[40px] min-h-[40px] rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center shrink-0 transition-colors"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#F2B8A2] text-[#0F1115] text-[10px] font-bold flex items-center justify-center tabular-nums">
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </span>
+              )}
             </button>
           </div>
 
@@ -1021,8 +1244,8 @@ export function App() {
                   onClick={() => navigateTo(tab.id)}
                   className={`w-full min-h-[44px] px-3.5 rounded-2xl flex items-center gap-3 text-sm font-medium transition-colors whitespace-nowrap ${
                     active
-                      ? 'bg-[#9EC5AB]/15 text-[#9EC5AB]'
-                      : 'text-[#98A2B3] hover:text-[#F1F3F6] hover:bg-white/[0.04]'
+                      ? 'bg-[#9EC5AB]/20 text-[#2E6B48] dark:text-[#9EC5AB]'
+                      : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.04]'
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
@@ -1032,8 +1255,8 @@ export function App() {
             })}
           </nav>
 
-          <div className="pt-4 border-t border-white/[0.06]">
-            <p className="text-xs text-[#98A2B3] px-3.5 mb-2">Modules</p>
+          <div className="pt-4 border-t border-slate-900/[0.07] dark:border-white/[0.06]">
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] px-3.5 mb-2">Modules</p>
             <nav className="space-y-1" aria-label="All modules">
               {SECONDARY_LINKS.map((item) => {
                 const Icon = item.icon;
@@ -1045,8 +1268,8 @@ export function App() {
                     onClick={() => navigateTo(item.route)}
                     className={`w-full min-h-[42px] px-3.5 rounded-2xl flex items-center gap-3 text-xs font-medium transition-colors whitespace-nowrap ${
                       active
-                        ? 'bg-white/[0.08] text-[#F1F3F6]'
-                        : 'text-[#98A2B3] hover:text-[#F1F3F6] hover:bg-white/[0.04]'
+                        ? 'bg-slate-900/[0.06] dark:bg-white/[0.08] text-[#111827] dark:text-[#F1F3F6]'
+                        : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.04]'
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
@@ -1058,14 +1281,14 @@ export function App() {
           </div>
         </div>
 
-        <div className="pt-4 border-t border-white/[0.06] space-y-3">
+        <div className="pt-4 border-t border-slate-900/[0.07] dark:border-white/[0.06] space-y-3">
           {activeSoundscapeIds.length > 0 && (
-            <div className="p-3 rounded-2xl bg-[#171A21] border border-white/[0.07] space-y-2">
+            <div className="p-3 rounded-2xl bg-[#F4F6F8] dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => navigateTo('soundscapes')}
-                  className="text-xs font-medium text-[#9BC4E2] truncate hover:underline text-left"
+                  className="text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] truncate hover:underline text-left"
                 >
                   {activeSoundscapeIds
                     .map((id) => SOUNDSCAPE_TRACKS.find((t) => t.id === id)?.title)
@@ -1076,45 +1299,45 @@ export function App() {
                   type="button"
                   onClick={handleStopAllSoundscapes}
                   aria-label="Stop soundscapes"
-                  className="w-8 h-8 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-[#F2B8A2] flex items-center justify-center shrink-0"
+                  className="w-8 h-8 rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] hover:bg-slate-900/[0.1] dark:hover:bg-white/[0.1] text-[#A6482D] dark:text-[#F2B8A2] flex items-center justify-center shrink-0"
                 >
                   <Square className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           )}
-          <div className="rounded-2xl bg-[#171A21] border border-white/[0.07] p-3 flex items-center justify-between gap-2.5">
+
+          {/* Clickable Profile & Settings Trigger Card (Sign Out & Name live inside this side panel) */}
+          <button
+            type="button"
+            onClick={() => setProfileDrawerOpen(true)}
+            aria-label="Open Profile & Settings"
+            className="w-full text-left rounded-2xl bg-[#F4F6F8] dark:bg-[#171A21] hover:bg-[#ECEFF3] dark:hover:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.07] p-3 flex items-center justify-between gap-2.5 transition-colors"
+          >
             <div className="flex items-center gap-2.5 min-w-0">
               {authUser.photoURL ? (
                 <img
                   src={authUser.photoURL}
-                  alt={authUser.displayName || 'Account avatar'}
+                  alt={activeDisplayName}
                   referrerPolicy="no-referrer"
                   className="w-8 h-8 rounded-full object-cover shrink-0"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-[#9EC5AB]/20 text-[#9EC5AB] text-xs font-semibold flex items-center justify-center shrink-0">
-                  {(authUser.displayName || authUser.email || 'M')[0]?.toUpperCase()}
+                <div className="w-8 h-8 rounded-full bg-[#9EC5AB]/25 text-[#2E6B48] dark:text-[#9EC5AB] text-xs font-semibold flex items-center justify-center shrink-0">
+                  {(activeDisplayName || authUser.email || 'M')[0]?.toUpperCase()}
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-xs font-medium text-[#F1F3F6] truncate">
-                  {userProfile?.displayName || authUser.displayName || 'My World'}
+                <p className="text-xs font-medium text-[#111827] dark:text-[#F1F3F6] truncate">
+                  {activeDisplayName}
                 </p>
-                <p className="text-[11px] text-[#98A2B3] truncate">{authUser.email}</p>
+                <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3] truncate">
+                  {authUser.email}
+                </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => void handleSignOut()}
-              aria-label="Sign out"
-              title="Sign out"
-              className="min-w-[36px] min-h-[36px] rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center shrink-0 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-[#98A2B3]">Offline storage · Zero tracking</p>
+            <ChevronRight className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] shrink-0" />
+          </button>
         </div>
       </aside>
 
@@ -1122,12 +1345,12 @@ export function App() {
       <main className="flex-1 min-w-0 pb-24 lg:pb-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
           {/* Mobile Account & Navigation Header (non-sticky) */}
-          <div className="mb-4 lg:hidden flex items-center justify-between gap-3">
+          <div className="mb-4 lg:hidden flex items-center justify-between gap-2">
             {isSecondaryRoute ? (
               <button
                 type="button"
                 onClick={() => navigateTo('explore')}
-                className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#98A2B3] hover:text-[#F1F3F6]"
+                className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Explore Hub
@@ -1136,34 +1359,70 @@ export function App() {
               <button
                 type="button"
                 onClick={() => navigateTo('home')}
-                className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#98A2B3] hover:text-[#F1F3F6]"
+                className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Home
               </button>
             ) : (
-              <span className="text-xs text-[#98A2B3] truncate">
-                {authUser.email}
-              </span>
+              <button
+                type="button"
+                onClick={() => setProfileDrawerOpen(true)}
+                aria-label="Open Profile & Settings"
+                className="min-h-[44px] px-2.5 -ml-2 rounded-2xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] inline-flex items-center gap-2.5 min-w-0 transition-colors"
+              >
+                {authUser.photoURL ? (
+                  <img
+                    src={authUser.photoURL}
+                    alt={activeDisplayName}
+                    referrerPolicy="no-referrer"
+                    className="w-7 h-7 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-[#9EC5AB]/25 text-[#2E6B48] dark:text-[#9EC5AB] text-xs font-semibold flex items-center justify-center shrink-0">
+                    {(activeDisplayName || authUser.email || 'M')[0]?.toUpperCase()}
+                  </div>
+                )}
+                <span className="text-xs font-medium text-[#334155] dark:text-[#D0D5DD] truncate max-w-[200px]">
+                  {authUser.email}
+                </span>
+              </button>
             )}
-            <button
-              type="button"
-              onClick={() => void handleSignOut()}
-              className="min-h-[44px] px-3 rounded-2xl bg-[#171A21] border border-white/[0.07] text-xs font-medium text-[#98A2B3] hover:text-[#F2B8A2] inline-flex items-center gap-1.5 shrink-0"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign Out
-            </button>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setNotificationsDrawerOpen(true)}
+                aria-label="Open notifications"
+                className="relative min-w-[44px] min-h-[44px] rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center transition-colors"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#F2B8A2] text-[#0F1115] text-[10px] font-bold flex items-center justify-center tabular-nums">
+                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setProfileDrawerOpen(true)}
+                aria-label="Open Profile & Settings"
+                className="min-w-[44px] min-h-[44px] rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Email verification notice for newly created Email/Password accounts */}
           {!isEmailVerified && (
-            <div className="mb-5 rounded-2xl bg-[#171A21] border border-[#9BC4E2]/30 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="mb-5 rounded-2xl bg-white dark:bg-[#171A21] border border-[#9BC4E2]/40 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-0.5">
-                <p className="text-xs font-medium text-[#9BC4E2]">
+                <p className="text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2]">
                   Verify your email ({authUser.email}) to sync your cloud profile
                 </p>
-                <p className="text-xs text-[#98A2B3]">
+                <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
                   {emailVerificationSent
                     ? 'Verification email sent. Check your inbox and click the link, then tap I’ve Verified.'
                     : 'Your local sanctuary works right away. Verify your inbox link whenever ready.'}
@@ -1176,7 +1435,7 @@ export function App() {
                     await resendVerificationEmail();
                     setEmailVerificationSent(true);
                   }}
-                  className="min-h-[38px] px-3 rounded-xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-[#F1F3F6] whitespace-nowrap"
+                  className="min-h-[38px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.08] dark:border-white/[0.08] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] whitespace-nowrap"
                 >
                   Resend Link
                 </button>
@@ -1199,11 +1458,11 @@ export function App() {
 
           {/* Mobile Inline Active Soundscapes Bar */}
           {activeSoundscapeIds.length > 0 && route !== 'soundscapes' && (
-            <div className="mb-4 lg:hidden rounded-2xl bg-[#171A21] border border-white/[0.08] px-4 py-2.5 flex items-center justify-between gap-3">
+            <div className="mb-4 lg:hidden rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.08] px-4 py-2.5 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => navigateTo('soundscapes')}
-                className="flex items-center gap-2 text-xs font-medium text-[#9BC4E2] min-w-0 truncate"
+                className="flex items-center gap-2 text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] min-w-0 truncate"
               >
                 <AudioLines className="w-4 h-4 shrink-0" />
                 <span className="truncate">
@@ -1217,7 +1476,7 @@ export function App() {
                 type="button"
                 onClick={handleStopAllSoundscapes}
                 aria-label="Stop soundscapes"
-                className="min-w-[36px] min-h-[36px] rounded-xl bg-white/[0.05] text-[#F2B8A2] flex items-center justify-center shrink-0"
+                className="min-w-[36px] min-h-[36px] rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-[#A6482D] dark:text-[#F2B8A2] flex items-center justify-center shrink-0"
               >
                 <Square className="w-3.5 h-3.5" />
               </button>
@@ -1226,12 +1485,7 @@ export function App() {
 
           {route === 'home' && (
             <HomeView
-              userName={
-                userProfile?.preferredName ||
-                userProfile?.displayName ||
-                authUser.displayName ||
-                undefined
-              }
+              userName={activeDisplayName}
               quotes={quotes}
               tasks={tasks}
               birthdays={birthdays}
@@ -1428,7 +1682,7 @@ export function App() {
       {/* Mobile Fixed 5-Tab Bottom Navigation Bar (<= 15% sticky height cap) */}
       <nav
         aria-label="Bottom Navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#13161C]/90 backdrop-blur-md border-t border-white/[0.08] grid grid-cols-5 items-center px-1"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-white/90 dark:bg-[#13161C]/90 backdrop-blur-md border-t border-slate-900/[0.08] dark:border-white/[0.08] grid grid-cols-5 items-center px-1 transition-colors"
       >
         {PRIMARY_TABS.map((tab) => {
           const Icon = tab.icon;
@@ -1439,7 +1693,9 @@ export function App() {
               type="button"
               onClick={() => navigateTo(tab.id)}
               className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors ${
-                active ? 'text-[#9EC5AB]' : 'text-[#98A2B3] hover:text-[#F1F3F6]'
+                active
+                  ? 'text-[#2E6B48] dark:text-[#9EC5AB]'
+                  : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
               }`}
             >
               <Icon className="w-5 h-5" />
@@ -1450,6 +1706,37 @@ export function App() {
           );
         })}
       </nav>
+
+      {/* Profile & Settings Side Panel */}
+      <ProfileSettingsDrawer
+        open={profileDrawerOpen}
+        onClose={() => setProfileDrawerOpen(false)}
+        authUser={authUser}
+        currentDisplayName={activeDisplayName}
+        isEmailVerified={isEmailVerified}
+        theme={theme}
+        onChangeTheme={setTheme}
+        onUpdateName={handleUpdateDisplayName}
+        defaultNotificationSoundId={defaultNotificationSoundId}
+        customAudioTones={customAudioTones}
+        onChangeDefaultNotificationSound={handleChangeDefaultNotificationSound}
+        unreadNotificationCount={unreadNotificationCount}
+        onOpenNotifications={() => setNotificationsDrawerOpen(true)}
+        onNavigate={navigateTo}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Missed & Recent Notifications Bell Drawer */}
+      <NotificationsDrawer
+        open={notificationsDrawerOpen}
+        onClose={() => setNotificationsDrawerOpen(false)}
+        notifications={inboxNotifications}
+        onMarkRead={handleMarkNotificationRead}
+        onMarkAllRead={handleMarkAllNotificationsRead}
+        onDismissItem={handleDismissInboxNotification}
+        onClearAll={handleClearAllInboxNotifications}
+        onNavigate={navigateTo}
+      />
 
       {/* Active Ringing Alarm Modal */}
       {ringingAlarm && (
@@ -1464,15 +1751,17 @@ export function App() {
       {activeReminderNotice && (
         <div
           role="status"
-          className="fixed bottom-20 lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-[#171A21] border border-[#9EC5AB]/40 p-4 shadow-xl flex items-start justify-between gap-3"
+          className="fixed bottom-20 lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/50 p-4 shadow-xl flex items-start justify-between gap-3"
         >
           <div className="min-w-0">
-            <p className="text-xs text-[#9EC5AB] font-medium">Scheduled Reminder</p>
-            <p className="text-sm font-medium text-[#F1F3F6] mt-0.5 truncate">
+            <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB] font-medium">
+              Scheduled Reminder
+            </p>
+            <p className="text-sm font-medium text-[#111827] dark:text-[#F1F3F6] mt-0.5 truncate">
               {activeReminderNotice.title}
             </p>
             {activeReminderNotice.notes && (
-              <p className="text-xs text-[#98A2B3] mt-1 line-clamp-2">
+              <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 line-clamp-2">
                 {activeReminderNotice.notes}
               </p>
             )}
@@ -1480,7 +1769,7 @@ export function App() {
           <button
             type="button"
             onClick={() => setActiveReminderNotice(null)}
-            className="min-h-[36px] px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-xs font-medium text-[#F1F3F6] shrink-0"
+            className="min-h-[36px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-white/[0.06] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.1] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] shrink-0"
           >
             Dismiss
           </button>

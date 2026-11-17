@@ -239,3 +239,22 @@ export interface SecuritySettings {
   autoLockOnBackground: boolean;
   updatedAt: string;
 }
+
+export type AppTheme = 'dark' | 'light';
+
+export type AppNotificationKind = 'alarm' | 'reminder' | 'calm' | 'birthday';
+
+export type AppNotificationStatus = 'missed' | 'delivered';
+
+export interface AppNotificationItem {
+  id: string;
+  dedupeKey: string;
+  kind: AppNotificationKind;
+  status: AppNotificationStatus;
+  title: string;
+  body: string;
+  scheduledAt: string;
+  createdAt: string;
+  read: boolean;
+  route: AppRoute;
+}

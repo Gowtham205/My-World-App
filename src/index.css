@@ -1,24 +1,39 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
-    --bg-canvas: #0f1115;
-    --bg-surface: #171a21;
-    --bg-surface-elevated: #1d212a;
-    --border-hairline: rgba(255, 255, 255, 0.07);
-    --text-primary: #f1f3f6;
-    --text-muted: #98a2b3;
+    --bg-canvas: #f4f6f8;
+    --bg-chrome: #ffffff;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #eceff3;
+    --border-hairline: rgba(15, 23, 42, 0.09);
+    --text-primary: #111827;
+    --text-secondary: #334155;
+    --text-muted: #5b6472;
     --pastel-sage: #9ec5ab;
     --pastel-lavender: #beb4dc;
     --pastel-peach: #f2b8a2;
     --pastel-sky: #9bc4e2;
+    color-scheme: light;
+  }
+
+  .dark {
+    --bg-canvas: #0f1115;
+    --bg-chrome: #13161c;
+    --bg-surface: #171a21;
+    --bg-surface-elevated: #1d212a;
+    --border-hairline: rgba(255, 255, 255, 0.07);
+    --text-primary: #f1f3f6;
+    --text-secondary: #d0d5dd;
+    --text-muted: #98a2b3;
+    color-scheme: dark;
   }
 
   html {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--bg-canvas);
     color: var(--text-primary);
-    color-scheme: dark;
   }
 
   body {
@@ -54,11 +69,19 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.16);
   border-radius: 9999px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.22);
 }
 

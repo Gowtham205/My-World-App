@@ -1,5 +1,7 @@
 import type {
   AlarmItem,
+  AppNotificationItem,
+  AppTheme,
   BirthdayEntry,
   CalendarEventItem,
   CreativeIdeaCard,
@@ -509,6 +511,78 @@ export function setDefaultNotificationSoundId(soundId: string): void {
   }
 }
 
+const THEME_STORAGE_KEY = 'my_world_theme_v1';
+
+export function getSavedTheme(): AppTheme {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+export function saveTheme(theme: AppTheme): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
+const LOCAL_PREFERRED_NAME_KEY = 'my_world_preferred_name_v1';
+
+export function getLocalPreferredName(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return localStorage.getItem(LOCAL_PREFERRED_NAME_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function saveLocalPreferredName(name: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const clean = name.trim().slice(0, 60);
+    if (clean) {
+      localStorage.setItem(LOCAL_PREFERRED_NAME_KEY, clean);
+    } else {
+      localStorage.removeItem(LOCAL_PREFERRED_NAME_KEY);
+    }
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
+const NOTIFICATION_INBOX_KEY = 'my_world_notification_inbox_v1';
+const MAX_NOTIFICATION_INBOX = 80;
+
+export function getNotificationHistory(): AppNotificationItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_INBOX_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as AppNotificationItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveNotificationHistory(items: AppNotificationItem[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(
+      NOTIFICATION_INBOX_KEY,
+      JSON.stringify(items.slice(0, MAX_NOTIFICATION_INBOX))
+    );
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
 export type {
   PersonalNote,
   EncryptedVaultRecord,
@@ -523,4 +597,6 @@ export type {
   EventCalmSession,
   SecuritySettings,
   CustomAudioTone,
+  AppTheme,
+  AppNotificationItem,
 };
