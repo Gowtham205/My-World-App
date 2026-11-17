@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App as CapApp } from '@capacitor/app';
 import {
   AlarmClock,
   ArrowLeft,
@@ -39,19 +40,35 @@ import type {
   MotivationalQuote,
   PersonalNote,
   PrivateMediaItem,
+  SecuritySettings,
   TaskReminderItem,
+  VaultSecretPayload,
 } from './types/sanctuary';
 import {
   deleteFromStore,
   getAllFromStore,
   getCalmMinutesByDate,
   getDefaultNotificationSoundId,
+  getSetting,
   putInStore,
   recordCalmMinutes,
   seedInitialSanctuaryDataIfNeeded,
   setDefaultNotificationSoundId as persistDefaultNotificationSoundId,
 } from './lib/storage';
+import {
+  decryptPayload,
+  deriveVaultKey,
+  encryptPayload,
+  generateSalt,
+  hashPin,
+} from './lib/crypto';
 import { getTodayStr } from './lib/dateUtils';
+import {
+  attachNotificationTapListener,
+  ensureNotificationSetup,
+  sendSystemNotification,
+  syncScheduledNativeNotifications,
+} from './lib/notifications';
 import {
   playNotificationSound,
   startAlarmRinging,
@@ -163,6 +180,11 @@ export function App() {
   // In-memory cryptographic key (cleared immediately on background/visibility hidden)
   const [vaultKey, setVaultKey] = useState<CryptoKey | null>(null);
 
+  // Navigation history stack so Back on Android returns cleanly to prior screen / Home
+  const historyRef = useRef<AppRoute[]>([]);
+  const routeRef = useRef<AppRoute>(route);
+  routeRef.current = route;
+
   // Active overlays (Alarms, Reminder Notification Toast, & Event Calm Check-In)
   const [ringingAlarm, setRingingAlarm] = useState<AlarmItem | null>(null);
   const [activeReminderNotice, setActiveReminderNotice] = useState<TaskReminderItem | null>(null);
@@ -174,6 +196,51 @@ export function App() {
   const [calmMinutesByDate, setCalmMinutesByDate] = useState<Record<string, number>>(() =>
     getCalmMinutesByDate()
   );
+
+  const ringingAlarmRef = useRef(ringingAlarm);
+  ringingAlarmRef.current = ringingAlarm;
+  const activeReminderNoticeRef = useRef(activeReminderNotice);
+  activeReminderNoticeRef.current = activeReminderNotice;
+  const breathingPromptStateRef = useRef(breathingPromptState);
+  breathingPromptStateRef.current = breathingPromptState;
+
+  const navigateTo = useCallback(
+    (nextRoute: AppRoute, options?: { pushHistory?: boolean }) => {
+      const prevRoute = routeRef.current;
+
+      // Immediately lock Vault & Private Gallery whenever leaving them
+      if ((prevRoute === 'vault' || prevRoute === 'gallery') && nextRoute !== prevRoute) {
+        setVaultKey(null);
+      }
+
+      if (prevRoute === nextRoute) return;
+
+      if (options?.pushHistory !== false) {
+        const stack = historyRef.current;
+        if (stack[stack.length - 1] !== prevRoute) {
+          stack.push(prevRoute);
+          if (stack.length > 30) stack.shift();
+        }
+        try {
+          window.history.pushState({ route: nextRoute }, '');
+        } catch {
+          // ignore history errors inside sandboxed environments
+        }
+      }
+
+      routeRef.current = nextRoute;
+      setRoute(nextRoute);
+      window.scrollTo({ top: 0 });
+    },
+    []
+  );
+
+  // Enforce relock whenever current route is neither vault nor gallery
+  useEffect(() => {
+    if (route !== 'vault' && route !== 'gallery') {
+      setVaultKey(null);
+    }
+  }, [route]);
 
   // Persistent Soundscapes state (lives at App level so audio continues across views)
   const [activeSoundscapes, setActiveSoundscapes] = useState<Record<SoundscapeId, boolean>>({
@@ -290,11 +357,36 @@ export function App() {
 
     document.addEventListener('visibilitychange', lockSensitiveAreas);
     window.addEventListener('pagehide', handlePageHide);
+
+    const appStateHandle = CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive) {
+        setVaultKey(null);
+      }
+    }).catch(() => null);
+
     return () => {
       document.removeEventListener('visibilitychange', lockSensitiveAreas);
       window.removeEventListener('pagehide', handlePageHide);
+      void appStateHandle.then((h) => h?.remove());
     };
   }, []);
+
+  // Setup Android notification channels, tap routing, & scheduled local notifications
+  useEffect(() => {
+    if (!ready || !authUser) return;
+    void ensureNotificationSetup();
+    const detach = attachNotificationTapListener((targetRoute) => {
+      navigateTo(targetRoute);
+    });
+    return () => {
+      detach();
+    };
+  }, [ready, authUser, navigateTo]);
+
+  useEffect(() => {
+    if (!ready || !authUser) return;
+    void syncScheduledNativeNotifications({ alarms, tasks, eventSessions });
+  }, [ready, authUser, alarms, tasks, eventSessions]);
 
   // Soundscapes sleep/focus timer countdown
   useEffect(() => {
@@ -368,11 +460,13 @@ export function App() {
           : undefined;
         startAlarmRinging(matchedTone, alarm.soundId);
 
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(alarm.linkedReminderTitle || alarm.label, {
-            body: alarm.linkedReminderNotes || `Alarm for ${currentHHMM}`,
-          });
-        }
+        void sendSystemNotification({
+          key: `alarm-${alarm.id}-${minuteKey}`,
+          title: alarm.linkedReminderTitle || alarm.label,
+          body: alarm.linkedReminderNotes || `Alarm for ${currentHHMM}`,
+          channel: 'alarm',
+          route: 'alarms',
+        });
         break;
       }
 
@@ -395,11 +489,13 @@ export function App() {
         );
         setActiveReminderNotice(updatedTask);
 
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(task.title, {
-            body: task.notes || `Scheduled reminder at ${currentHHMM}`,
-          });
-        }
+        void sendSystemNotification({
+          key: `task-${task.id}-${minuteKey}`,
+          title: task.title,
+          body: task.notes || `Scheduled reminder at ${currentHHMM}`,
+          channel: 'reminder',
+          route: 'tasks',
+        });
         break;
       }
 
@@ -440,6 +536,14 @@ export function App() {
             session: updatedSession,
             prompt,
             startedAtMs: Date.now(),
+          });
+
+          void sendSystemNotification({
+            key: `calm-${updatedSession.id}-${minuteKey}`,
+            title: `${updatedSession.eventName} · Event Calm`,
+            body: prompt,
+            channel: 'calm',
+            route: 'event-calm',
           });
         }
       }
@@ -639,10 +743,132 @@ export function App() {
     setRingingAlarm(null);
   };
 
-  const handleDismissAlarm = () => {
+  const handleDismissAlarm = useCallback(() => {
     stopAlarmRinging();
     setRingingAlarm(null);
-  };
+  }, []);
+
+  const handleCloseBreathingOverlay = useCallback(() => {
+    const active = breathingPromptStateRef.current;
+    if (!active) return;
+    const elapsedMinutes = Math.max(
+      1,
+      Math.round((Date.now() - active.startedAtMs) / 60000)
+    );
+    const updated = recordCalmMinutes(getTodayStr(), elapsedMinutes);
+    setCalmMinutesByDate(updated);
+    setBreathingPromptState(null);
+  }, []);
+
+  // Android hardware Back button & browser popstate navigation handler
+  useEffect(() => {
+    const backHandle = CapApp.addListener('backButton', () => {
+      if (breathingPromptStateRef.current) {
+        handleCloseBreathingOverlay();
+        return;
+      }
+      if (activeReminderNoticeRef.current) {
+        setActiveReminderNotice(null);
+        return;
+      }
+      if (ringingAlarmRef.current) {
+        handleDismissAlarm();
+        return;
+      }
+
+      if (historyRef.current.length > 0) {
+        const previousRoute = historyRef.current.pop()!;
+        navigateTo(previousRoute, { pushHistory: false });
+        return;
+      }
+
+      const curr = routeRef.current;
+      if (curr !== 'home') {
+        const currIsSecondary =
+          curr !== 'tasks' && curr !== 'calendar' && curr !== 'alarms' && curr !== 'explore';
+        navigateTo(currIsSecondary ? 'explore' : 'home', { pushHistory: false });
+        return;
+      }
+
+      void CapApp.minimizeApp();
+    }).catch(() => null);
+
+    const handlePopState = () => {
+      if (historyRef.current.length > 0) {
+        const previousRoute = historyRef.current.pop()!;
+        navigateTo(previousRoute, { pushHistory: false });
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      void backHandle.then((h) => h?.remove());
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [handleCloseBreathingOverlay, handleDismissAlarm, navigateTo]);
+
+  // Master PIN Update (re-encrypts existing Vault secrets with the new PIN) & Reset handler
+  const handleChangeMasterPin = useCallback(
+    async (currentPin: string, newPin: string): Promise<{ ok: boolean; error?: string }> => {
+      const saved = await getSetting<SecuritySettings>('security');
+      if (!saved) {
+        return { ok: false, error: 'Security lock is not configured yet.' };
+      }
+      if (!/^\d{4,6}$/.test(newPin)) {
+        return { ok: false, error: 'New PIN must be 4 to 6 digits.' };
+      }
+
+      const currentHash = await hashPin(currentPin, saved.pinSalt);
+      if (currentHash !== saved.pinHash) {
+        return { ok: false, error: 'Current Master PIN is incorrect.' };
+      }
+
+      try {
+        const oldKey = await deriveVaultKey(currentPin, saved.pinSalt);
+        const newSalt = generateSalt();
+        const newPinHash = await hashPin(newPin, newSalt);
+        const newKey = await deriveVaultKey(newPin, newSalt);
+
+        const reencryptedRecords: EncryptedVaultRecord[] = [];
+        for (const rec of vaultRecords) {
+          const payload = await decryptPayload<VaultSecretPayload>(
+            rec.iv,
+            rec.ciphertext,
+            oldKey
+          );
+          const { iv, ciphertext } = await encryptPayload(payload, newKey);
+          const updatedRec: EncryptedVaultRecord = {
+            ...rec,
+            iv,
+            ciphertext,
+            updatedAt: new Date().toISOString(),
+          };
+          await putInStore('vault', updatedRec);
+          reencryptedRecords.push(updatedRec);
+        }
+
+        const updatedSettings: SecuritySettings = {
+          ...saved,
+          pinHash: newPinHash,
+          pinSalt: newSalt,
+          updatedAt: new Date().toISOString(),
+        };
+        await putInStore('settings', updatedSettings);
+
+        setVaultRecords(reencryptedRecords);
+        setVaultKey(newKey);
+        return { ok: true };
+      } catch {
+        return { ok: false, error: 'Failed to update Master PIN. Try again.' };
+      }
+    },
+    [vaultRecords]
+  );
+
+  const handleResetVaultLock = useCallback(async () => {
+    setVaultKey(null);
+    setVaultRecords([]);
+  }, []);
 
   const handleToggleSoundscape = (id: SoundscapeId) => {
     const currentlyActive = activeSoundscapes[id];
@@ -721,6 +947,7 @@ export function App() {
 
   const handleSignOut = async () => {
     setVaultKey(null);
+    historyRef.current = [];
     soundscapeEngine.stopAll();
     setActiveSoundscapes({
       rain: false,
@@ -732,7 +959,7 @@ export function App() {
     });
     setSoundTimerRemainingSec(null);
     await signOutSanctuary();
-    setRoute('home');
+    navigateTo('home', { pushHistory: false });
   };
 
   if (!authReady || !ready) {
@@ -773,7 +1000,7 @@ export function App() {
           <div>
             <button
               type="button"
-              onClick={() => setRoute('home')}
+              onClick={() => navigateTo('home')}
               className="text-left focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
             >
               <span className="font-display text-2xl font-medium text-[#F1F3F6] tracking-tight block">
@@ -791,7 +1018,7 @@ export function App() {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setRoute(tab.id)}
+                  onClick={() => navigateTo(tab.id)}
                   className={`w-full min-h-[44px] px-3.5 rounded-2xl flex items-center gap-3 text-sm font-medium transition-colors whitespace-nowrap ${
                     active
                       ? 'bg-[#9EC5AB]/15 text-[#9EC5AB]'
@@ -815,7 +1042,7 @@ export function App() {
                   <button
                     key={item.route}
                     type="button"
-                    onClick={() => setRoute(item.route)}
+                    onClick={() => navigateTo(item.route)}
                     className={`w-full min-h-[42px] px-3.5 rounded-2xl flex items-center gap-3 text-xs font-medium transition-colors whitespace-nowrap ${
                       active
                         ? 'bg-white/[0.08] text-[#F1F3F6]'
@@ -837,7 +1064,7 @@ export function App() {
               <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => setRoute('soundscapes')}
+                  onClick={() => navigateTo('soundscapes')}
                   className="text-xs font-medium text-[#9BC4E2] truncate hover:underline text-left"
                 >
                   {activeSoundscapeIds
@@ -899,11 +1126,20 @@ export function App() {
             {isSecondaryRoute ? (
               <button
                 type="button"
-                onClick={() => setRoute('explore')}
+                onClick={() => navigateTo('explore')}
                 className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#98A2B3] hover:text-[#F1F3F6]"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Explore Hub
+              </button>
+            ) : route !== 'home' ? (
+              <button
+                type="button"
+                onClick={() => navigateTo('home')}
+                className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#98A2B3] hover:text-[#F1F3F6]"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Home
               </button>
             ) : (
               <span className="text-xs text-[#98A2B3] truncate">
@@ -966,7 +1202,7 @@ export function App() {
             <div className="mb-4 lg:hidden rounded-2xl bg-[#171A21] border border-white/[0.08] px-4 py-2.5 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => setRoute('soundscapes')}
+                onClick={() => navigateTo('soundscapes')}
                 className="flex items-center gap-2 text-xs font-medium text-[#9BC4E2] min-w-0 truncate"
               >
                 <AudioLines className="w-4 h-4 shrink-0" />
@@ -1001,7 +1237,7 @@ export function App() {
               birthdays={birthdays}
               eventSessions={eventSessions}
               activeEventSession={activeEventSession}
-              onNavigate={setRoute}
+              onNavigate={navigateTo}
               onShuffleQuote={handleShuffleHomeQuote}
               onToggleTask={async (id) => {
                 const target = tasks.find((t) => t.id === id);
@@ -1032,7 +1268,7 @@ export function App() {
                 events: eventSessions.length,
                 activeSoundscapes: activeSoundscapeIds.length,
               }}
-              onNavigate={setRoute}
+              onNavigate={navigateTo}
             />
           )}
 
@@ -1048,6 +1284,8 @@ export function App() {
               onLock={() => setVaultKey(null)}
               onSaveEncrypted={saveVaultRecord}
               onDeleteEncrypted={deleteVaultRecord}
+              onChangeMasterPin={handleChangeMasterPin}
+              onResetVault={handleResetVaultLock}
             />
           )}
 
@@ -1058,6 +1296,7 @@ export function App() {
           {route === 'tasks' && (
             <TasksView
               tasks={tasks}
+              alarms={alarms}
               customAudioTones={customAudioTones}
               defaultNotificationSoundId={defaultNotificationSoundId}
               onSaveTask={saveTask}
@@ -1085,6 +1324,8 @@ export function App() {
               onSaveAlbum={saveAlbum}
               onSaveMedia={saveMedia}
               onDeleteMedia={deleteMedia}
+              onChangeMasterPin={handleChangeMasterPin}
+              onResetVault={handleResetVaultLock}
             />
           )}
 
@@ -1130,7 +1371,7 @@ export function App() {
               onOpenBreathing={handleOpenBreathing}
               onOpenOnMap={(venue) => {
                 setMapsInitialQuery(venue);
-                setRoute('maps');
+                navigateTo('maps');
               }}
             />
           )}
@@ -1168,8 +1409,8 @@ export function App() {
               initialDestinationQuery={mapsInitialQuery}
               onSaveEventSession={saveEventSession}
               onSaveCalendarEvent={saveCalendarEvent}
-              onNavigateToEventCalm={() => setRoute('event-calm')}
-              onNavigateToCalendar={() => setRoute('calendar')}
+              onNavigateToEventCalm={() => navigateTo('event-calm')}
+              onNavigateToCalendar={() => navigateTo('calendar')}
             />
           )}
 
@@ -1196,7 +1437,7 @@ export function App() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setRoute(tab.id)}
+              onClick={() => navigateTo(tab.id)}
               className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors ${
                 active ? 'text-[#9EC5AB]' : 'text-[#98A2B3] hover:text-[#F1F3F6]'
               }`}
@@ -1253,15 +1494,7 @@ export function App() {
           promptMessage={breathingPromptState.prompt}
           customAudioTones={customAudioTones}
           notificationSoundId={defaultNotificationSoundId}
-          onClose={() => {
-            const elapsedMinutes = Math.max(
-              1,
-              Math.round((Date.now() - breathingPromptState.startedAtMs) / 60000)
-            );
-            const updated = recordCalmMinutes(getTodayStr(), elapsedMinutes);
-            setCalmMinutesByDate(updated);
-            setBreathingPromptState(null);
-          }}
+          onClose={handleCloseBreathingOverlay}
         />
       )}
     </div>

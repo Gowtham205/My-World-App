@@ -42,15 +42,16 @@ VITE_API_BASE_URL=https://my-world-appify.ai.studio
 
 1. **Install dependencies:**
    ```bash
-   npm install
+   npm install --legacy-peer-deps
    ```
+   *(If you pull updates that add Capacitor plugins such as `@capacitor/app`, `@capacitor/local-notifications`, or `@capacitor/share`, always re-run `npm install --legacy-peer-deps` and `npm run cap:sync` before rebuilding in Android Studio.)*
 
 2. **Build the web bundle and sync into Android:**
    *(If `android/` does not exist yet, run `npm run cap:add-android` first.)*
    ```bash
    npm run cap:sync
    ```
-   *(Every time you edit `.env` or frontend files, re-run `npm run cap:sync` so `dist/` is rebuilt and copied into `android/app/src/main/assets/public`.)*
+   *(Every time you edit `.env`, Capacitor plugins, or frontend files, re-run `npm run cap:sync` so `dist/` and native plugins are rebuilt and synced into `android/`.)*
 
 3. **Open the `android/` subfolder in Android Studio:**
    ```bash
@@ -82,13 +83,15 @@ VITE_API_BASE_URL=https://my-world-appify.ai.studio
 ## 4. Pre-Configured Android Permissions & Behavior
 `android/app/src/main/AndroidManifest.xml` already includes:
 - `INTERNET` (Firebase Auth, Gemini backend calls, Google Maps)
+- `POST_NOTIFICATIONS`, `VIBRATE`, `SCHEDULE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED` (Android status bar & notification drawer pop-ups for Alarms, Smart Reminders, and Event Calm check-ins)
 - `RECORD_AUDIO` & `MODIFY_AUDIO_SETTINGS` (Live Voice Sanctuary & Audio Transcription)
 - `ACCESS_COARSE_LOCATION` & `ACCESS_FINE_LOCATION` (Sanctuary Maps near-me & navigation)
 - `WAKE_LOCK` (Audio / Soundscapes stability)
 
-### Custom Audio & Alarms on Mobile
+### Custom Audio, Notifications & Navigation on Mobile
+- **Android System Notifications:** Smart Reminders, Alarms, and Event Calm check-ins post native Android status bar & heads-up drawer notifications (including custom notification channels) even when the app is minimized on your home screen. Grant notification permission when prompted on first launch (Android 13+).
+- **Android Back Button & Security Auto-Lock:** Pressing Android's hardware/gesture Back returns cleanly to the previous view or Home instead of closing the app prematurely. Leaving **Secrets Vault** or **Private Gallery** (to Explore Hub or another screen) immediately re-locks them until unlocked with your Master PIN again.
 - **Custom Ringtones & Sounds:** Audio files uploaded in **Alarms** or **Tasks & Reminders** (`MP3`, `WAV`, `M4A`, `OGG`, `AAC`, `FLAC`, up to 25 MB) are saved locally in IndexedDB inside the app.
-- **Background Alarm Note:** Because this Capacitor build runs timers inside Android WebView, alarms and scheduled reminder sounds fire reliably while the app is open/active; Android OS battery optimization may pause WebView timers if the app is swiped away or asleep.
 
 ### Privacy & Data Storage Summary
 - **Stays 100% Local on Your Phone:** Vault secrets (AES-256 encrypted), Private Gallery photos/videos, Personal Notes, Tasks, Birthdays, Calendar, Alarms, Custom Audio files, Soundscapes, and Analytics live strictly in local IndexedDB / `localStorage` and are never uploaded to Firestore.

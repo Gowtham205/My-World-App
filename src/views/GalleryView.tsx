@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FolderPlus, Image as ImageIcon, Lock, Plus, Trash2, Video, X } from 'lucide-react';
+import {
+  FolderPlus,
+  Image as ImageIcon,
+  KeyRound,
+  Lock,
+  Plus,
+  Trash2,
+  Video,
+  X,
+} from 'lucide-react';
 import type { MediaAlbum, PrivateMediaItem } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { SecurityGate } from '../components/SecurityGate';
@@ -13,6 +22,8 @@ interface GalleryViewProps {
   onSaveAlbum: (album: MediaAlbum) => Promise<void>;
   onSaveMedia: (item: PrivateMediaItem) => Promise<void>;
   onDeleteMedia: (id: string) => Promise<void>;
+  onChangeMasterPin: (currentPin: string, newPin: string) => Promise<{ ok: boolean; error?: string }>;
+  onResetVault: () => Promise<void>;
 }
 
 export const GalleryView: React.FC<GalleryViewProps> = ({
@@ -24,12 +35,24 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onSaveAlbum,
   onSaveMedia,
   onDeleteMedia,
+  onChangeMasterPin,
+  onResetVault,
 }) => {
   const [activeAlbumId, setActiveAlbumId] = useState<string>('all');
   const [showNewAlbum, setShowNewAlbum] = useState(false);
   const [albumName, setAlbumName] = useState('');
   const [viewerItem, setViewerItem] = useState<PrivateMediaItem | null>(null);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<PrivateMediaItem | null>(null);
   const [objectUrls, setObjectUrls] = useState<Record<string, string>>({});
+
+  // Update PIN state
+  const [showPinUpdate, setShowPinUpdate] = useState(false);
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmNewPin, setConfirmNewPin] = useState('');
+  const [pinUpdateError, setPinUpdateError] = useState('');
+  const [pinUpdateSuccess, setPinUpdateSuccess] = useState('');
+  const [pinBusy, setPinBusy] = useState(false);
 
   useEffect(() => {
     const urls: Record<string, string> = {};
@@ -56,9 +79,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     return (
       <SecurityGate
         areaTitle="Private Media Gallery"
-        areaSubtitle="Hidden from public gallery views. Authenticate with Fingerprint or Master PIN to view private folders."
+        areaSubtitle="Enter your Master PIN or device biometrics to view your private folders."
         accentColor="sky"
         onUnlock={onUnlock}
+        onResetVault={onResetVault}
       />
     );
   }
@@ -105,20 +129,72 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     setActiveAlbumId(id);
   };
 
+  const handlePinChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinUpdateError('');
+    setPinUpdateSuccess('');
+
+    if (!/^\d{4,6}$/.test(newPin)) {
+      setPinUpdateError('New PIN must be 4 to 6 digits.');
+      return;
+    }
+    if (newPin !== confirmNewPin) {
+      setPinUpdateError('New PIN and confirmation do not match.');
+      return;
+    }
+
+    setPinBusy(true);
+    const result = await onChangeMasterPin(currentPin, newPin);
+    setPinBusy(false);
+
+    if (!result.ok) {
+      setPinUpdateError(result.error || 'Could not update PIN.');
+      return;
+    }
+
+    setCurrentPin('');
+    setNewPin('');
+    setConfirmNewPin('');
+    setShowPinUpdate(false);
+    setPinUpdateSuccess('Master Lock PIN updated.');
+    setTimeout(() => setPinUpdateSuccess(''), 3500);
+  };
+
+  const confirmDeleteMedia = async () => {
+    if (!pendingDeleteItem) return;
+    const idToDelete = pendingDeleteItem.id;
+    setPendingDeleteItem(null);
+    if (viewerItem?.id === idToDelete) {
+      setViewerItem(null);
+    }
+    await onDeleteMedia(idToDelete);
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#9BC4E2]">Private Internal Media Storage</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6]">
             Private Gallery
           </h1>
           <p className="text-xs text-[#98A2B3] mt-1">
-            Stored inside private IndexedDB blobs · Auto-locks when minimized.
+            Stored privately inside your device · Auto-locks whenever you leave or minimize.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowPinUpdate((v) => !v);
+              setPinUpdateError('');
+              setShowNewAlbum(false);
+            }}
+            className="min-h-[44px] px-4 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#9BC4E2] flex items-center gap-2 whitespace-nowrap"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            Update PIN
+          </button>
           <button
             type="button"
             onClick={onLock}
@@ -129,7 +205,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setShowNewAlbum((v) => !v)}
+            onClick={() => {
+              setShowNewAlbum((v) => !v);
+              setShowPinUpdate(false);
+            }}
             className="min-h-[44px] px-4 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#F1F3F6] flex items-center gap-2 whitespace-nowrap"
           >
             <FolderPlus className="w-4 h-4 text-[#9BC4E2]" />
@@ -148,6 +227,82 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           </label>
         </div>
       </header>
+
+      {pinUpdateSuccess && (
+        <p className="text-xs text-[#9EC5AB]" role="status">
+          {pinUpdateSuccess}
+        </p>
+      )}
+
+      {showPinUpdate && (
+        <form
+          onSubmit={handlePinChangeSubmit}
+          className="rounded-3xl bg-[#171A21] border border-[#9BC4E2]/30 p-5 sm:p-6 space-y-4"
+        >
+          <div>
+            <h2 className="text-base font-semibold text-[#F1F3F6]">Update Master Lock PIN</h2>
+            <p className="text-xs text-[#98A2B3] mt-0.5">
+              Applies to both Private Gallery and Secrets & Passwords.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={currentPin}
+              onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Current PIN"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="New PIN (4–6 digits)"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={confirmNewPin}
+              onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Confirm new PIN"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+            />
+          </div>
+          {pinUpdateError && (
+            <p className="text-xs text-[#F2B8A2]" role="alert">
+              {pinUpdateError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setShowPinUpdate(false);
+                setPinUpdateError('');
+              }}
+              className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pinBusy}
+              className="min-h-[44px] px-5 rounded-2xl bg-[#9BC4E2] text-[#0F1115] text-sm font-semibold disabled:opacity-50"
+            >
+              {pinBusy ? 'Updating...' : 'Save New PIN'}
+            </button>
+          </div>
+        </form>
+      )}
 
       {showNewAlbum && (
         <form
@@ -206,7 +361,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           <ImageIcon className="w-8 h-8 text-[#9BC4E2] mx-auto opacity-70" />
           <p className="text-sm text-[#D0D5DD]">No private photos or videos in this folder yet.</p>
           <p className="text-xs text-[#98A2B3]">
-            Tap “Import Media” to copy files into your encrypted app sandbox.
+            Tap “Import Media” to copy files into your private app folder.
           </p>
         </div>
       ) : (
@@ -241,9 +396,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onDeleteMedia(item.id)}
+                  onClick={() => setPendingDeleteItem(item)}
                   aria-label={`Delete ${item.name}`}
-                  className="absolute top-2.5 right-2.5 w-9 h-9 rounded-full bg-[#0F1115]/80 text-[#F1F3F6] hover:text-[#F2B8A2] flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                  className="absolute top-2.5 right-2.5 w-10 h-10 rounded-full bg-[#0F1115]/80 text-[#F1F3F6] hover:text-[#F2B8A2] flex items-center justify-center opacity-95 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -260,16 +415,26 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-4xl flex items-center justify-between mb-4">
+          <div className="w-full max-w-4xl flex items-center justify-between mb-4 gap-3">
             <p className="text-sm text-[#F1F3F6] truncate">{viewerItem.name}</p>
-            <button
-              type="button"
-              onClick={() => setViewerItem(null)}
-              aria-label="Close viewer"
-              className="w-11 h-11 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-[#F1F3F6]"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteItem(viewerItem)}
+                aria-label={`Delete ${viewerItem.name}`}
+                className="w-11 h-11 rounded-full bg-white/[0.06] hover:bg-[#F2B8A2]/20 flex items-center justify-center text-[#F2B8A2]"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewerItem(null)}
+                aria-label="Close viewer"
+                className="w-11 h-11 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-[#F1F3F6]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           <div className="max-h-[78vh] w-full max-w-4xl flex items-center justify-center">
             {viewerItem.kind === 'video' ? (
@@ -287,6 +452,61 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 className="max-h-[75vh] max-w-full object-contain rounded-2xl"
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {pendingDeleteItem && (
+        <div
+          className="fixed inset-0 z-[60] bg-[#0F1115]/85 backdrop-blur-sm flex items-center justify-center p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm media deletion"
+        >
+          <div className="max-w-sm w-full rounded-3xl bg-[#171A21] border border-white/[0.1] p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              {pendingDeleteItem.kind === 'image' && objectUrls[pendingDeleteItem.id] ? (
+                <img
+                  src={objectUrls[pendingDeleteItem.id]}
+                  alt={pendingDeleteItem.name}
+                  referrerPolicy="no-referrer"
+                  className="w-12 h-12 rounded-2xl object-cover shrink-0 border border-white/[0.08]"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-[#1D212A] flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-[#F2B8A2]" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-[#F1F3F6]">
+                  Delete from Private Gallery?
+                </h2>
+                <p className="text-xs text-[#98A2B3] truncate mt-0.5">{pendingDeleteItem.name}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#D0D5DD] leading-relaxed">
+              This private {pendingDeleteItem.kind} will be permanently removed from your app
+              storage.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteItem(null)}
+                className="min-h-[44px] px-4 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] text-sm font-medium text-[#D0D5DD]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDeleteMedia()}
+                className="min-h-[44px] px-5 rounded-2xl bg-[#F2B8A2] hover:bg-[#E7A890] text-[#0F1115] text-sm font-semibold"
+              >
+                Delete Permanently
+              </button>
+            </div>
           </div>
         </div>
       )}

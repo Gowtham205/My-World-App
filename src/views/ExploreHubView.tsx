@@ -234,8 +234,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#9EC5AB]">Sanctuary Directory</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6]">
             Explore Your World
           </h1>
           <p className="text-sm text-[#98A2B3] mt-1">

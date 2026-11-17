@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Fingerprint, Lock, ShieldCheck, KeyRound, Delete } from 'lucide-react';
+import { Fingerprint, Lock, ShieldCheck, KeyRound, Delete, RotateCcw } from 'lucide-react';
 import {
   deriveVaultKey,
   enrollDeviceBiometric,
@@ -8,7 +8,7 @@ import {
   isPlatformBiometricAvailable,
   verifyDeviceBiometric,
 } from '../lib/crypto';
-import { getSetting, putInStore } from '../lib/storage';
+import { clearStore, deleteFromStore, getSetting, putInStore } from '../lib/storage';
 import type { SecuritySettings } from '../types/sanctuary';
 
 interface SecurityGateProps {
@@ -16,6 +16,7 @@ interface SecurityGateProps {
   areaSubtitle: string;
   accentColor?: 'lavender' | 'sky';
   onUnlock: (derivedKey: CryptoKey) => void;
+  onResetVault?: () => Promise<void> | void;
 }
 
 export const SecurityGate: React.FC<SecurityGateProps> = ({
@@ -23,6 +24,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
   areaSubtitle,
   accentColor = 'lavender',
   onUnlock,
+  onResetVault,
 }) => {
   const [settings, setSettings] = useState<SecuritySettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
   const [error, setError] = useState('');
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -115,7 +118,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
       const key = await deriveVaultKey(pin, salt);
       onUnlock(key);
     } catch {
-      setError('Could not initialize local encryption.');
+      setError('Could not initialize local lock.');
     } finally {
       setBusy(false);
     }
@@ -148,7 +151,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
   const handleBiometricUnlock = async () => {
     if (!settings) return;
     if (!settings.webAuthnCredentialId) {
-      setError('Unlock with your Master PIN below; biometrics can be enrolled inside Vault settings.');
+      setError('Enter your Master PIN below to unlock.');
       return;
     }
     setBusy(true);
@@ -159,14 +162,34 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
       setError('Biometric prompt was cancelled or unavailable. Use your Master PIN.');
       return;
     }
-    // WebAuthn proves user presence; for AES key derivation we still need PIN if no cached key exists.
-    setError('Biometric verified. Enter your Master PIN to derive your local AES-256 decryption key.');
+    setError('Biometric verified. Enter your Master PIN to unlock your encrypted records.');
+  };
+
+  const handleResetLock = async () => {
+    setBusy(true);
+    try {
+      await clearStore('vault');
+      await deleteFromStore('settings', 'security');
+      if (onResetVault) {
+        await onResetVault();
+      }
+      setSettings(null);
+      setPin('');
+      setConfirmPin('');
+      setSetupStep('create');
+      setShowResetConfirm(false);
+      setError('');
+    } catch {
+      setError('Could not reset lock settings.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-sm text-[#98A2B3]">Preparing encrypted sanctuary...</p>
+        <p className="text-sm text-[#98A2B3]">Preparing locked area...</p>
       </div>
     );
   }
@@ -185,13 +208,13 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
         </div>
 
         <h2 className="font-display text-2xl font-medium text-[#F1F3F6] tracking-tight">
-          {settings ? areaTitle : `Set Your Master PIN`}
+          {settings ? areaTitle : 'Set Your Master PIN'}
         </h2>
         <p className="text-sm text-[#98A2B3] mt-1.5 leading-relaxed">
           {settings
             ? areaSubtitle
             : setupStep === 'create'
-              ? 'Create a 4–6 digit PIN to encrypt your Vault and lock your Private Media locally.'
+              ? 'Create a 4–6 digit PIN to lock your Secrets Vault and Private Gallery on this device.'
               : 'Re-enter your Master PIN to confirm.'}
         </p>
 
@@ -271,14 +294,53 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
           {busy
             ? 'Unlocking...'
             : settings
-              ? 'Unlock Sanctuary'
+              ? 'Unlock'
               : setupStep === 'create'
                 ? 'Continue'
-                : 'Encrypt & Enter'}
+                : 'Save PIN & Enter'}
         </button>
 
+        {settings && !showResetConfirm && (
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            className="mt-4 min-h-[40px] px-3 rounded-xl text-xs text-[#98A2B3] hover:text-[#F2B8A2] inline-flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Forgot or Reset Lock
+          </button>
+        )}
+
+        {settings && showResetConfirm && (
+          <div className="mt-4 p-4 rounded-2xl bg-[#1D212A] border border-[#F2B8A2]/30 text-left space-y-3">
+            <p className="text-xs font-medium text-[#F2B8A2]">Reset Master PIN?</p>
+            <p className="text-xs text-[#98A2B3] leading-relaxed">
+              Resetting your PIN lets you set a new lock code. Previously saved Secrets Vault entries
+              locked with the old PIN will be cleared; your Private Gallery photos, Notes, Tasks,
+              and Birthdays will stay safe.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="min-h-[38px] px-3 rounded-xl bg-white/[0.06] text-xs text-[#D0D5DD]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleResetLock()}
+                className="min-h-[38px] px-3.5 rounded-xl bg-[#F2B8A2] text-[#0F1115] text-xs font-semibold"
+              >
+                Confirm Reset
+              </button>
+            </div>
+          </div>
+        )}
+
         <p className="text-xs text-[#98A2B3] mt-4">
-          AES-256-GCM local key · Auto-locks immediately when minimized
+          Local device lock · Auto-locks whenever you leave or minimize
         </p>
       </div>
     </div>

@@ -100,6 +100,17 @@ export async function deleteFromStore(storeName: StoreName, id: string): Promise
   });
 }
 
+export async function clearStore(storeName: StoreName): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const req = store.clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function getSetting<T>(id: string): Promise<T | undefined> {
   const db = await openDB();
   return new Promise((resolve, reject) => {

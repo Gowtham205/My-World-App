@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Copy, Pin, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Copy, Pencil, Pin, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { MotivationalQuote, QuoteMood } from '../types/sanctuary';
 import { createId } from '../lib/storage';
+import { copyText } from '../lib/share';
 
 // Future-ready QuoteProvider interface so an optional mood-based generator can plug in cleanly later
 export interface QuoteProvider {
@@ -25,6 +26,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   const [moodFilter, setMoodFilter] = useState<QuoteMood | 'All'>('All');
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingQuote, setEditingQuote] = useState<MotivationalQuote | null>(null);
   const [text, setText] = useState('');
   const [author, setAuthor] = useState('');
   const [mood, setMood] = useState<QuoteMood>('Calm');
@@ -42,6 +44,26 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
     return filteredQuotes.find((q) => q.pinnedToHome) || filteredQuotes[0] || null;
   }, [filteredQuotes, spotlightId]);
 
+  const resetForm = () => {
+    setEditingQuote(null);
+    setText('');
+    setAuthor('');
+    setMood('Calm');
+  };
+
+  const openCreateForm = () => {
+    resetForm();
+    setShowAdd((v) => !v);
+  };
+
+  const openEditForm = (q: MotivationalQuote) => {
+    setEditingQuote(q);
+    setText(q.text);
+    setAuthor(q.author);
+    setMood(q.mood);
+    setShowAdd(true);
+  };
+
   const handleShuffleByMood = () => {
     if (filteredQuotes.length === 0) return;
     if (filteredQuotes.length === 1) {
@@ -53,19 +75,18 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
     if (pick) setSpotlightId(pick.id);
   };
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
     await onSaveQuote({
-      id: createId('quote'),
+      id: editingQuote ? editingQuote.id : createId('quote'),
       text: text.trim(),
       author: author.trim() || 'Personal Note',
       mood,
-      pinnedToHome: quotes.length === 0,
-      createdAt: new Date().toISOString(),
+      pinnedToHome: editingQuote ? editingQuote.pinnedToHome : quotes.length === 0,
+      createdAt: editingQuote ? editingQuote.createdAt : new Date().toISOString(),
     });
-    setText('');
-    setAuthor('');
+    resetForm();
     setShowAdd(false);
   };
 
@@ -79,12 +100,10 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   };
 
   const handleCopy = async (q: MotivationalQuote) => {
-    try {
-      await navigator.clipboard.writeText(`"${q.text}" — ${q.author}`);
+    const ok = await copyText(`"${q.text}" — ${q.author}`);
+    if (ok) {
       setCopiedId(q.id);
       setTimeout(() => setCopiedId(null), 1600);
-    } catch {
-      // ignore clipboard restrictions
     }
   };
 
@@ -99,7 +118,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
         </div>
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={openCreateForm}
           className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#BEB4DC] hover:bg-[#AFA3D4] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
@@ -153,13 +172,15 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
         </section>
       )}
 
-      {/* Add Quote Form */}
+      {/* Add / Edit Quote Form */}
       {showAdd && (
         <form
-          onSubmit={handleAdd}
+          onSubmit={handleSubmit}
           className="rounded-3xl bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-6 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">Save a Quote or Grounding Block</h2>
+          <h2 className="text-base font-semibold text-[#F1F3F6]">
+            {editingQuote ? 'Edit Quote' : 'Save a Quote or Grounding Block'}
+          </h2>
           <textarea
             rows={3}
             required
@@ -191,7 +212,10 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
           <div className="flex justify-end gap-2.5">
             <button
               type="button"
-              onClick={() => setShowAdd(false)}
+              onClick={() => {
+                resetForm();
+                setShowAdd(false);
+              }}
               className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD] whitespace-nowrap"
             >
               Cancel
@@ -200,7 +224,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
               type="submit"
               className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold whitespace-nowrap"
             >
-              Save to Collection
+              {editingQuote ? 'Update Quote' : 'Save to Collection'}
             </button>
           </div>
         </form>
@@ -239,11 +263,19 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => handleCopy(q)}
+                  onClick={() => void handleCopy(q)}
                   className="min-h-[40px] px-3 rounded-xl hover:bg-white/[0.05] text-xs text-[#98A2B3] hover:text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   {copiedId === q.id ? 'Copied' : 'Copy'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openEditForm(q)}
+                  aria-label="Edit quote"
+                  className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.05] text-[#98A2B3] hover:text-[#9BC4E2] flex items-center justify-center"
+                >
+                  <Pencil className="w-4 h-4" />
                 </button>
                 <button
                   type="button"

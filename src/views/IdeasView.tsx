@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Link2, Plus, Trash2 } from 'lucide-react';
+import { Link2, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { CreativeIdeaCard, IdeaBoardType, IdeaCardColor } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 
@@ -21,6 +21,7 @@ const CARD_COLORS: { id: IdeaCardColor; label: string; bg: string; accent: strin
 export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDeleteIdea }) => {
   const [boardFilter, setBoardFilter] = useState<IdeaBoardType | 'All'>('All');
   const [showAdd, setShowAdd] = useState(false);
+  const [editingIdea, setEditingIdea] = useState<CreativeIdeaCard | null>(null);
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -33,29 +34,62 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
     return ideas.filter((i) => i.board === boardFilter);
   }, [ideas, boardFilter]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openAddForm = () => {
+    setEditingIdea(null);
+    setTitle('');
+    setBody('');
+    setBoard(boardFilter === 'All' ? 'Learn' : boardFilter);
+    setColor('lavender');
+    setConnectTargetId('');
+    setShowAdd((v) => !v);
+  };
+
+  const openEditForm = (card: CreativeIdeaCard) => {
+    setEditingIdea(card);
+    setTitle(card.title);
+    setBody(card.body);
+    setBoard(card.board);
+    setColor(card.color);
+    setConnectTargetId(card.connectedIds[0] || '');
+    setShowAdd(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    const newId = createId('idea');
-    const newCard: CreativeIdeaCard = {
-      id: newId,
+    const targetId = editingIdea ? editingIdea.id : createId('idea');
+    const existingExtraConnections = editingIdea
+      ? editingIdea.connectedIds.slice(1).filter((cid) => cid !== connectTargetId && cid !== targetId)
+      : [];
+    const nextConnectedIds = Array.from(
+      new Set([
+        ...(connectTargetId && connectTargetId !== targetId ? [connectTargetId] : []),
+        ...existingExtraConnections,
+      ])
+    );
+
+    const savedCard: CreativeIdeaCard = {
+      ...(editingIdea || {}),
+      id: targetId,
       title: title.trim(),
       body: body.trim(),
       board,
       color,
-      connectedIds: connectTargetId ? [connectTargetId] : [],
-      createdAt: new Date().toISOString(),
+      connectedIds: nextConnectedIds,
+      createdAt: editingIdea ? editingIdea.createdAt : new Date().toISOString(),
     };
-    await onSaveIdea(newCard);
+    await onSaveIdea(savedCard);
 
-    if (connectTargetId) {
+    if (connectTargetId && connectTargetId !== targetId) {
       const target = ideas.find((i) => i.id === connectTargetId);
-      if (target && !target.connectedIds.includes(newId)) {
-        await onSaveIdea({ ...target, connectedIds: [...target.connectedIds, newId] });
+      if (target && !target.connectedIds.includes(targetId)) {
+        await onSaveIdea({ ...target, connectedIds: [...target.connectedIds, targetId] });
       }
     }
 
+    setEditingIdea(null);
     setTitle('');
     setBody('');
     setConnectTargetId('');
@@ -76,7 +110,7 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
         </div>
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={openAddForm}
           className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#BEB4DC] hover:bg-[#AFA3D4] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
@@ -104,10 +138,12 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
 
       {showAdd && (
         <form
-          onSubmit={handleCreate}
+          onSubmit={handleSaveForm}
           className="rounded-3xl bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-7 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">Pin an Idea Card</h2>
+          <h2 className="text-base font-semibold text-[#F1F3F6]">
+            {editingIdea ? 'Edit Idea Card' : 'Pin an Idea Card'}
+          </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
@@ -135,11 +171,13 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
               className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
             >
               <option value="">Connect to another idea (optional)</option>
-              {ideas.map((i) => (
-                <option key={i.id} value={i.id}>
-                  Link with: {i.title}
-                </option>
-              ))}
+              {ideas
+                .filter((i) => !editingIdea || i.id !== editingIdea.id)
+                .map((i) => (
+                  <option key={i.id} value={i.id}>
+                    Link with: {i.title}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -172,7 +210,10 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
           <div className="flex justify-end gap-2.5">
             <button
               type="button"
-              onClick={() => setShowAdd(false)}
+              onClick={() => {
+                setShowAdd(false);
+                setEditingIdea(null);
+              }}
               className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
             >
               Cancel
@@ -181,7 +222,7 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
               type="submit"
               className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold"
             >
-              Save Idea
+              {editingIdea ? 'Update Idea' : 'Save Idea'}
             </button>
           </div>
         </form>
@@ -215,14 +256,24 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <p className={`text-xs ${style.accent}`}>{card.board}</p>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteIdea(card.id)}
-                      aria-label="Delete idea card"
-                      className="min-w-[36px] min-h-[36px] -mt-1 -mr-1 rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-0.5 -mt-1 -mr-1">
+                      <button
+                        type="button"
+                        onClick={() => openEditForm(card)}
+                        aria-label={`Edit ${card.title}`}
+                        className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F1F3F6] flex items-center justify-center"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteIdea(card.id)}
+                        aria-label="Delete idea card"
+                        className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <h2 className="font-display text-lg font-medium text-[#F1F3F6] mt-1">

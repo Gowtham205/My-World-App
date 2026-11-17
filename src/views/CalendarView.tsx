@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Download,
   ExternalLink,
+  Pencil,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -48,9 +49,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [showAdd, setShowAdd] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEventItem | null>(null);
 
-  // New event form
+  // Event form
   const [title, setTitle] = useState('');
+  const [eventDate, setEventDate] = useState(todayStr);
   const [startTime, setStartTime] = useState('10:00');
   const [endTime, setEndTime] = useState('11:00');
   const [location, setLocation] = useState('');
@@ -89,23 +92,52 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const selectedAgenda = getItemsForDate(selectedDate);
 
-  const handleAddEvent = async (e: React.FormEvent) => {
+  const resetForm = (targetDate = selectedDate) => {
+    setEditingEvent(null);
+    setTitle('');
+    setEventDate(targetDate);
+    setStartTime('10:00');
+    setEndTime('11:00');
+    setLocation('');
+    setNotes('');
+    setColor('sky');
+  };
+
+  const openCreateForm = () => {
+    resetForm(selectedDate);
+    setShowAdd((v) => !v);
+  };
+
+  const openEditForm = (ev: CalendarEventItem) => {
+    setEditingEvent(ev);
+    setTitle(ev.title);
+    setEventDate(ev.date);
+    setStartTime(ev.startTime || '10:00');
+    setEndTime(ev.endTime || '11:00');
+    setLocation(ev.location || '');
+    setNotes(ev.notes || '');
+    setColor(ev.color);
+    setShowAdd(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    const savedDate = eventDate || selectedDate;
     await onSaveEvent({
-      id: createId('cal'),
+      id: editingEvent ? editingEvent.id : createId('cal'),
       title: title.trim(),
-      date: selectedDate,
+      date: savedDate,
       startTime,
       endTime,
       location: location.trim(),
       notes: notes.trim(),
       color,
-      createdAt: new Date().toISOString(),
+      syncedToDevice: editingEvent?.syncedToDevice,
+      createdAt: editingEvent ? editingEvent.createdAt : new Date().toISOString(),
     });
-    setTitle('');
-    setLocation('');
-    setNotes('');
+    setSelectedDate(savedDate);
+    resetForm(savedDate);
     setShowAdd(false);
   };
 
@@ -131,7 +163,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={openCreateForm}
           className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9BC4E2] hover:bg-[#8AB6D6] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
@@ -141,11 +173,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       {showAdd && (
         <form
-          onSubmit={handleAddEvent}
+          onSubmit={handleSubmit}
           className="rounded-3xl bg-[#171A21] border border-[#9BC4E2]/30 p-5 sm:p-7 space-y-4"
         >
           <h2 className="text-base font-semibold text-[#F1F3F6]">
-            New Event on {formatShortDate(selectedDate)}
+            {editingEvent ? 'Edit Event' : `New Event on ${formatShortDate(eventDate || selectedDate)}`}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
@@ -154,6 +186,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Event title"
+              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+            />
+            <input
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
               className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
             />
             <input
@@ -198,7 +236,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <div className="flex justify-end gap-2.5">
             <button
               type="button"
-              onClick={() => setShowAdd(false)}
+              onClick={() => {
+                resetForm(selectedDate);
+                setShowAdd(false);
+              }}
               className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
             >
               Cancel
@@ -207,7 +248,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               type="submit"
               className="min-h-[44px] px-5 rounded-2xl bg-[#9BC4E2] text-[#0F1115] text-sm font-semibold"
             >
-              Save Event
+              {editingEvent ? 'Update Event' : 'Save Event'}
             </button>
           </div>
         </form>
@@ -320,7 +361,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => setShowAdd(true)}
+              onClick={() => {
+                resetForm(selectedDate);
+                setShowAdd(true);
+              }}
               className="min-h-[40px] px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-xs font-medium text-[#9BC4E2] flex items-center gap-1.5"
             >
               <CalendarPlus className="w-3.5 h-3.5" />
@@ -363,14 +407,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       </p>
                       <h3 className="text-sm font-semibold text-[#F1F3F6] mt-0.5">{ev.title}</h3>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteEvent(ev.id)}
-                      aria-label="Delete event"
-                      className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => openEditForm(ev)}
+                        aria-label={`Edit ${ev.title}`}
+                        className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#9BC4E2] flex items-center justify-center"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteEvent(ev.id)}
+                        aria-label="Delete event"
+                        className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {ev.notes && <p className="text-xs text-[#D0D5DD]">{ev.notes}</p>}

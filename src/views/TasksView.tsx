@@ -4,6 +4,7 @@ import {
   Bell,
   CheckCircle2,
   Circle,
+  Pencil,
   Play,
   Plus,
   Square,
@@ -29,6 +30,7 @@ import {
 
 interface TasksViewProps {
   tasks: TaskReminderItem[];
+  alarms?: AlarmItem[];
   customAudioTones: CustomAudioTone[];
   defaultNotificationSoundId: string;
   onSaveTask: (task: TaskReminderItem) => Promise<void>;
@@ -43,6 +45,7 @@ const RECURRENCES: RecurrencePattern[] = ['Once', 'Daily', 'Weekly', 'Monthly', 
 
 export const TasksView: React.FC<TasksViewProps> = ({
   tasks,
+  alarms = [],
   customAudioTones,
   defaultNotificationSoundId,
   onSaveTask,
@@ -53,6 +56,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [filterStatus, setFilterStatus] = useState<'active' | 'completed' | 'all'>('active');
   const [categoryFilter, setCategoryFilter] = useState<TaskCategory | 'All'>('All');
   const [showAdd, setShowAdd] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskReminderItem | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -95,17 +99,56 @@ export const TasksView: React.FC<TasksViewProps> = ({
       });
   }, [tasks, filterStatus, categoryFilter]);
 
+  const resetForm = () => {
+    setEditingTask(null);
+    setTitle('');
+    setNotes('');
+    setPriority('Medium');
+    setCategory('Personal');
+    setDueDate(getTodayStr());
+    setDueTime('');
+    setEndTime('');
+    setRecurrence('Once');
+    setCustomRecurrenceNote('');
+    setSelectedSoundId(defaultNotificationSoundId);
+    setLinkAlarmOnCreate(true);
+  };
+
+  const openCreateForm = () => {
+    resetForm();
+    setShowAdd((v) => !v);
+  };
+
+  const openEditForm = (task: TaskReminderItem) => {
+    setEditingTask(task);
+    setTitle(task.title);
+    setNotes(task.notes);
+    setPriority(task.priority);
+    setCategory(task.category);
+    setDueDate(task.dueDate || getTodayStr());
+    setDueTime(task.dueTime || '');
+    setEndTime(task.endTime || '');
+    setRecurrence(task.recurrence);
+    setCustomRecurrenceNote(task.customRecurrenceNote || '');
+    setSelectedSoundId(task.soundId || defaultNotificationSoundId);
+    setLinkAlarmOnCreate(!task.linkedAlarmId);
+    setShowAdd(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    const taskId = createId('task');
     const resolvedSoundName = dueTime
       ? resolveSoundName(customAudioTones, selectedSoundId)
       : undefined;
 
-    const newTask: TaskReminderItem = {
-      id: taskId,
+    const scheduleChanged =
+      editingTask &&
+      (editingTask.dueDate !== (dueDate || getTodayStr()) || editingTask.dueTime !== dueTime);
+
+    const savedTask: TaskReminderItem = {
+      id: editingTask ? editingTask.id : createId('task'),
       title: title.trim(),
       notes: notes.trim(),
       priority,
@@ -115,25 +158,41 @@ export const TasksView: React.FC<TasksViewProps> = ({
       endTime: endTime || undefined,
       recurrence,
       customRecurrenceNote: recurrence === 'Custom' ? customRecurrenceNote.trim() : undefined,
-      completed: false,
+      completed: editingTask ? editingTask.completed : false,
+      completedAt: editingTask?.completedAt,
+      linkedAlarmId: editingTask?.linkedAlarmId,
       soundId: dueTime ? selectedSoundId : undefined,
       soundName: resolvedSoundName,
-      createdAt: new Date().toISOString(),
+      lastNotifiedMinute: scheduleChanged ? undefined : editingTask?.lastNotifiedMinute,
+      createdAt: editingTask ? editingTask.createdAt : new Date().toISOString(),
     };
 
-    if (dueTime && linkAlarmOnCreate) {
-      // Show explicit Smart Reminder-to-Alarm Bridge confirmation dialog
-      await onSaveTask(newTask);
-      setPendingSavedTask(newTask);
+    await onSaveTask(savedTask);
+
+    // Keep linked alarm synchronized when editing a task that already has a linked alarm
+    if (editingTask?.linkedAlarmId && dueTime) {
+      const existingAlarm = alarms.find((a) => a.id === editingTask.linkedAlarmId);
+      if (existingAlarm) {
+        const repeatDays =
+          savedTask.recurrence === 'Daily' ? [0, 1, 2, 3, 4, 5, 6] : existingAlarm.repeatDays;
+        await onCreateLinkedAlarm({
+          ...existingAlarm,
+          label: savedTask.title,
+          time: dueTime,
+          repeatDays,
+          linkedReminderTitle: savedTask.title,
+          linkedReminderNotes: savedTask.notes,
+          soundId: savedTask.soundId || existingAlarm.soundId,
+          soundName: savedTask.soundName || existingAlarm.soundName,
+          lastTriggeredMinute: scheduleChanged ? undefined : existingAlarm.lastTriggeredMinute,
+        });
+      }
+    } else if (dueTime && !savedTask.linkedAlarmId && linkAlarmOnCreate) {
+      setPendingSavedTask(savedTask);
       setAskAlarmBridge(true);
-    } else {
-      await onSaveTask(newTask);
     }
 
-    setTitle('');
-    setNotes('');
-    setDueTime('');
-    setEndTime('');
+    resetForm();
     setShowAdd(false);
   };
 
@@ -201,7 +260,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={openCreateForm}
           className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
@@ -293,13 +352,15 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
       </div>
 
-      {/* Add Task Form */}
+      {/* Add / Edit Task Form */}
       {showAdd && (
         <form
           onSubmit={handleSubmit}
           className="rounded-3xl bg-[#171A21] border border-[#9EC5AB]/30 p-5 sm:p-7 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">Create Task or Smart Reminder</h2>
+          <h2 className="text-base font-semibold text-[#F1F3F6]">
+            {editingTask ? 'Edit Task or Smart Reminder' : 'Create Task or Smart Reminder'}
+          </h2>
 
           <input
             type="text"
@@ -473,24 +534,29 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 </div>
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={linkAlarmOnCreate}
-                  onChange={(e) => setLinkAlarmOnCreate(e.target.checked)}
-                  className="w-4 h-4 accent-[#9EC5AB]"
-                />
-                <span className="text-xs text-[#D0D5DD]">
-                  Prompt me to link a dedicated Alarm at {formatTime12h(dueTime)}
-                </span>
-              </label>
+              {!editingTask?.linkedAlarmId && (
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={linkAlarmOnCreate}
+                    onChange={(e) => setLinkAlarmOnCreate(e.target.checked)}
+                    className="w-4 h-4 accent-[#9EC5AB]"
+                  />
+                  <span className="text-xs text-[#D0D5DD]">
+                    Prompt me to link a dedicated Alarm at {formatTime12h(dueTime)}
+                  </span>
+                </label>
+              )}
             </div>
           )}
 
           <div className="flex justify-end gap-2.5 pt-2">
             <button
               type="button"
-              onClick={() => setShowAdd(false)}
+              onClick={() => {
+                resetForm();
+                setShowAdd(false);
+              }}
               className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
             >
               Cancel
@@ -499,7 +565,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               type="submit"
               className="min-h-[44px] px-5 rounded-2xl bg-[#9EC5AB] text-[#0F1115] text-sm font-semibold"
             >
-              Save Task
+              {editingTask ? 'Update Task' : 'Save Task'}
             </button>
           </div>
         </form>
@@ -595,6 +661,15 @@ export const TasksView: React.FC<TasksViewProps> = ({
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => openEditForm(task)}
+                  aria-label={`Edit ${task.title}`}
+                  title="Edit task"
+                  className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#9BC4E2] flex items-center justify-center"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
                 {task.dueTime && !task.linkedAlarmId && !task.completed && (
                   <button
                     type="button"

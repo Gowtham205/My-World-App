@@ -3,6 +3,7 @@ import {
   AlarmClock,
   BellRing,
   Music2,
+  Pencil,
   Play,
   Plus,
   Square,
@@ -65,6 +66,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
   onChangeDefaultNotificationSound,
 }) => {
   const [showAdd, setShowAdd] = useState(false);
+  const [editingAlarm, setEditingAlarm] = useState<AlarmItem | null>(null);
   const [label, setLabel] = useState('');
   const [time, setTime] = useState('07:30');
   const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
@@ -152,22 +154,51 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
     }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openAddForm = () => {
+    setEditingAlarm(null);
+    setLabel('');
+    setTime('07:30');
+    setRepeatDays([1, 2, 3, 4, 5]);
+    setSnoozeMinutes(10);
+    setSelectedSoundId(BUILTIN_TONES[0].id);
+    setShowAdd((v) => !v);
+  };
+
+  const openEditForm = (alarm: AlarmItem) => {
+    setEditingAlarm(alarm);
+    setLabel(alarm.label);
+    setTime(alarm.time);
+    setRepeatDays([...alarm.repeatDays]);
+    setSnoozeMinutes(alarm.snoozeMinutes);
+    setSelectedSoundId(alarm.soundId || BUILTIN_TONES[0].id);
+    setShowAdd(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!time) return;
 
+    const scheduleChanged =
+      !editingAlarm ||
+      editingAlarm.time !== time ||
+      editingAlarm.repeatDays.join(',') !== repeatDays.join(',');
+
     await onSaveAlarm({
-      id: createId('alarm'),
+      ...(editingAlarm || {}),
+      id: editingAlarm ? editingAlarm.id : createId('alarm'),
       label: label.trim() || 'Sanctuary Alarm',
       time,
-      enabled: true,
+      enabled: editingAlarm ? editingAlarm.enabled : true,
       repeatDays,
       snoozeMinutes,
       soundId: selectedSoundId,
       soundName: resolveSoundName(customAudioTones, selectedSoundId),
-      createdAt: new Date().toISOString(),
+      lastTriggeredMinute: scheduleChanged ? undefined : editingAlarm?.lastTriggeredMinute,
+      createdAt: editingAlarm ? editingAlarm.createdAt : new Date().toISOString(),
     });
 
+    setEditingAlarm(null);
     setLabel('');
     setShowAdd(false);
   };
@@ -211,7 +242,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
         </div>
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={openAddForm}
           className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#F2B8A2] hover:bg-[#E7A890] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
@@ -221,10 +252,12 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
 
       {showAdd && (
         <form
-          onSubmit={handleCreate}
+          onSubmit={handleSaveForm}
           className="rounded-3xl bg-[#171A21] border border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">Configure Alarm</h2>
+          <h2 className="text-base font-semibold text-[#F1F3F6]">
+            {editingAlarm ? 'Edit Alarm' : 'Configure Alarm'}
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <input
               type="text"
@@ -346,7 +379,10 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
           <div className="flex justify-end gap-2.5 pt-2">
             <button
               type="button"
-              onClick={() => setShowAdd(false)}
+              onClick={() => {
+                setShowAdd(false);
+                setEditingAlarm(null);
+              }}
               className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
             >
               Cancel
@@ -355,7 +391,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
               type="submit"
               className="min-h-[44px] px-5 rounded-2xl bg-[#F2B8A2] text-[#0F1115] text-sm font-semibold"
             >
-              Save Alarm
+              {editingAlarm ? 'Update Alarm' : 'Save Alarm'}
             </button>
           </div>
         </form>
@@ -464,6 +500,14 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                     >
                       <BellRing className="w-3.5 h-3.5" />
                       Test Ring
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEditForm(alarm)}
+                      aria-label={`Edit ${alarm.label}`}
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F1F3F6] flex items-center justify-center"
+                    >
+                      <Pencil className="w-4 h-4" />
                     </button>
                     <button
                       type="button"

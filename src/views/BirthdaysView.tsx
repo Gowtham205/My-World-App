@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Bell, Cake, Copy, Plus, Share2, Trash2 } from 'lucide-react';
+import { Bell, Cake, Copy, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import type { BirthdayEntry, BirthdayOffset, OffsetUnit } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { formatShortDate, getDaysUntilBirthday } from '../lib/dateUtils';
+import { copyText, shareText } from '../lib/share';
 
 interface BirthdaysViewProps {
   birthdays: BirthdayEntry[];
@@ -16,6 +17,8 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
   onDeleteBirthday,
 }) => {
   const [showAdd, setShowAdd] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<BirthdayEntry | null>(null);
+
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [relationship, setRelationship] = useState('Friend');
@@ -26,12 +29,37 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
   const [offsetVal, setOffsetVal] = useState(2);
   const [offsetUnit, setOffsetUnit] = useState<OffsetUnit>('hours');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sharedId, setSharedId] = useState<string | null>(null);
 
   const sortedBirthdays = useMemo(() => {
     return [...birthdays]
       .map((entry) => ({ entry, info: getDaysUntilBirthday(entry.birthDate) }))
       .sort((a, b) => a.info.daysUntil - b.info.daysUntil);
   }, [birthdays]);
+
+  const resetForm = () => {
+    setEditingEntry(null);
+    setName('');
+    setBirthDate('');
+    setRelationship('Friend');
+    setWishTemplate('');
+    setOffsets([{ id: createId('off'), value: 1, unit: 'days' }]);
+  };
+
+  const openCreateForm = () => {
+    resetForm();
+    setShowAdd((v) => !v);
+  };
+
+  const openEditForm = (entry: BirthdayEntry) => {
+    setEditingEntry(entry);
+    setName(entry.name);
+    setBirthDate(entry.birthDate);
+    setRelationship(entry.relationship);
+    setWishTemplate(entry.wishTemplate);
+    setOffsets(entry.offsets.length > 0 ? entry.offsets.map((o) => ({ ...o })) : []);
+    setShowAdd(true);
+  };
 
   const addOffset = () => {
     if (offsetVal <= 0) return;
@@ -41,12 +69,12 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
     ]);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !birthDate) return;
 
     await onSaveBirthday({
-      id: createId('bday'),
+      id: editingEntry ? editingEntry.id : createId('bday'),
       name: name.trim(),
       birthDate,
       relationship: relationship.trim() || 'Friend',
@@ -54,39 +82,34 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
         wishTemplate.trim() ||
         `Happy Birthday, ${name.trim()}! Wishing you joy, calm, and wonderful memories ahead.`,
       offsets,
-      createdAt: new Date().toISOString(),
+      createdAt: editingEntry ? editingEntry.createdAt : new Date().toISOString(),
     });
 
-    setName('');
-    setBirthDate('');
-    setWishTemplate('');
-    setOffsets([{ id: createId('off'), value: 1, unit: 'days' }]);
+    resetForm();
     setShowAdd(false);
   };
 
   const handleCopyWish = async (entry: BirthdayEntry) => {
-    try {
-      await navigator.clipboard.writeText(entry.wishTemplate);
+    const ok = await copyText(entry.wishTemplate);
+    if (ok) {
       setCopiedId(entry.id);
       setTimeout(() => setCopiedId(null), 1600);
-    } catch {
-      // ignore clipboard restriction
     }
   };
 
   const handleShareWish = async (entry: BirthdayEntry) => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Birthday Wish for ${entry.name}`,
-          text: entry.wishTemplate,
-        });
-        return;
-      } catch {
-        // fallback to copy
-      }
+    const outcome = await shareText({
+      title: `Birthday Wish for ${entry.name}`,
+      text: entry.wishTemplate,
+      dialogTitle: `Share wish for ${entry.name}`,
+    });
+    if (outcome === 'shared') {
+      setSharedId(entry.id);
+      setTimeout(() => setSharedId(null), 1800);
+    } else if (outcome === 'copied') {
+      setCopiedId(entry.id);
+      setTimeout(() => setCopiedId(null), 1800);
     }
-    await handleCopyWish(entry);
   };
 
   return (
@@ -100,7 +123,7 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
         </div>
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={openCreateForm}
           className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#F2B8A2] hover:bg-[#E7A890] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
@@ -110,10 +133,12 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
 
       {showAdd && (
         <form
-          onSubmit={handleCreate}
+          onSubmit={handleSubmit}
           className="rounded-3xl bg-[#171A21] border border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">Track Birthday & Alert Offsets</h2>
+          <h2 className="text-base font-semibold text-[#F1F3F6]">
+            {editingEntry ? 'Edit Birthday & Alert Offsets' : 'Track Birthday & Alert Offsets'}
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <input
               type="text"
@@ -194,7 +219,10 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
           <div className="flex justify-end gap-2.5 pt-2">
             <button
               type="button"
-              onClick={() => setShowAdd(false)}
+              onClick={() => {
+                resetForm();
+                setShowAdd(false);
+              }}
               className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
             >
               Cancel
@@ -203,7 +231,7 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
               type="submit"
               className="min-h-[44px] px-5 rounded-2xl bg-[#F2B8A2] text-[#0F1115] text-sm font-semibold"
             >
-              Save Birthday
+              {editingEntry ? 'Update Birthday' : 'Save Birthday'}
             </button>
           </div>
         </form>
@@ -263,7 +291,7 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleCopyWish(entry)}
+                    onClick={() => void handleCopyWish(entry)}
                     className="min-h-[40px] px-3.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-xs font-medium text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <Copy className="w-3.5 h-3.5 text-[#F2B8A2]" />
@@ -271,22 +299,33 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleShareWish(entry)}
+                    onClick={() => void handleShareWish(entry)}
                     className="min-h-[40px] px-3.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-xs font-medium text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <Share2 className="w-3.5 h-3.5 text-[#9BC4E2]" />
-                    Share
+                    {sharedId === entry.id ? 'Shared' : 'Share'}
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onDeleteBirthday(entry.id)}
-                  aria-label="Delete birthday"
-                  className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openEditForm(entry)}
+                    aria-label={`Edit ${entry.name}`}
+                    title="Edit birthday"
+                    className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#9BC4E2] flex items-center justify-center"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteBirthday(entry.id)}
+                    aria-label="Delete birthday"
+                    className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </article>
           ))}

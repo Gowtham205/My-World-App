@@ -13,6 +13,12 @@ const config: CapacitorConfig = {
     backgroundColor: '#0F1115',
     allowMixedContent: false,
   },
+  plugins: {
+    LocalNotifications: {
+      smallIcon: 'ic_stat_sanctuary',
+      iconColor: '#9EC5AB',
+    },
+  },
 };
 
 export default config;

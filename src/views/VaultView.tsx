@@ -9,6 +9,7 @@ import {
   Heart,
   KeyRound,
   Lock,
+  Pencil,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ import type {
 } from '../types/sanctuary';
 import { decryptPayload, encryptPayload } from '../lib/crypto';
 import { createId } from '../lib/storage';
+import { copyText } from '../lib/share';
 import { SecurityGate } from '../components/SecurityGate';
 
 interface VaultViewProps {
@@ -30,9 +32,15 @@ interface VaultViewProps {
   onLock: () => void;
   onSaveEncrypted: (record: EncryptedVaultRecord) => Promise<void>;
   onDeleteEncrypted: (id: string) => Promise<void>;
+  onChangeMasterPin: (currentPin: string, newPin: string) => Promise<{ ok: boolean; error?: string }>;
+  onResetVault: () => Promise<void>;
 }
 
-const ENTRY_TYPES: { value: VaultEntryType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+const ENTRY_TYPES: {
+  value: VaultEntryType;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
   { value: 'login', label: 'Website Login', icon: Globe },
   { value: 'secret_note', label: 'Secret Note', icon: FileKey2 },
   { value: 'bank_card', label: 'Bank / Card', icon: CreditCard },
@@ -48,12 +56,24 @@ export const VaultView: React.FC<VaultViewProps> = ({
   onLock,
   onSaveEncrypted,
   onDeleteEncrypted,
+  onChangeMasterPin,
+  onResetVault,
 }) => {
   const [items, setItems] = useState<DecryptedVaultItem[]>([]);
   const [decryptError, setDecryptError] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [editingItem, setEditingItem] = useState<DecryptedVaultItem | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Update PIN modal/form state
+  const [showPinUpdate, setShowPinUpdate] = useState(false);
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmNewPin, setConfirmNewPin] = useState('');
+  const [pinUpdateError, setPinUpdateError] = useState('');
+  const [pinUpdateSuccess, setPinUpdateSuccess] = useState('');
+  const [pinBusy, setPinBusy] = useState(false);
 
   // Form state
   const [entryType, setEntryType] = useState<VaultEntryType>('login');
@@ -111,14 +131,17 @@ export const VaultView: React.FC<VaultViewProps> = ({
     return (
       <SecurityGate
         areaTitle="Secrets & Passwords Vault"
-        areaSubtitle="Hardware biometric or Master PIN required. Everything inside is encrypted with AES-256-GCM."
+        areaSubtitle="Enter your Master PIN or device biometrics to unlock."
         accentColor="lavender"
         onUnlock={onUnlock}
+        onResetVault={onResetVault}
       />
     );
   }
 
   const resetForm = () => {
+    setEditingItem(null);
+    setEntryType('login');
     setTitle('');
     setUsername('');
     setPassword('');
@@ -129,6 +152,29 @@ export const VaultView: React.FC<VaultViewProps> = ({
     setPinCode('');
     setNotes('');
     setCustomFields([]);
+  };
+
+  const openAddForm = () => {
+    resetForm();
+    setShowAdd((v) => !v);
+    setShowPinUpdate(false);
+  };
+
+  const openEditForm = (item: DecryptedVaultItem) => {
+    setEditingItem(item);
+    setEntryType(item.type);
+    setTitle(item.title);
+    setUsername(item.username || '');
+    setPassword(item.password || '');
+    setUrl(item.url || '');
+    setCardNumber(item.cardNumber || '');
+    setExpiry(item.expiry || '');
+    setCvv(item.cvv || '');
+    setPinCode(item.pinCode || '');
+    setNotes(item.notes || '');
+    setCustomFields(item.customFields ? item.customFields.map((f) => ({ ...f })) : []);
+    setShowAdd(true);
+    setShowPinUpdate(false);
   };
 
   const handleSaveEntry = async (e: React.FormEvent) => {
@@ -152,12 +198,12 @@ export const VaultView: React.FC<VaultViewProps> = ({
     const { iv, ciphertext } = await encryptPayload(payload, vaultKey);
     const now = new Date().toISOString();
     const record: EncryptedVaultRecord = {
-      id: createId('vault'),
+      id: editingItem ? editingItem.id : createId('vault'),
       type: entryType,
       labelHint: 'Encrypted',
       iv,
       ciphertext,
-      createdAt: now,
+      createdAt: editingItem ? editingItem.createdAt : now,
       updatedAt: now,
     };
 
@@ -166,13 +212,42 @@ export const VaultView: React.FC<VaultViewProps> = ({
     setShowAdd(false);
   };
 
+  const handlePinChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinUpdateError('');
+    setPinUpdateSuccess('');
+
+    if (!/^\d{4,6}$/.test(newPin)) {
+      setPinUpdateError('New PIN must be 4 to 6 digits.');
+      return;
+    }
+    if (newPin !== confirmNewPin) {
+      setPinUpdateError('New PIN and confirmation do not match.');
+      return;
+    }
+
+    setPinBusy(true);
+    const result = await onChangeMasterPin(currentPin, newPin);
+    setPinBusy(false);
+
+    if (!result.ok) {
+      setPinUpdateError(result.error || 'Could not update PIN.');
+      return;
+    }
+
+    setCurrentPin('');
+    setNewPin('');
+    setConfirmNewPin('');
+    setShowPinUpdate(false);
+    setPinUpdateSuccess('Master PIN updated and all Vault records re-encrypted.');
+    setTimeout(() => setPinUpdateSuccess(''), 3500);
+  };
+
   const handleCopy = async (val: string, key: string) => {
-    try {
-      await navigator.clipboard.writeText(val);
+    const ok = await copyText(val);
+    if (ok) {
       setCopiedKey(key);
       setTimeout(() => setCopiedKey(null), 1500);
-    } catch {
-      // ignore clipboard permissions
     }
   };
 
@@ -187,16 +262,27 @@ export const VaultView: React.FC<VaultViewProps> = ({
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#BEB4DC]">AES-256-GCM Encrypted Vault</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6]">
             Secrets & Passwords
           </h1>
           <p className="text-xs text-[#98A2B3] mt-1">
-            Auto-locks immediately whenever you minimize or switch away.
+            Auto-locks automatically whenever you leave or minimize.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowPinUpdate((v) => !v);
+              setPinUpdateError('');
+              setShowAdd(false);
+            }}
+            className="min-h-[44px] px-4 py-2 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#BEB4DC] flex items-center gap-2 whitespace-nowrap"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            Update PIN
+          </button>
           <button
             type="button"
             onClick={onLock}
@@ -207,7 +293,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setShowAdd((v) => !v)}
+            onClick={openAddForm}
             className="min-h-[44px] px-5 py-2 rounded-2xl bg-[#BEB4DC] hover:bg-[#AFA3D4] text-[#0F1115] text-sm font-semibold flex items-center gap-2 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
@@ -216,10 +302,86 @@ export const VaultView: React.FC<VaultViewProps> = ({
         </div>
       </header>
 
+      {pinUpdateSuccess && (
+        <p className="text-xs text-[#9EC5AB]" role="status">
+          {pinUpdateSuccess}
+        </p>
+      )}
+
       {decryptError && (
         <p className="text-xs text-[#F2B8A2]" role="alert">
           {decryptError}
         </p>
+      )}
+
+      {showPinUpdate && (
+        <form
+          onSubmit={handlePinChangeSubmit}
+          className="rounded-3xl bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-6 space-y-4"
+        >
+          <div>
+            <h2 className="text-base font-semibold text-[#F1F3F6]">Update Master Lock PIN</h2>
+            <p className="text-xs text-[#98A2B3] mt-0.5">
+              Applies to both Secrets & Passwords and Private Gallery.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={currentPin}
+              onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Current PIN"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="New PIN (4–6 digits)"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={confirmNewPin}
+              onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Confirm new PIN"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+            />
+          </div>
+          {pinUpdateError && (
+            <p className="text-xs text-[#F2B8A2]" role="alert">
+              {pinUpdateError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setShowPinUpdate(false);
+                setPinUpdateError('');
+              }}
+              className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pinBusy}
+              className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold disabled:opacity-50"
+            >
+              {pinBusy ? 'Updating...' : 'Save New PIN'}
+            </button>
+          </div>
+        </form>
       )}
 
       {showAdd && (
@@ -227,6 +389,10 @@ export const VaultView: React.FC<VaultViewProps> = ({
           onSubmit={handleSaveEntry}
           className="rounded-3xl bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-7 space-y-4"
         >
+          <h2 className="text-base font-semibold text-[#F1F3F6]">
+            {editingItem ? 'Edit Secret Entry' : 'Add Secret Entry'}
+          </h2>
+
           <div className="flex flex-wrap gap-1.5">
             {ENTRY_TYPES.map((t) => (
               <button
@@ -385,7 +551,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
               type="submit"
               className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold"
             >
-              Encrypt & Save
+              {editingItem ? 'Update Secret' : 'Encrypt & Save'}
             </button>
           </div>
         </form>
@@ -422,6 +588,14 @@ export const VaultView: React.FC<VaultViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openEditForm(item)}
+                      aria-label={`Edit ${item.title}`}
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#9BC4E2] flex items-center justify-center"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
                     <button
                       type="button"
                       onClick={() =>
@@ -475,6 +649,13 @@ export const VaultView: React.FC<VaultViewProps> = ({
                           {copiedKey === `${item.id}-p` ? 'Copied' : <Copy className="w-3.5 h-3.5" />}
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {item.url && (
+                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-white/[0.05]">
+                      <span className="text-[#98A2B3]">Website</span>
+                      <span className="text-[#9BC4E2] truncate max-w-[200px]">{item.url}</span>
                     </div>
                   )}
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Navigation, Play, Plus, Square, Trash2, Wind } from 'lucide-react';
+import { MapPin, Navigation, Pencil, Play, Plus, Square, Trash2, Wind, X } from 'lucide-react';
 import type { EventCalmSession } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import {
@@ -32,6 +32,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
   onOpenOnMap,
 }) => {
   const [showAdd, setShowAdd] = useState(false);
+  const [editingSession, setEditingSession] = useState<EventCalmSession | null>(null);
   const [eventName, setEventName] = useState('');
   const [venue, setVenue] = useState('');
   const [date, setDate] = useState(getTodayStr());
@@ -57,12 +58,56 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
     setCustomPromptInput('');
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openAddForm = () => {
+    setEditingSession(null);
+    setEventName('');
+    setVenue('');
+    setDate(getTodayStr());
+    setStartTime('18:00');
+    setEndTime('21:30');
+    setIntervalOption('20');
+    setSelectedPrompts([BUILT_IN_PROMPTS[0], BUILT_IN_PROMPTS[1]]);
+    setCustomPrompts([]);
+    setCustomPromptInput('');
+    setShowAdd((v) => !v);
+  };
+
+  const openEditForm = (session: EventCalmSession) => {
+    setEditingSession(session);
+    setEventName(session.eventName);
+    setVenue(session.venue);
+    setDate(session.date);
+    setStartTime(session.startTime);
+    setEndTime(session.endTime);
+    setIntervalOption(
+      session.isMidpointOnly
+        ? 'midpoint'
+        : session.intervalMinutes === 15
+          ? '15'
+          : session.intervalMinutes === 30
+            ? '30'
+            : '20'
+    );
+    setSelectedPrompts([...session.selectedPrompts]);
+    setCustomPrompts([...session.customPrompts]);
+    setCustomPromptInput('');
+    setShowAdd(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventName.trim()) return;
 
+    const scheduleChanged =
+      !editingSession ||
+      editingSession.date !== date ||
+      editingSession.startTime !== startTime ||
+      editingSession.endTime !== endTime;
+
     await onSaveSession({
-      id: createId('evcalm'),
+      ...(editingSession || {}),
+      id: editingSession ? editingSession.id : createId('evcalm'),
       eventName: eventName.trim(),
       venue: venue.trim(),
       date: date || getTodayStr(),
@@ -73,10 +118,12 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
       selectedPrompts:
         selectedPrompts.length > 0 ? selectedPrompts : [BUILT_IN_PROMPTS[0]],
       customPrompts,
-      active: true,
-      createdAt: new Date().toISOString(),
+      active: editingSession ? editingSession.active : true,
+      lastCheckInMinute: scheduleChanged ? undefined : editingSession?.lastCheckInMinute,
+      createdAt: editingSession ? editingSession.createdAt : new Date().toISOString(),
     });
 
+    setEditingSession(null);
     setEventName('');
     setVenue('');
     setCustomPrompts([]);
@@ -99,7 +146,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
 
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={openAddForm}
           className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -109,10 +156,12 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
 
       {showAdd && (
         <form
-          onSubmit={handleCreate}
+          onSubmit={handleSaveForm}
           className="rounded-3xl bg-[#171A21] border border-[#9EC5AB]/30 p-5 sm:p-7 space-y-5"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">Configure Event Calm Session</h2>
+          <h2 className="text-base font-semibold text-[#F1F3F6]">
+            {editingSession ? 'Edit Event Calm Session' : 'Configure Event Calm Session'}
+          </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
@@ -225,16 +274,30 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
               </button>
             </div>
             {customPrompts.map((cp, idx) => (
-              <p key={idx} className="text-xs text-[#D0D5DD] pl-1">
-                • {cp}
-              </p>
+              <div
+                key={`${cp}-${idx}`}
+                className="flex items-center justify-between gap-2 pl-2 pr-1 py-1 rounded-xl bg-[#1D212A]/70 text-xs text-[#D0D5DD]"
+              >
+                <span>• {cp}</span>
+                <button
+                  type="button"
+                  onClick={() => setCustomPrompts((prev) => prev.filter((_, i) => i !== idx))}
+                  aria-label="Remove custom reassurance"
+                  className="min-w-[32px] min-h-[32px] rounded-lg hover:bg-white/[0.08] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             ))}
           </div>
 
           <div className="flex justify-end gap-2.5 pt-2">
             <button
               type="button"
-              onClick={() => setShowAdd(false)}
+              onClick={() => {
+                setShowAdd(false);
+                setEditingSession(null);
+              }}
               className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
             >
               Cancel
@@ -243,7 +306,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
               type="submit"
               className="min-h-[44px] px-5 rounded-2xl bg-[#9EC5AB] text-[#0F1115] text-sm font-semibold"
             >
-              Save & Activate
+              {editingSession ? 'Update Session' : 'Save & Activate'}
             </button>
           </div>
         </form>
@@ -281,14 +344,24 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
                         {session.eventName}
                       </h2>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteSession(session.id)}
-                      aria-label="Delete event session"
-                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => openEditForm(session)}
+                        aria-label={`Edit ${session.eventName}`}
+                        className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F1F3F6] flex items-center justify-center"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteSession(session.id)}
+                        aria-label="Delete event session"
+                        className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {session.venue && (
