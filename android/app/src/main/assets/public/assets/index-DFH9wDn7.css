@@ -460,6 +460,10 @@
     right: 0;
   }
 
+  .right-1 {
+    right: var(--spacing);
+  }
+
   .right-2\.5 {
     right: calc(var(--spacing) * 2.5);
   }
@@ -777,6 +781,10 @@
     height: 100%;
   }
 
+  .h-px {
+    height: 1px;
+  }
+
   .h-screen {
     height: 100vh;
   }
@@ -845,20 +853,12 @@
     min-height: 50vh;
   }
 
-  .min-h-\[52px\] {
-    min-height: 52px;
-  }
-
   .min-h-\[148px\] {
     min-height: 148px;
   }
 
   .min-h-\[220px\] {
     min-height: 220px;
-  }
-
-  .min-h-\[240px\] {
-    min-height: 240px;
   }
 
   .min-h-\[360px\] {
@@ -1175,6 +1175,12 @@
     gap: calc(var(--spacing) * 6);
   }
 
+  :where(.space-y-0\.5 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * .5) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * .5) * calc(1 - var(--tw-space-y-reverse)));
+  }
+
   :where(.space-y-1 > :not(:last-child)) {
     --tw-space-y-reverse: 0;
     margin-block-start: calc(var(--spacing) * var(--tw-space-y-reverse));
@@ -1203,6 +1209,12 @@
     --tw-space-y-reverse: 0;
     margin-block-start: calc(calc(var(--spacing) * 3) * var(--tw-space-y-reverse));
     margin-block-end: calc(calc(var(--spacing) * 3) * calc(1 - var(--tw-space-y-reverse)));
+  }
+
+  :where(.space-y-3\.5 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 3.5) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 3.5) * calc(1 - var(--tw-space-y-reverse)));
   }
 
   :where(.space-y-4 > :not(:last-child)) {
@@ -1843,6 +1855,10 @@
     padding-right: calc(var(--spacing) * 9);
   }
 
+  .pr-11 {
+    padding-right: calc(var(--spacing) * 11);
+  }
+
   .pb-1 {
     padding-bottom: var(--spacing);
   }
@@ -2061,6 +2077,10 @@
   .antialiased {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  .placeholder-\[\#98A2B3\]\/60::placeholder {
+    color: oklab(70.9798% -.00421202 -.0269676 / .6);
   }
 
   .placeholder-\[\#98A2B3\]\/70::placeholder {
@@ -2360,6 +2380,10 @@
     border-color: oklab(80.1101% -.0302858 -.0529734 / .5);
   }
 
+  .focus\:border-\[\#9EC5AB\]\/50:focus {
+    border-color: oklab(78.7828% -.0505843 .0227981 / .5);
+  }
+
   .focus\:border-\[\#BEB4DC\]\/50:focus {
     border-color: oklab(79.1358% .025463 -.0510051 / .5);
   }
@@ -2594,8 +2618,8 @@
       display: none;
     }
 
-    .lg\:min-h-\[540px\] {
-      min-height: 540px;
+    .lg\:min-h-\[560px\] {
+      min-height: 560px;
     }
 
     .lg\:w-64 {

@@ -65,6 +65,8 @@ import {
   db,
   handleFirestoreError,
   OperationType,
+  reloadCurrentUser,
+  resendVerificationEmail,
   signOutSanctuary,
   upsertUserProfile,
   type UserProfileRecord,
@@ -228,21 +230,27 @@ export function App() {
     loadAll();
   }, [loadAll]);
 
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+
   // Firebase Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
+      setIsEmailVerified(Boolean(user?.emailVerified));
       if (!user) {
         setUserProfile(null);
+        setEmailVerificationSent(false);
       }
       setAuthReady(true);
     });
     return () => unsubscribe();
   }, []);
 
-  // Sync & subscribe to user profile only when authenticated
+  // Sync & subscribe to user profile only when authenticated AND email-verified
+  // (required by hardened Firestore security rules)
   useEffect(() => {
-    if (!authReady || !authUser) return;
+    if (!authReady || !authUser || !isEmailVerified) return;
 
     void upsertUserProfile(authUser).catch((err) => {
       console.error('Profile sync error:', err);
@@ -262,7 +270,7 @@ export function App() {
     );
 
     return () => unsubscribe();
-  }, [authReady, authUser]);
+  }, [authReady, authUser, isEmailVerified]);
 
   // Listen for Google Maps Platform Case A quota exhaustion events globally
   useEffect(() => {
@@ -911,6 +919,47 @@ export function App() {
               Sign Out
             </button>
           </div>
+
+          {/* Email verification notice for newly created Email/Password accounts */}
+          {!isEmailVerified && (
+            <div className="mb-5 rounded-2xl bg-[#171A21] border border-[#9BC4E2]/30 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-[#9BC4E2]">
+                  Verify your email ({authUser.email}) to sync your cloud profile
+                </p>
+                <p className="text-xs text-[#98A2B3]">
+                  {emailVerificationSent
+                    ? 'Verification email sent. Check your inbox and click the link, then tap I’ve Verified.'
+                    : 'Your local sanctuary works right away. Verify your inbox link whenever ready.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await resendVerificationEmail();
+                    setEmailVerificationSent(true);
+                  }}
+                  className="min-h-[38px] px-3 rounded-xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-[#F1F3F6] whitespace-nowrap"
+                >
+                  Resend Link
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const updated = await reloadCurrentUser();
+                    if (updated?.emailVerified) {
+                      await updated.getIdToken(true);
+                      setIsEmailVerified(true);
+                    }
+                  }}
+                  className="min-h-[38px] px-3 rounded-xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-xs font-semibold whitespace-nowrap"
+                >
+                  I’ve Verified
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Mobile Inline Active Soundscapes Bar */}
           {activeSoundscapeIds.length > 0 && route !== 'soundscapes' && (

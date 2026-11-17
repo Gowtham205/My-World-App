@@ -12521,6 +12521,23 @@ var LogOut = createLucideIcon("log-out", [
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var Mail = createLucideIcon("mail", [["path", {
+	d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7",
+	key: "132q7q"
+}], ["rect", {
+	x: "2",
+	y: "4",
+	width: "20",
+	height: "16",
+	rx: "2",
+	key: "izxlao"
+}]]);
+/**
+* @license lucide-react v0.546.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var MapPin = createLucideIcon("map-pin", [["path", {
 	d: "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0",
 	key: "1r0f0z"
@@ -13151,6 +13168,21 @@ var Upload = createLucideIcon("upload", [
 		key: "ih7n3h"
 	}]
 ]);
+/**
+* @license lucide-react v0.546.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var User$1 = createLucideIcon("user", [["path", {
+	d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",
+	key: "975kel"
+}], ["circle", {
+	cx: "12",
+	cy: "7",
+	r: "4",
+	key: "17ys0d"
+}]]);
 /**
 * @license lucide-react v0.546.0 - ISC
 *
@@ -18595,6 +18627,15 @@ async function linkEmailPassword(auth, request) {
 async function signInWithPassword(auth, request) {
 	return _performSignInRequest(auth, "POST", "/v1/accounts:signInWithPassword", _addTidIfNecessary(auth, request));
 }
+async function sendOobCode(auth, request) {
+	return _performApiRequest(auth, "POST", "/v1/accounts:sendOobCode", _addTidIfNecessary(auth, request));
+}
+async function sendEmailVerification$1(auth, request) {
+	return sendOobCode(auth, request);
+}
+async function sendPasswordResetEmail$1(auth, request) {
+	return sendOobCode(auth, request);
+}
 /**
 * @license
 * Copyright 2020 Google LLC
@@ -19742,6 +19783,9 @@ TwitterAuthProvider.PROVIDER_ID = "twitter.com";
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+async function signUp(auth, request) {
+	return _performSignInRequest(auth, "POST", "/v1/accounts:signUp", _addTidIfNecessary(auth, request));
+}
 /**
 * @license
 * Copyright 2020 Google LLC
@@ -19940,21 +19984,22 @@ async function _signInWithCredential(auth, credential, bypassAuthState = false) 
 	return userCredential;
 }
 /**
-* @license
-* Copyright 2020 Google LLC
+* Asynchronously signs in with the given credentials.
 *
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
+* @remarks
+* An {@link AuthProvider} can be used to generate the credential.
 *
-*   http://www.apache.org/licenses/LICENSE-2.0
+* This method is not supported by {@link Auth} instances created with a
+* {@link @firebase/app#FirebaseServerApp}.
 *
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
+* @param auth - The {@link Auth} instance.
+* @param credential - The auth credential.
+*
+* @public
 */
+async function signInWithCredential(auth, credential) {
+	return _signInWithCredential(_castAuth(auth), credential);
+}
 /**
 * @license
 * Copyright 2020 Google LLC
@@ -20019,6 +20064,169 @@ async function _signInWithCredential(auth, credential, bypassAuthState = false) 
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+function _setActionCodeSettingsOnRequest(auth, request, actionCodeSettings) {
+	_assert(actionCodeSettings.url?.length > 0, auth, "invalid-continue-uri");
+	_assert(typeof actionCodeSettings.dynamicLinkDomain === "undefined" || actionCodeSettings.dynamicLinkDomain.length > 0, auth, "invalid-dynamic-link-domain");
+	_assert(typeof actionCodeSettings.linkDomain === "undefined" || actionCodeSettings.linkDomain.length > 0, auth, "invalid-hosting-link-domain");
+	request.continueUrl = actionCodeSettings.url;
+	request.dynamicLinkDomain = actionCodeSettings.dynamicLinkDomain;
+	request.linkDomain = actionCodeSettings.linkDomain;
+	request.canHandleCodeInApp = actionCodeSettings.handleCodeInApp;
+	if (actionCodeSettings.iOS) {
+		_assert(actionCodeSettings.iOS.bundleId.length > 0, auth, "missing-ios-bundle-id");
+		request.iOSBundleId = actionCodeSettings.iOS.bundleId;
+	}
+	if (actionCodeSettings.android) {
+		_assert(actionCodeSettings.android.packageName.length > 0, auth, "missing-android-pkg-name");
+		request.androidInstallApp = actionCodeSettings.android.installApp;
+		request.androidMinimumVersionCode = actionCodeSettings.android.minimumVersion;
+		request.androidPackageName = actionCodeSettings.android.packageName;
+	}
+}
+/**
+* @license
+* Copyright 2020 Google LLC
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*   http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+/**
+* Updates the password policy cached in the {@link Auth} instance if a policy is already
+* cached for the project or tenant.
+*
+* @remarks
+* We only fetch the password policy if the password did not meet policy requirements and
+* there is an existing policy cached. A developer must call validatePassword at least
+* once for the cache to be automatically updated.
+*
+* @param auth - The {@link Auth} instance.
+*
+* @private
+*/
+async function recachePasswordPolicy(auth) {
+	const authInternal = _castAuth(auth);
+	if (authInternal._getPasswordPolicyInternal()) await authInternal._updatePasswordPolicy();
+}
+/**
+* Sends a password reset email to the given email address. This method does not throw an error when
+* there's no user account with the given email address and
+* {@link https://cloud.google.com/identity-platform/docs/admin/email-enumeration-protection | Email Enumeration Protection}
+* is enabled.
+*
+* @remarks
+* To complete the password reset, call {@link confirmPasswordReset} with the code supplied in
+* the email sent to the user, along with the new password specified by the user.
+*
+* @example
+* ```javascript
+* const actionCodeSettings = {
+*   url: 'https://www.example.com/?email=user@example.com',
+*   iOS: {
+*      bundleId: 'com.example.ios'
+*   },
+*   android: {
+*     packageName: 'com.example.android',
+*     installApp: true,
+*     minimumVersion: '12'
+*   },
+*   handleCodeInApp: true
+* };
+* await sendPasswordResetEmail(auth, 'user@example.com', actionCodeSettings);
+* // Obtain code from user.
+* await confirmPasswordReset('user@example.com', code);
+* ```
+*
+* @param auth - The {@link Auth} instance.
+* @param email - The user's email address.
+* @param actionCodeSettings - The {@link ActionCodeSettings}.
+*
+* @public
+*/
+async function sendPasswordResetEmail(auth, email, actionCodeSettings) {
+	const authInternal = _castAuth(auth);
+	const request = {
+		requestType: "PASSWORD_RESET",
+		email,
+		clientType: "CLIENT_TYPE_WEB"
+	};
+	if (actionCodeSettings) _setActionCodeSettingsOnRequest(authInternal, request, actionCodeSettings);
+	await handleRecaptchaFlow(authInternal, request, "getOobCode", sendPasswordResetEmail$1, "EMAIL_PASSWORD_PROVIDER");
+}
+/**
+* Creates a new user account associated with the specified email address and password.
+*
+* @remarks
+* On successful creation of the user account, this user will also be signed in to your application.
+*
+* User account creation can fail if the account already exists or the password is invalid.
+*
+* This method is not supported on {@link Auth} instances created with a
+* {@link @firebase/app#FirebaseServerApp}.
+*
+* Note: The email address acts as a unique identifier for the user and enables an email-based
+* password reset. This function will create a new user account and set the initial user password.
+*
+* @param auth - The {@link Auth} instance.
+* @param email - The user's email address.
+* @param password - The user's chosen password.
+*
+* @public
+*/
+async function createUserWithEmailAndPassword(auth, email, password) {
+	if (_isFirebaseServerApp(auth.app)) return Promise.reject(_serverAppCurrentUserOperationNotSupportedError(auth));
+	const authInternal = _castAuth(auth);
+	const response = await handleRecaptchaFlow(authInternal, {
+		returnSecureToken: true,
+		email,
+		password,
+		clientType: "CLIENT_TYPE_WEB"
+	}, "signUpPassword", signUp, "EMAIL_PASSWORD_PROVIDER").catch((error) => {
+		if (error.code === `auth/password-does-not-meet-requirements`) recachePasswordPolicy(auth);
+		throw error;
+	});
+	const userCredential = await UserCredentialImpl._fromIdTokenResponse(authInternal, "signIn", response);
+	await authInternal._updateCurrentUser(userCredential.user);
+	return userCredential;
+}
+/**
+* Asynchronously signs in using an email and password.
+*
+* @remarks
+* Fails with an error if the email address and password do not match. When
+* {@link https://cloud.google.com/identity-platform/docs/admin/email-enumeration-protection | Email Enumeration Protection}
+* is enabled, this method fails with "auth/invalid-credential" in case of an invalid
+* email/password.
+*
+* This method is not supported on {@link Auth} instances created with a
+* {@link @firebase/app#FirebaseServerApp}.
+*
+* Note: The user's password is NOT the password used to access the user's email account. The
+* email address serves as a unique identifier for the user, and the password is used to access
+* the user's account in your Firebase project. See also: {@link createUserWithEmailAndPassword}.
+*
+*
+* @param auth - The {@link Auth} instance.
+* @param email - The users email address.
+* @param password - The users password.
+*
+* @public
+*/
+function signInWithEmailAndPassword(auth, email, password) {
+	if (_isFirebaseServerApp(auth.app)) return Promise.reject(_serverAppCurrentUserOperationNotSupportedError(auth));
+	return signInWithCredential(getModularInstance(auth), EmailAuthProvider.credential(email, password)).catch(async (error) => {
+		if (error.code === `auth/password-does-not-meet-requirements`) recachePasswordPolicy(auth);
+		throw error;
+	});
+}
 /**
 * @license
 * Copyright 2020 Google LLC
@@ -20068,21 +20276,45 @@ async function _signInWithCredential(auth, credential, bypassAuthState = false) 
 * limitations under the License.
 */
 /**
-* @license
-* Copyright 2020 Google LLC
+* Sends a verification email to a user.
 *
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
+* @remarks
+* The verification process is completed by calling {@link applyActionCode}.
 *
-*   http://www.apache.org/licenses/LICENSE-2.0
+* @example
+* ```javascript
+* const actionCodeSettings = {
+*   url: 'https://www.example.com/?email=user@example.com',
+*   iOS: {
+*      bundleId: 'com.example.ios'
+*   },
+*   android: {
+*     packageName: 'com.example.android',
+*     installApp: true,
+*     minimumVersion: '12'
+*   },
+*   handleCodeInApp: true
+* };
+* await sendEmailVerification(user, actionCodeSettings);
+* // Obtain code from the user.
+* await applyActionCode(auth, code);
+* ```
 *
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
+* @param user - The user.
+* @param actionCodeSettings - The {@link ActionCodeSettings}.
+*
+* @public
 */
+async function sendEmailVerification(user, actionCodeSettings) {
+	const userInternal = getModularInstance(user);
+	const request = {
+		requestType: "VERIFY_EMAIL",
+		idToken: await user.getIdToken()
+	};
+	if (actionCodeSettings) _setActionCodeSettingsOnRequest(userInternal.auth, request, actionCodeSettings);
+	const { email } = await sendEmailVerification$1(userInternal.auth, request);
+	if (email !== user.email) await user.reload();
+}
 /**
 * @license
 * Copyright 2020 Google LLC
@@ -20099,6 +20331,53 @@ async function _signInWithCredential(auth, credential, bypassAuthState = false) 
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+async function updateProfile$1(auth, request) {
+	return _performApiRequest(auth, "POST", "/v1/accounts:update", request);
+}
+/**
+* @license
+* Copyright 2020 Google LLC
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*   http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+/**
+* Updates a user's profile data.
+*
+* @param user - The user.
+* @param profile - The profile's `displayName` and `photoURL` to update.
+*
+* @public
+*/
+async function updateProfile(user, profile) {
+	const { displayName, photoURL: photoUrl } = profile;
+	if (displayName === void 0 && photoUrl === void 0) return;
+	const userInternal = getModularInstance(user);
+	const profileRequest = {
+		idToken: await userInternal.getIdToken(),
+		displayName,
+		photoUrl,
+		returnSecureToken: true
+	};
+	const response = await _logoutIfInvalidated(userInternal, updateProfile$1(userInternal.auth, profileRequest));
+	userInternal.displayName = response.displayName || null;
+	userInternal.photoURL = response.photoUrl || null;
+	const passwordProvider = userInternal.providerData.find(({ providerId }) => providerId === "password");
+	if (passwordProvider) {
+		passwordProvider.displayName = userInternal.displayName;
+		passwordProvider.photoURL = userInternal.photoURL;
+	}
+	await userInternal._updateTokensIfNecessary(response);
+}
 /**
 * @license
 * Copyright 2019 Google LLC
@@ -50826,6 +51105,29 @@ testConnection();
 async function signInWithGoogle() {
 	return (await signInWithPopup(auth, googleProvider)).user;
 }
+async function signInWithEmail(email, password) {
+	return (await signInWithEmailAndPassword(auth, email.trim(), password)).user;
+}
+async function signUpWithEmail(name, email, password) {
+	const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+	const cleanName = name.trim().slice(0, 100);
+	if (cleanName) await updateProfile(result.user, { displayName: cleanName });
+	try {
+		await sendEmailVerification(result.user);
+	} catch {}
+	return result.user;
+}
+async function sendResetPasswordEmail(email) {
+	await sendPasswordResetEmail(auth, email.trim());
+}
+async function resendVerificationEmail() {
+	if (auth.currentUser) await sendEmailVerification(auth.currentUser);
+}
+async function reloadCurrentUser() {
+	if (!auth.currentUser) return null;
+	await auth.currentUser.reload();
+	return auth.currentUser;
+}
 async function signOutSanctuary() {
 	await signOut(auth);
 }
@@ -50873,25 +51175,90 @@ async function upsertUserProfile(user, preferredName) {
 	}
 }
 // src/components/AuthGate.tsx
+function mapAuthError(err) {
+	switch (err?.code || "") {
+		case "auth/popup-closed-by-user":
+		case "auth/cancelled-popup-request": return "Sign-in popup was closed before completing. Please try again.";
+		case "auth/popup-blocked": return "Your browser blocked the sign-in popup. Allow popups or use Email & Password above.";
+		case "auth/unauthorized-domain": return "This domain is not authorized in Firebase Authentication settings.";
+		case "auth/operation-not-allowed": return "Email/Password sign-in is not enabled yet in Firebase Console (Authentication → Sign-in method → Email/Password). Enable it there or continue with Google below.";
+		case "auth/invalid-credential":
+		case "auth/wrong-password":
+		case "auth/user-not-found": return "Incorrect email or password. Please check your details and try again.";
+		case "auth/email-already-in-use": return "An account already exists with this email. Switch to Sign In instead.";
+		case "auth/weak-password": return "Please choose a password with at least 6 characters.";
+		case "auth/invalid-email": return "Please enter a valid email address.";
+		case "auth/too-many-requests": return "Too many attempts. Please wait a moment and try again.";
+		default: return err instanceof Error ? err.message : "Unable to sign in right now. Please try again.";
+	}
+}
 var AuthGate = ({ onSignedIn }) => {
 	const [mode, setMode] = (0, import_react.useState)("signin");
-	const [loading, setLoading] = (0, import_react.useState)(false);
+	const [name, setName] = (0, import_react.useState)("");
+	const [email, setEmail] = (0, import_react.useState)("");
+	const [password, setPassword] = (0, import_react.useState)("");
+	const [showPassword, setShowPassword] = (0, import_react.useState)(false);
+	const [loadingMethod, setLoadingMethod] = (0, import_react.useState)(null);
 	const [errorMsg, setErrorMsg] = (0, import_react.useState)(null);
-	const handleGoogleAuth = async () => {
-		if (loading) return;
+	const [statusMsg, setStatusMsg] = (0, import_react.useState)(null);
+	const handleEmailSubmit = async (e) => {
+		e.preventDefault();
+		if (loadingMethod) return;
 		setErrorMsg(null);
-		setLoading(true);
+		setStatusMsg(null);
+		if (!email.trim()) {
+			setErrorMsg("Please enter your email address.");
+			return;
+		}
+		if (password.length < 6) {
+			setErrorMsg("Password must be at least 6 characters.");
+			return;
+		}
+		if (mode === "signup" && !name.trim()) {
+			setErrorMsg("Please enter your name for your sanctuary profile.");
+			return;
+		}
+		setLoadingMethod("email");
+		try {
+			if (mode === "signin") await signInWithEmail(email, password);
+			else await signUpWithEmail(name, email, password);
+			onSignedIn?.();
+		} catch (err) {
+			setErrorMsg(mapAuthError(err));
+		} finally {
+			setLoadingMethod(null);
+		}
+	};
+	const handlePasswordReset = async () => {
+		if (loadingMethod) return;
+		setErrorMsg(null);
+		setStatusMsg(null);
+		if (!email.trim()) {
+			setErrorMsg("Enter your email address first, then tap Forgot password.");
+			return;
+		}
+		setLoadingMethod("reset");
+		try {
+			await sendResetPasswordEmail(email);
+			setStatusMsg(`Password reset email sent to ${email.trim()}.`);
+		} catch (err) {
+			setErrorMsg(mapAuthError(err));
+		} finally {
+			setLoadingMethod(null);
+		}
+	};
+	const handleGoogleAuth = async () => {
+		if (loadingMethod) return;
+		setErrorMsg(null);
+		setStatusMsg(null);
+		setLoadingMethod("google");
 		try {
 			await signInWithGoogle();
 			onSignedIn?.();
 		} catch (err) {
-			const code = err?.code || "";
-			if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") setErrorMsg("Sign-in popup was closed before completing. Please try again.");
-			else if (code === "auth/popup-blocked") setErrorMsg("Your browser blocked the sign-in popup. Please allow popups for this site and try again.");
-			else if (code === "auth/unauthorized-domain") setErrorMsg("This domain is not yet authorized in Firebase Authentication settings.");
-			else setErrorMsg(err instanceof Error ? err.message : "Unable to sign in right now. Please try again.");
+			setErrorMsg(mapAuthError(err));
 		} finally {
-			setLoading(false);
+			setLoadingMethod(null);
 		}
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
@@ -50899,7 +51266,7 @@ var AuthGate = ({ onSignedIn }) => {
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "w-full max-w-5xl rounded-3xl bg-[#171A21] border border-white/[0.08] overflow-hidden grid grid-cols-1 lg:grid-cols-12 items-stretch",
 			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "lg:col-span-6 relative min-h-[240px] lg:min-h-[540px] flex flex-col justify-between p-7 sm:p-10 bg-gradient-to-br from-[#1C2229] via-[#151920] to-[#111419]",
+				className: "lg:col-span-6 relative min-h-[220px] lg:min-h-[560px] flex flex-col justify-between p-7 sm:p-10 bg-gradient-to-br from-[#1C2229] via-[#151920] to-[#111419]",
 				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
 						src: "/src/assets/images/sanctuary_calm_horizon_1794911112791.jpg",
@@ -50929,20 +51296,20 @@ var AuthGate = ({ onSignedIn }) => {
 								className: "flex items-start gap-3",
 								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { className: "w-4 h-4 text-[#9EC5AB] mt-0.5 shrink-0" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 									className: "text-xs sm:text-sm text-[#D0D5DD] leading-relaxed",
-									children: "Your notes, tasks, alarms, and AES-256 encrypted vault remain stored privately on this device."
+									children: "Your notes, tasks, alarms, custom audio, and AES-256 vault remain stored privately on your device."
 								})]
 							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 								className: "flex items-start gap-3",
 								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sparkles, { className: "w-4 h-4 text-[#BEB4DC] mt-0.5 shrink-0" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 									className: "text-xs sm:text-sm text-[#D0D5DD] leading-relaxed",
-									children: "Signing in protects entry to your sanctuary and enables Gemini Companion, Live Voice, and Audio Transcription."
+									children: "Sign in with any email address or your Google account to unlock your sanctuary."
 								})]
 							})]
 						})]
 					})
 				]
 			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "lg:col-span-6 p-7 sm:p-10 flex flex-col justify-center space-y-6",
+				className: "lg:col-span-6 p-7 sm:p-10 flex flex-col justify-center space-y-5",
 				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 						className: "space-y-2",
@@ -50958,6 +51325,7 @@ var AuthGate = ({ onSignedIn }) => {
 									onClick: () => {
 										setMode("signin");
 										setErrorMsg(null);
+										setStatusMsg(null);
 									},
 									className: `min-h-[40px] px-4 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${mode === "signin" ? "bg-[#1D212A] text-[#F1F3F6]" : "text-[#98A2B3] hover:text-[#F1F3F6]"}`,
 									children: "Sign In"
@@ -50968,18 +51336,19 @@ var AuthGate = ({ onSignedIn }) => {
 									onClick: () => {
 										setMode("signup");
 										setErrorMsg(null);
+										setStatusMsg(null);
 									},
 									className: `min-h-[40px] px-4 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${mode === "signup" ? "bg-[#1D212A] text-[#F1F3F6]" : "text-[#98A2B3] hover:text-[#F1F3F6]"}`,
 									children: "Create Account"
 								})]
 							}),
 							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
-								className: "font-display text-2xl font-medium text-[#F1F3F6] pt-2",
+								className: "font-display text-2xl font-medium text-[#F1F3F6] pt-1",
 								children: mode === "signin" ? "Welcome back" : "Create your sanctuary"
 							}),
 							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-								className: "text-sm text-[#98A2B3] leading-relaxed",
-								children: mode === "signin" ? "Sign in with your Google or Gmail account to enter My World." : "Use your Google or Gmail account to set up your personal My World profile in one tap."
+								className: "text-xs sm:text-sm text-[#98A2B3] leading-relaxed",
+								children: mode === "signin" ? "Sign in with your email and password, or continue with Google." : "Sign up with any email address or set up instantly using Google."
 							})
 						]
 					}),
@@ -50988,45 +51357,137 @@ var AuthGate = ({ onSignedIn }) => {
 						className: "rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#F2B8A2] leading-relaxed",
 						children: errorMsg
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-						className: "space-y-3",
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
-							type: "button",
-							disabled: loading,
-							onClick: () => void handleGoogleAuth(),
-							className: "w-full min-h-[52px] px-5 py-3 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] disabled:opacity-60 text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-3 transition-colors",
-							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
-									"aria-hidden": "true",
-									viewBox: "0 0 24 24",
-									className: "w-5 h-5 shrink-0",
-									children: [
-										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
-											fill: "#0F1115",
-											d: "M21.805 10.023H12.2v3.955h5.52c-.238 1.275-.957 2.355-2.04 3.08v2.56h3.302c1.932-1.78 3.048-4.4 3.048-7.508 0-.705-.064-1.384-.225-2.087Z"
-										}),
-										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
-											fill: "#0F1115",
-											d: "M12.2 22c2.76 0 5.075-.915 6.767-2.382l-3.302-2.56c-.915.613-2.085.975-3.465.975-2.665 0-4.922-1.8-5.73-4.218H3.058v2.642C4.74 19.798 8.202 22 12.2 22Z"
-										}),
-										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
-											fill: "#0F1115",
-											d: "M6.47 13.815A5.97 5.97 0 0 1 6.155 12c0-.63.11-1.242.315-1.815V7.543H3.058A9.992 9.992 0 0 0 2 12c0 1.615.388 3.144 1.058 4.457l3.412-2.642Z"
-										}),
-										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
-											fill: "#0F1115",
-											d: "M12.2 5.967c1.501 0 2.848.516 3.908 1.53l2.931-2.931C17.27 2.912 14.955 2 12.2 2 8.202 2 4.74 4.202 3.058 7.543l3.412 2.642c.808-2.418 3.065-4.218 5.73-4.218Z"
-										})
-									]
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: loading ? "Connecting..." : mode === "signin" ? "Continue with Google" : "Sign Up with Google" }),
-								!loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "w-4 h-4 shrink-0" })
-							]
-						})
+					statusMsg && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						role: "status",
+						className: "rounded-2xl bg-[#9EC5AB]/10 border border-[#9EC5AB]/30 px-4 py-3 text-xs text-[#9EC5AB] leading-relaxed",
+						children: statusMsg
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
+						onSubmit: handleEmailSubmit,
+						className: "space-y-3.5",
+						children: [
+							mode === "signup" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+								htmlFor: "auth-name",
+								className: "block text-xs text-[#98A2B3] mb-1",
+								children: "Your Name"
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "relative",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(User$1, { className: "w-4 h-4 text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									id: "auth-name",
+									type: "text",
+									required: true,
+									value: name,
+									onChange: (e) => setName(e.target.value),
+									placeholder: "e.g. Gowtham",
+									autoComplete: "name",
+									className: "w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+								})]
+							})] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+								htmlFor: "auth-email",
+								className: "block text-xs text-[#98A2B3] mb-1",
+								children: "Email Address"
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "relative",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mail, { className: "w-4 h-4 text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									id: "auth-email",
+									type: "email",
+									required: true,
+									value: email,
+									onChange: (e) => setEmail(e.target.value),
+									placeholder: "you@example.com",
+									autoComplete: "email",
+									className: "w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+								})]
+							})] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "flex items-center justify-between mb-1",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+									htmlFor: "auth-password",
+									className: "block text-xs text-[#98A2B3]",
+									children: "Password"
+								}), mode === "signin" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+									type: "button",
+									disabled: loadingMethod !== null,
+									onClick: () => void handlePasswordReset(),
+									className: "text-xs text-[#9BC4E2] hover:underline disabled:opacity-50",
+									children: loadingMethod === "reset" ? "Sending..." : "Forgot password?"
+								})]
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "relative",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { className: "w-4 h-4 text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+										id: "auth-password",
+										type: showPassword ? "text" : "password",
+										required: true,
+										minLength: 6,
+										value: password,
+										onChange: (e) => setPassword(e.target.value),
+										placeholder: mode === "signup" ? "At least 6 characters" : "Enter your password",
+										autoComplete: mode === "signup" ? "new-password" : "current-password",
+										className: "w-full min-h-[46px] pl-10 pr-11 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										type: "button",
+										onClick: () => setShowPassword((v) => !v),
+										"aria-label": showPassword ? "Hide password" : "Show password",
+										className: "w-10 h-10 absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center text-[#98A2B3] hover:text-[#F1F3F6]",
+										children: showPassword ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EyeOff, { className: "w-4 h-4" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Eye, { className: "w-4 h-4" })
+									})
+								]
+							})] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+								type: "submit",
+								disabled: loadingMethod !== null,
+								className: "w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] disabled:opacity-60 text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: loadingMethod === "email" ? mode === "signin" ? "Signing In..." : "Creating Account..." : mode === "signin" ? "Sign In with Email" : "Create Account" }), loadingMethod !== "email" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "w-4 h-4 shrink-0" })]
+							})
+						]
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						className: "pt-4 border-t border-white/[0.06] flex items-start gap-2.5 text-xs text-[#98A2B3] leading-relaxed",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, { className: "w-4 h-4 text-[#9EC5AB] mt-0.5 shrink-0" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Secured by Firebase Authentication. No separate password to remember, and your local sanctuary data stays private to you." })]
+						className: "flex items-center gap-3",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-px flex-1 bg-white/[0.08]" }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-xs text-[#98A2B3]",
+								children: "or"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-px flex-1 bg-white/[0.08]" })
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						type: "button",
+						disabled: loadingMethod !== null,
+						onClick: () => void handleGoogleAuth(),
+						className: "w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.1] disabled:opacity-60 text-[#F1F3F6] text-sm font-medium flex items-center justify-center gap-3 transition-colors",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+							"aria-hidden": "true",
+							viewBox: "0 0 24 24",
+							className: "w-4 h-4 shrink-0",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+									fill: "#F1F3F6",
+									d: "M21.805 10.023H12.2v3.955h5.52c-.238 1.275-.957 2.355-2.04 3.08v2.56h3.302c1.932-1.78 3.048-4.4 3.048-7.508 0-.705-.064-1.384-.225-2.087Z"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+									fill: "#F1F3F6",
+									d: "M12.2 22c2.76 0 5.075-.915 6.767-2.382l-3.302-2.56c-.915.613-2.085.975-3.465.975-2.665 0-4.922-1.8-5.73-4.218H3.058v2.642C4.74 19.798 8.202 22 12.2 22Z"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+									fill: "#F1F3F6",
+									d: "M6.47 13.815A5.97 5.97 0 0 1 6.155 12c0-.63.11-1.242.315-1.815V7.543H3.058A9.992 9.992 0 0 0 2 12c0 1.615.388 3.144 1.058 4.457l3.412-2.642Z"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+									fill: "#F1F3F6",
+									d: "M12.2 5.967c1.501 0 2.848.516 3.908 1.53l2.931-2.931C17.27 2.912 14.955 2 12.2 2 8.202 2 4.74 4.202 3.058 7.543l3.412 2.642c.808-2.418 3.065-4.218 5.73-4.218Z"
+								})
+							]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: loadingMethod === "google" ? "Connecting Google..." : "Continue with Google" })]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "pt-2 border-t border-white/[0.06] flex items-start gap-2.5 text-xs text-[#98A2B3] leading-relaxed",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, { className: "w-4 h-4 text-[#9EC5AB] mt-0.5 shrink-0" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Secured by Firebase Authentication. Use Email & Password for mobile APK builds or Google Sign-In on the web." })]
 					})
 				]
 			})]
@@ -88517,16 +88978,22 @@ function App() {
 	(0, import_react.useEffect)(() => {
 		loadAll();
 	}, [loadAll]);
+	const [isEmailVerified, setIsEmailVerified] = (0, import_react.useState)(false);
+	const [emailVerificationSent, setEmailVerificationSent] = (0, import_react.useState)(false);
 	(0, import_react.useEffect)(() => {
 		const unsubscribe = onAuthStateChanged(auth, (user) => {
 			setAuthUser(user);
-			if (!user) setUserProfile(null);
+			setIsEmailVerified(Boolean(user?.emailVerified));
+			if (!user) {
+				setUserProfile(null);
+				setEmailVerificationSent(false);
+			}
 			setAuthReady(true);
 		});
 		return () => unsubscribe();
 	}, []);
 	(0, import_react.useEffect)(() => {
-		if (!authReady || !authUser) return;
+		if (!authReady || !authUser || !isEmailVerified) return;
 		upsertUserProfile(authUser).catch((err) => {
 			console.error("Profile sync error:", err);
 		});
@@ -88537,7 +89004,11 @@ function App() {
 			handleFirestoreError(error, OperationType.GET, profilePath);
 		});
 		return () => unsubscribe();
-	}, [authReady, authUser]);
+	}, [
+		authReady,
+		authUser,
+		isEmailVerified
+	]);
 	(0, import_react.useEffect)(() => {
 		const handleQuota = () => setMapsQuotaExceeded(true);
 		window.addEventListener("gmp-quota-exceeded", handleQuota);
@@ -89062,6 +89533,45 @@ function App() {
 									onClick: () => void handleSignOut(),
 									className: "min-h-[44px] px-3 rounded-2xl bg-[#171A21] border border-white/[0.07] text-xs font-medium text-[#98A2B3] hover:text-[#F2B8A2] inline-flex items-center gap-1.5 shrink-0",
 									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LogOut, { className: "w-3.5 h-3.5" }), "Sign Out"]
+								})]
+							}),
+							!isEmailVerified && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "mb-5 rounded-2xl bg-[#171A21] border border-[#9BC4E2]/30 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "space-y-0.5",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										className: "text-xs font-medium text-[#9BC4E2]",
+										children: [
+											"Verify your email (",
+											authUser.email,
+											") to sync your cloud profile"
+										]
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-xs text-[#98A2B3]",
+										children: emailVerificationSent ? "Verification email sent. Check your inbox and click the link, then tap I’ve Verified." : "Your local sanctuary works right away. Verify your inbox link whenever ready."
+									})]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "flex items-center gap-2 shrink-0",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										type: "button",
+										onClick: async () => {
+											await resendVerificationEmail();
+											setEmailVerificationSent(true);
+										},
+										className: "min-h-[38px] px-3 rounded-xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-[#F1F3F6] whitespace-nowrap",
+										children: "Resend Link"
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										type: "button",
+										onClick: async () => {
+											const updated = await reloadCurrentUser();
+											if (updated?.emailVerified) {
+												await updated.getIdToken(true);
+												setIsEmailVerified(true);
+											}
+										},
+										className: "min-h-[38px] px-3 rounded-xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-xs font-semibold whitespace-nowrap",
+										children: "I’ve Verified"
+									})]
 								})]
 							}),
 							activeSoundscapeIds.length > 0 && route !== "soundscapes" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
