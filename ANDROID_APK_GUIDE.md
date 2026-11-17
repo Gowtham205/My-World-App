@@ -52,18 +52,28 @@ VITE_API_BASE_URL=https://my-world-appify.ai.studio
    ```
    *(Every time you edit `.env` or frontend files, re-run `npm run cap:sync` so `dist/` is rebuilt and copied into `android/app/src/main/assets/public`.)*
 
-3. **Open the project in Android Studio:**
+3. **Open the `android/` subfolder in Android Studio:**
    ```bash
    npm run cap:open
    ```
-   *(Or open the `android/` folder directly from Android Studio.)*
+   *(If you open it manually in Android Studio, click **File → Open...** and select the **`android`** subfolder inside your project — **NOT** the outer root folder containing `package.json`. Opening the outer folder prevents Android Studio from showing the **Build → Build Bundle(s) / APK(s)** menu.)*
 
 4. **Compile the `.apk`:**
-   - Wait for Gradle sync to finish inside Android Studio.
-   - Select **Build → Build Bundle(s) / APK(s) → Build APK(s)** (for testing) or **Build → Generate Signed Bundle / APK...** (for release).
-   - Or build from the terminal inside `android/`:
+   - Look at the bottom-right status bar in Android Studio and **wait for Gradle sync / indexing to finish** (the **Build APK(s)** option stays hidden until Gradle finishes syncing).
+   - Once synced, select **Build → Build Bundle(s) / APK(s) → Build APK(s)** (for testing) or **Build → Generate Signed Bundle / APK...** (for release).
+   - **If you still don't see Build APK(s)** (for example, `android/build.gradle` or `android/gradlew.bat` is missing from a downloaded zip):
+     Run this in your project root terminal (PowerShell on Windows) to regenerate `android/` while keeping your permissions:
+     ```powershell
+     Copy-Item android\app\src\main\AndroidManifest.xml .\AndroidManifest.xml.bak
+     Remove-Item -Recurse -Force android
+     npm run cap:add-android
+     Move-Item -Force .\AndroidManifest.xml.bak android\app\src\main\AndroidManifest.xml
+     npm run cap:sync
+     ```
+     Then close the project in Android Studio and open the **`android`** subfolder again (**File → Open... → select `android`**).
+   - Or build directly from the terminal inside `android/`:
      - **macOS / Linux:** `./gradlew assembleDebug`
-     - **Windows:** `gradlew.bat assembleDebug`
+     - **Windows:** `.\gradlew.bat assembleDebug`
    - Output APK path:
      `android/app/build/outputs/apk/debug/app-debug.apk`
 
