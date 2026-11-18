@@ -86,13 +86,15 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
       onClick={onClose}
     >
       <aside
-        className="w-full max-w-md h-full bg-white dark:bg-[#13161C] border-l border-slate-900/[0.08] dark:border-white/[0.08] flex flex-col shadow-2xl"
+        className="w-full max-w-md h-full bg-gradient-to-b from-[#F4F8F5] via-[#FAF8FC] to-[#F7F9FC] dark:from-[#151A25] dark:via-[#141722] dark:to-[#12151E] border-l border-[#9EC5AB]/30 dark:border-[#9EC5AB]/20 flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-900/[0.08] dark:border-white/[0.07] flex items-center justify-between gap-3 shrink-0">
+        <div className="px-5 py-4 border-b border-slate-900/[0.08] dark:border-white/[0.07] bg-white/55 dark:bg-white/[0.03] flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5">
-            <Bell className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />
+            <div className="w-9 h-9 rounded-xl bg-[#E4F2E9] dark:bg-[#1D2D24] border border-[#9EC5AB]/35 flex items-center justify-center">
+              <Bell className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />
+            </div>
             <div>
               <h2 className="font-display text-lg font-medium text-[#111827] dark:text-[#F1F3F6]">
                 Notifications
@@ -107,7 +109,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close Notifications"
-            className="min-w-[44px] min-h-[44px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center shrink-0"
+            className="min-w-[44px] min-h-[44px] rounded-2xl bg-white/75 dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.08] dark:border-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -115,7 +117,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 
         {/* Filter Bar + Actions */}
         <div className="px-5 py-3 border-b border-slate-900/[0.06] dark:border-white/[0.06] flex items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A]">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-white/65 dark:bg-[#1D212A] border border-slate-900/[0.06] dark:border-white/[0.06]">
             {(['all', 'missed', 'unread'] as const).map((tab) => (
               <button
                 key={tab}
@@ -123,7 +125,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                 onClick={() => setFilter(tab)}
                 className={`min-h-[34px] px-3 rounded-lg text-xs font-medium capitalize transition-colors whitespace-nowrap ${
                   filter === tab
-                    ? 'bg-white dark:bg-[#171A21] text-[#111827] dark:text-[#F1F3F6] shadow-xs'
+                    ? 'bg-[#E4F2E9] dark:bg-[#23322A] text-[#245C3D] dark:text-[#A9DFBE] shadow-xs'
                     : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
                 }`}
               >
@@ -161,7 +163,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
         {/* Notification List */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {filtered.length === 0 ? (
-            <div className="rounded-3xl bg-[#F4F6F8] dark:bg-[#171A21] border border-slate-900/[0.07] dark:border-white/[0.07] p-8 text-center">
+            <div className="rounded-3xl bg-white/75 dark:bg-[#191E2A]/85 border border-slate-900/[0.07] dark:border-white/[0.07] p-8 text-center">
               <Bell className="w-7 h-7 text-[#5B6472] dark:text-[#98A2B3] mx-auto mb-3 opacity-60" />
               <p className="text-sm font-medium text-[#111827] dark:text-[#F1F3F6]">
                 {filter === 'all' ? 'No missed or recent alerts' : `No ${filter} notifications`}
@@ -177,8 +179,8 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                 key={item.id}
                 className={`rounded-2xl border p-4 transition-colors ${
                   item.read
-                    ? 'bg-[#F4F6F8]/70 dark:bg-[#171A21]/60 border-slate-900/[0.06] dark:border-white/[0.05]'
-                    : 'bg-white dark:bg-[#171A21] border-[#9EC5AB]/45 shadow-xs'
+                    ? 'bg-white/60 dark:bg-[#191E2A]/65 border-slate-900/[0.07] dark:border-white/[0.06]'
+                    : 'bg-gradient-to-br from-[#F4FAF6] to-[#FFFFFF] dark:from-[#1B242B] dark:to-[#181C26] border-[#9EC5AB]/45 dark:border-[#9EC5AB]/30 shadow-xs'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2.5">
@@ -191,7 +193,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                     }}
                     className="flex items-start gap-3 text-left min-w-0 flex-1"
                   >
-                    <div className="w-9 h-9 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-9 h-9 rounded-xl bg-white/85 dark:bg-[#232938] border border-slate-900/[0.06] dark:border-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
                       {renderIcon(item.kind)}
                     </div>
                     <div className="min-w-0 flex-1">

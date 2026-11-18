@@ -231,9 +231,9 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <header className="rounded-3xl bg-gradient-to-br from-[#FDF1EB] via-[#FFF7F3] to-[#FDF6EB] dark:from-[#2C1E1B] dark:via-[#241A1A] dark:to-[#241E17] border border-[#F2B8A2]/45 dark:border-[#F2B8A2]/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 shadow-xs">
         <div>
-          <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2]">Dedicated Alarms & Custom Audio</p>
+          <p className="text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2]">Dedicated Alarms & Custom Audio</p>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Wake-Up, Medicine & Break Alarms
           </h1>
@@ -245,7 +245,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
         <button
           type="button"
           onClick={openAddForm}
-          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#F2B8A2] hover:bg-[#E7A890] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#F2B8A2] hover:bg-[#E7A890] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors whitespace-nowrap shadow-xs"
         >
           <Plus className="w-4 h-4" />
           New Alarm
@@ -255,7 +255,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
       {showAdd && (
         <form
           onSubmit={handleSaveForm}
-          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4"
+          className="rounded-3xl bg-white/90 dark:bg-[#191D28]/95 border border-[#F2B8A2]/40 dark:border-[#F2B8A2]/25 p-5 sm:p-7 space-y-4 shadow-xs"
         >
           <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
             {editingAlarm ? 'Edit Alarm' : 'Configure Alarm'}

@@ -40,13 +40,55 @@ interface ExploreHubViewProps {
   onNavigate: (route: AppRoute) => void;
 }
 
+type PastelTone = 'sage' | 'lavender' | 'sky' | 'peach' | 'rose' | 'honey';
+
+const PASTEL_STYLES: Record<
+  PastelTone,
+  {
+    card: string;
+    iconBox: string;
+    iconText: string;
+  }
+> = {
+  sage: {
+    card: 'bg-gradient-to-br from-[#ECF7F0] via-[#F7FCF9] to-[#FFFFFF] hover:from-[#E2F3E9] hover:to-[#F7FCF9] dark:from-[#16251F] dark:via-[#171E24] dark:to-[#171B24] border-[#9EC5AB]/45 dark:border-[#9EC5AB]/25',
+    iconBox: 'bg-[#9EC5AB]/30 dark:bg-[#9EC5AB]/20 border-[#9EC5AB]/45 dark:border-[#9EC5AB]/30',
+    iconText: 'text-[#245A3B] dark:text-[#9EC5AB]',
+  },
+  lavender: {
+    card: 'bg-gradient-to-br from-[#F3EFFC] via-[#F9F7FD] to-[#FFFFFF] hover:from-[#EAE3FA] hover:to-[#F9F7FD] dark:from-[#201A2F] dark:via-[#191926] dark:to-[#171B24] border-[#BEB4DC]/45 dark:border-[#BEB4DC]/25',
+    iconBox: 'bg-[#BEB4DC]/35 dark:bg-[#BEB4DC]/20 border-[#BEB4DC]/45 dark:border-[#BEB4DC]/30',
+    iconText: 'text-[#4E3F80] dark:text-[#C7B8EA]',
+  },
+  sky: {
+    card: 'bg-gradient-to-br from-[#EBF5FC] via-[#F6FBFF] to-[#FFFFFF] hover:from-[#DFEFFA] hover:to-[#F6FBFF] dark:from-[#15212E] dark:via-[#171D26] dark:to-[#171B24] border-[#9BC4E2]/45 dark:border-[#9BC4E2]/25',
+    iconBox: 'bg-[#9BC4E2]/35 dark:bg-[#9BC4E2]/20 border-[#9BC4E2]/45 dark:border-[#9BC4E2]/30',
+    iconText: 'text-[#1B5780] dark:text-[#9BC4E2]',
+  },
+  peach: {
+    card: 'bg-gradient-to-br from-[#FDF1EC] via-[#FEF8F5] to-[#FFFFFF] hover:from-[#FAE6DD] hover:to-[#FEF8F5] dark:from-[#271C1B] dark:via-[#1E1B22] dark:to-[#171B24] border-[#F2B8A2]/45 dark:border-[#F2B8A2]/25',
+    iconBox: 'bg-[#F2B8A2]/35 dark:bg-[#F2B8A2]/20 border-[#F2B8A2]/45 dark:border-[#F2B8A2]/30',
+    iconText: 'text-[#9A3F26] dark:text-[#F2B8A2]',
+  },
+  rose: {
+    card: 'bg-gradient-to-br from-[#FCEFF5] via-[#FEF7FA] to-[#FFFFFF] hover:from-[#F8E2ED] hover:to-[#FEF7FA] dark:from-[#261923] dark:via-[#1D1924] dark:to-[#171B24] border-[#EAB8CE]/45 dark:border-[#EAB8CE]/25',
+    iconBox: 'bg-[#EAB8CE]/35 dark:bg-[#EAB8CE]/20 border-[#EAB8CE]/45 dark:border-[#EAB8CE]/30',
+    iconText: 'text-[#843B5C] dark:text-[#EAB8CE]',
+  },
+  honey: {
+    card: 'bg-gradient-to-br from-[#FCF5E6] via-[#FFFBF2] to-[#FFFFFF] hover:from-[#F9ECD2] hover:to-[#FFFBF2] dark:from-[#252016] dark:via-[#1E1C20] dark:to-[#171B24] border-[#EDD59E]/55 dark:border-[#EDD59E]/25',
+    iconBox: 'bg-[#EDD59E]/45 dark:bg-[#EDD59E]/20 border-[#EDD59E]/60 dark:border-[#EDD59E]/30',
+    iconText: 'text-[#7A5714] dark:text-[#EDD59E]',
+  },
+};
+
 interface ModuleTile {
   id: string;
   route: AppRoute;
   title: string;
   subtitle: string;
   meta: string;
-  accent: string;
+  tone: PastelTone;
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -60,7 +102,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Personal Notes',
       subtitle: 'Everyday thoughts, clickable links, checklists, and pinned reminders.',
       meta: `${counts.notes} notes · Offline`,
-      accent: 'text-[#255F8A] dark:text-[#9BC4E2]',
+      tone: 'sky',
       icon: FileText,
     },
     {
@@ -69,7 +111,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Secrets & Passwords Vault',
       subtitle: 'AES-256 encrypted logins, bank cards, PINs, and custom fields.',
       meta: `${counts.vault} encrypted · Auto-locks`,
-      accent: 'text-[#5B4D8A] dark:text-[#BEB4DC]',
+      tone: 'lavender',
       icon: Lock,
     },
     {
@@ -78,7 +120,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Motivational Quotes',
       subtitle: 'Save calming passages and shuffle anytime by mood or purpose.',
       meta: `${counts.quotes} quotes · Mood shuffle`,
-      accent: 'text-[#5B4D8A] dark:text-[#BEB4DC]',
+      tone: 'rose',
       icon: Quote,
     },
     {
@@ -87,7 +129,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Tasks & Smart Reminders',
       subtitle: 'Priority tasks, recurring habits, and one-tap Alarm linking.',
       meta: `${counts.tasks} items · Alarm bridge`,
-      accent: 'text-[#2E6B48] dark:text-[#9EC5AB]',
+      tone: 'sage',
       icon: CheckSquare,
     },
     {
@@ -96,16 +138,16 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Birthday Tracker & Wishes',
       subtitle: 'Countdowns, custom wishes to copy, and early notification offsets.',
       meta: `${counts.birthdays} people tracked`,
-      accent: 'text-[#A6482D] dark:text-[#F2B8A2]',
+      tone: 'peach',
       icon: Cake,
     },
     {
       id: 'gallery',
       route: 'gallery',
       title: 'Private Media Gallery',
-      subtitle: 'Biometric/PIN-locked folders stored privately inside your app sandbox.',
+      subtitle: 'Fingerprint/PIN-locked folders stored privately inside your app.',
       meta: `${counts.media} private files`,
-      accent: 'text-[#255F8A] dark:text-[#9BC4E2]',
+      tone: 'sky',
       icon: ImageIcon,
     },
     {
@@ -114,7 +156,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'General Calendar',
       subtitle: 'Monthly plans, birthdays, reminders, and .ICS / Google Calendar export.',
       meta: `${counts.calendar} events · Local first`,
-      accent: 'text-[#255F8A] dark:text-[#9BC4E2]',
+      tone: 'lavender',
       icon: Calendar,
     },
     {
@@ -123,7 +165,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Dedicated Alarms',
       subtitle: 'Wake-up, medicine, and reminder-linked alarms with gentle chimes.',
       meta: `${counts.alarms} alarms`,
-      accent: 'text-[#A6482D] dark:text-[#F2B8A2]',
+      tone: 'peach',
       icon: AlarmClock,
     },
     {
@@ -132,7 +174,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Creative Ideas Hub',
       subtitle: 'Color-coded sticky cards, moodboards, and connected idea boards.',
       meta: `${counts.ideas} cards · Visual boards`,
-      accent: 'text-[#5B4D8A] dark:text-[#BEB4DC]',
+      tone: 'honey',
       icon: Lightbulb,
     },
     {
@@ -141,7 +183,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Event Calm Mode',
       subtitle: 'Social anxiety companion with check-ins, breathing, and Maps directions.',
       meta: `${counts.events} sessions · Grounding`,
-      accent: 'text-[#2E6B48] dark:text-[#9EC5AB]',
+      tone: 'sage',
       icon: Wind,
     },
     {
@@ -153,7 +195,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
         counts.activeSoundscapes > 0
           ? `${counts.activeSoundscapes} playing · Web Audio`
           : '6 ambient layers · Offline',
-      accent: 'text-[#255F8A] dark:text-[#9BC4E2]',
+      tone: 'sky',
       icon: AudioLines,
     },
     {
@@ -162,7 +204,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Analytics & Wellbeing',
       subtitle: 'Charts for daily tasks completed, notes written, and Event Calm Mode time.',
       meta: 'Trends · Charts',
-      accent: 'text-[#2E6B48] dark:text-[#9EC5AB]',
+      tone: 'honey',
       icon: BarChart3,
     },
     {
@@ -171,7 +213,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Sanctuary Maps',
       subtitle: 'Search venues, preview calm routes, and send destinations to Event Calm Mode.',
       meta: 'Places · Routes',
-      accent: 'text-[#255F8A] dark:text-[#9BC4E2]',
+      tone: 'sage',
       icon: MapPin,
     },
     {
@@ -180,7 +222,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Stillwater Lanterns',
       subtitle: 'Soothing nocturnal pond game—collect drifting lanterns and build flow.',
       meta: 'Zen Arcade · 60fps',
-      accent: 'text-[#2E6B48] dark:text-[#9EC5AB]',
+      tone: 'lavender',
       icon: Gamepad2,
     },
     {
@@ -189,7 +231,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Gemini Companion',
       subtitle: 'Multi-turn thoughtful chat with tone presets and one-tap saving to Notes.',
       meta: 'Multi-turn · Streaming',
-      accent: 'text-[#5B4D8A] dark:text-[#BEB4DC]',
+      tone: 'rose',
       icon: MessageSquareHeart,
     },
     {
@@ -198,7 +240,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Live Voice Sanctuary',
       subtitle: 'Real-time bidirectional voice conversations with live transcripts.',
       meta: 'Live Voice · 24kHz',
-      accent: 'text-[#2E6B48] dark:text-[#9EC5AB]',
+      tone: 'sage',
       icon: PhoneCall,
     },
     {
@@ -207,7 +249,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       title: 'Audio Transcription',
       subtitle: 'Record voice memos or upload audio files to convert speech into Notes.',
       meta: 'Speech-to-Text',
-      accent: 'text-[#A6482D] dark:text-[#F2B8A2]',
+      tone: 'peach',
       icon: Mic,
     },
   ];
@@ -245,9 +287,9 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
         <button
           type="button"
           onClick={handleExportBackup}
-          className="min-h-[44px] px-4 py-2.5 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] flex items-center justify-center gap-2 transition-colors whitespace-nowrap shrink-0"
+          className="min-h-[44px] px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#ECF7F0] to-[#F7FBFE] dark:from-[#17231F] dark:to-[#171E28] hover:opacity-90 border border-[#9EC5AB]/45 dark:border-[#9EC5AB]/25 text-xs font-semibold text-[#245A3B] dark:text-[#9EC5AB] flex items-center justify-center gap-2 transition-opacity whitespace-nowrap shrink-0"
         >
-          <Download className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />
+          <Download className="w-4 h-4" />
           Export Local Backup
         </button>
       </header>
@@ -261,40 +303,48 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {modules.map((mod) => {
           const Icon = mod.icon;
+          const style = PASTEL_STYLES[mod.tone];
           return (
             <button
               key={mod.id}
               type="button"
               onClick={() => onNavigate(mod.route)}
-              className="group text-left bg-white dark:bg-[#171A21] hover:bg-[#E2E6EC] dark:hover:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.07] rounded-3xl p-5 sm:p-6 transition-all active:scale-[0.99] flex flex-col justify-between min-h-[148px]"
+              className={`group text-left border rounded-3xl p-5 sm:p-6 transition-all active:scale-[0.99] flex flex-col justify-between min-h-[150px] shadow-xs ${style.card}`}
             >
               <div>
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.04] border border-slate-900/[0.08] dark:border-white/[0.06] flex items-center justify-center">
-                    <Icon className={`w-5 h-5 ${mod.accent}`} />
+                <div className="flex items-center justify-between gap-3 mb-3.5">
+                  <div
+                    className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${style.iconBox}`}
+                  >
+                    <Icon className={`w-5 h-5 ${style.iconText}`} />
                   </div>
-                  <span className="text-xs text-[#5B6472] dark:text-[#98A2B3] tabular-nums">{mod.meta}</span>
+                  <span className="text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] tabular-nums">
+                    {mod.meta}
+                  </span>
                 </div>
-                <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6] group-hover:text-[#111827] dark:hover:text-white">
+                <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
                   {mod.title}
                 </h2>
-                <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1.5 leading-relaxed">{mod.subtitle}</p>
+                <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1.5 leading-relaxed">
+                  {mod.subtitle}
+                </p>
               </div>
             </button>
           );
         })}
       </div>
 
-      <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex items-start gap-4">
-        <div className="w-10 h-10 rounded-2xl bg-[#9EC5AB]/10 flex items-center justify-center shrink-0">
+      <section className="rounded-3xl bg-gradient-to-br from-[#ECF7F0] via-[#F7FCF9] to-[#FFFFFF] dark:from-[#16251F] dark:to-[#171B24] border border-[#9EC5AB]/45 dark:border-[#9EC5AB]/25 p-5 sm:p-6 flex items-start gap-4">
+        <div className="w-10 h-10 rounded-2xl bg-[#9EC5AB]/30 dark:bg-[#9EC5AB]/20 border border-[#9EC5AB]/40 flex items-center justify-center shrink-0">
           <Shield className="w-5 h-5 text-[#2E6B48] dark:text-[#9EC5AB]" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6]">100% Local-First Privacy</h3>
+          <h3 className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6]">
+            100% Local-First Privacy
+          </h3>
           <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 leading-relaxed">
-            Zero cloud accounts, zero trackers, and zero analytics. Notes, Tasks, Birthdays,
-            Calendar, Private Media blobs, and AES-256 encrypted Vault entries live exclusively in
-            your local IndexedDB storage.
+            Notes, Tasks, Birthdays, Calendar, Private Media, and AES-256 encrypted Vault entries
+            live exclusively inside your device storage.
           </p>
         </div>
       </section>

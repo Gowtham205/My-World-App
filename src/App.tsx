@@ -49,6 +49,7 @@ import type {
   VaultSecretPayload,
 } from './types/sanctuary';
 import {
+  addDismissedNotificationKeys,
   createId,
   deleteFromStore,
   getAllFromStore,
@@ -68,6 +69,10 @@ import {
   seedInitialSanctuaryDataIfNeeded,
   setDefaultNotificationSoundId as persistDefaultNotificationSoundId,
 } from './lib/storage';
+import {
+  clearStoredBiometricData,
+  syncBiometricAfterPinChange,
+} from './lib/biometrics';
 import {
   decryptPayload,
   deriveVaultKey,
@@ -137,33 +142,83 @@ const PRIMARY_TABS: {
   id: BottomTab;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  activeBox: string;
+  activeText: string;
+  activeBar: string;
+  idleIcon: string;
 }[] = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-  { id: 'calendar', label: 'Calendar', icon: Calendar },
-  { id: 'alarms', label: 'Alarms', icon: AlarmClock },
-  { id: 'explore', label: 'Explore', icon: Compass },
+  {
+    id: 'home',
+    label: 'Home',
+    icon: Home,
+    activeBox:
+      'bg-[#9EC5AB]/32 dark:bg-[#9EC5AB]/24 border-[#6CA982]/55 dark:border-[#9EC5AB]/45',
+    activeText: 'text-[#1D5636] dark:text-[#A7D7B8]',
+    activeBar: 'bg-[#2E6B48] dark:bg-[#9EC5AB]',
+    idleIcon: 'text-[#4B6B58] dark:text-[#86A794]',
+  },
+  {
+    id: 'tasks',
+    label: 'Tasks',
+    icon: CheckSquare,
+    activeBox:
+      'bg-[#BEB4DC]/38 dark:bg-[#BEB4DC]/24 border-[#8E7EC4]/55 dark:border-[#BEB4DC]/45',
+    activeText: 'text-[#47387A] dark:text-[#CEC3F0]',
+    activeBar: 'bg-[#5B4D8A] dark:bg-[#BEB4DC]',
+    idleIcon: 'text-[#665C84] dark:text-[#9D95B8]',
+  },
+  {
+    id: 'calendar',
+    label: 'Calendar',
+    icon: Calendar,
+    activeBox:
+      'bg-[#9BC4E2]/38 dark:bg-[#9BC4E2]/24 border-[#5C9ECC]/55 dark:border-[#9BC4E2]/45',
+    activeText: 'text-[#15527A] dark:text-[#A3CEF0]',
+    activeBar: 'bg-[#1E5F8A] dark:bg-[#9BC4E2]',
+    idleIcon: 'text-[#4E6C84] dark:text-[#88A5BD]',
+  },
+  {
+    id: 'alarms',
+    label: 'Alarms',
+    icon: AlarmClock,
+    activeBox:
+      'bg-[#F2B8A2]/42 dark:bg-[#F2B8A2]/24 border-[#DA8668]/55 dark:border-[#F2B8A2]/45',
+    activeText: 'text-[#913B22] dark:text-[#F5C1AD]',
+    activeBar: 'bg-[#B55437] dark:bg-[#F2B8A2]',
+    idleIcon: 'text-[#845E52] dark:text-[#BA968A]',
+  },
+  {
+    id: 'explore',
+    label: 'Explore',
+    icon: Compass,
+    activeBox:
+      'bg-[#EAB8CE]/42 dark:bg-[#EAB8CE]/24 border-[#CE7CA2]/55 dark:border-[#EAB8CE]/45',
+    activeText: 'text-[#7F3256] dark:text-[#F0C1D6]',
+    activeBar: 'bg-[#99456C] dark:bg-[#EAB8CE]',
+    idleIcon: 'text-[#7D5B6B] dark:text-[#B592A3]',
+  },
 ];
 
 const SECONDARY_LINKS: {
   route: AppRoute;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  iconColor: string;
 }[] = [
-  { route: 'notes', label: 'Personal Notes', icon: FileText },
-  { route: 'vault', label: 'Secrets Vault', icon: Lock },
-  { route: 'quotes', label: 'Quotes', icon: Quote },
-  { route: 'birthdays', label: 'Birthdays', icon: Cake },
-  { route: 'gallery', label: 'Private Gallery', icon: ImageIcon },
-  { route: 'ideas', label: 'Ideas Hub', icon: Lightbulb },
-  { route: 'event-calm', label: 'Event Calm Mode', icon: Wind },
-  { route: 'soundscapes', label: 'Soundscapes', icon: AudioLines },
-  { route: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { route: 'maps', label: 'Sanctuary Maps', icon: MapPin },
-  { route: 'game', label: 'Stillwater Lanterns', icon: Gamepad2 },
-  { route: 'ai-chat', label: 'Gemini Companion', icon: MessageSquareHeart },
-  { route: 'voice-live', label: 'Live Voice', icon: PhoneCall },
-  { route: 'transcribe', label: 'Audio Transcribe', icon: Mic },
+  { route: 'notes', label: 'Personal Notes', icon: FileText, iconColor: 'text-[#1E5F8A] dark:text-[#9BC4E2]' },
+  { route: 'vault', label: 'Secrets Vault', icon: Lock, iconColor: 'text-[#5B4D8A] dark:text-[#BEB4DC]' },
+  { route: 'quotes', label: 'Quotes', icon: Quote, iconColor: 'text-[#843B5C] dark:text-[#EAB8CE]' },
+  { route: 'birthdays', label: 'Birthdays', icon: Cake, iconColor: 'text-[#A6482D] dark:text-[#F2B8A2]' },
+  { route: 'gallery', label: 'Private Gallery', icon: ImageIcon, iconColor: 'text-[#1E5F8A] dark:text-[#9BC4E2]' },
+  { route: 'ideas', label: 'Ideas Hub', icon: Lightbulb, iconColor: 'text-[#8A6218] dark:text-[#EDD59E]' },
+  { route: 'event-calm', label: 'Event Calm Mode', icon: Wind, iconColor: 'text-[#2E6B48] dark:text-[#9EC5AB]' },
+  { route: 'soundscapes', label: 'Soundscapes', icon: AudioLines, iconColor: 'text-[#1E5F8A] dark:text-[#9BC4E2]' },
+  { route: 'analytics', label: 'Analytics', icon: BarChart3, iconColor: 'text-[#8A6218] dark:text-[#EDD59E]' },
+  { route: 'maps', label: 'Sanctuary Maps', icon: MapPin, iconColor: 'text-[#2E6B48] dark:text-[#9EC5AB]' },
+  { route: 'game', label: 'Stillwater Lanterns', icon: Gamepad2, iconColor: 'text-[#5B4D8A] dark:text-[#BEB4DC]' },
+  { route: 'ai-chat', label: 'Gemini Companion', icon: MessageSquareHeart, iconColor: 'text-[#843B5C] dark:text-[#EAB8CE]' },
+  { route: 'voice-live', label: 'Live Voice', icon: PhoneCall, iconColor: 'text-[#2E6B48] dark:text-[#9EC5AB]' },
+  { route: 'transcribe', label: 'Audio Transcribe', icon: Mic, iconColor: 'text-[#A6482D] dark:text-[#F2B8A2]' },
 ];
 
 function parseMinutes(hhmm: string): number {
@@ -209,10 +264,12 @@ export function App() {
   // In-memory cryptographic key (cleared immediately on background/visibility hidden)
   const [vaultKey, setVaultKey] = useState<CryptoKey | null>(null);
 
-  // Navigation history stack so Back on Android returns cleanly to prior screen / Home
+  // Navigation history stack & per-route scroll memory
   const historyRef = useRef<AppRoute[]>([]);
   const routeRef = useRef<AppRoute>(route);
   routeRef.current = route;
+  const scrollPositionsRef = useRef<Partial<Record<AppRoute, number>>>({});
+  const pendingScrollYRef = useRef<number | null>(null);
 
   // Active overlays (Alarms, Reminder Notification Toast, & Event Calm Check-In)
   const [ringingAlarm, setRingingAlarm] = useState<AlarmItem | null>(null);
@@ -265,7 +322,7 @@ export function App() {
   );
 
   const navigateTo = useCallback(
-    (nextRoute: AppRoute, options?: { pushHistory?: boolean }) => {
+    (nextRoute: AppRoute, options?: { pushHistory?: boolean; restoreScroll?: boolean }) => {
       const prevRoute = routeRef.current;
 
       // Immediately lock Vault & Private Gallery whenever leaving them
@@ -274,6 +331,14 @@ export function App() {
       }
 
       if (prevRoute === nextRoute) return;
+
+      // Persist scroll position of the screen we are leaving
+      scrollPositionsRef.current[prevRoute] = window.scrollY || window.pageYOffset || 0;
+
+      const isBackNav = options?.restoreScroll ?? options?.pushHistory === false;
+      pendingScrollYRef.current = isBackNav
+        ? scrollPositionsRef.current[nextRoute] ?? 0
+        : 0;
 
       if (options?.pushHistory !== false) {
         const stack = historyRef.current;
@@ -290,10 +355,28 @@ export function App() {
 
       routeRef.current = nextRoute;
       setRoute(nextRoute);
-      window.scrollTo({ top: 0 });
     },
     []
   );
+
+  // Restore saved scroll position (on Back) or reset to top (on forward navigation) after route renders
+  useEffect(() => {
+    const targetY = pendingScrollYRef.current;
+    if (targetY === null) return;
+    pendingScrollYRef.current = null;
+
+    let raf2 = 0;
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        window.scrollTo({ top: targetY, behavior: 'auto' });
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+    };
+  }, [route]);
 
   // Enforce relock whenever current route is neither vault nor gallery
   useEffect(() => {
@@ -1250,7 +1333,7 @@ export function App() {
 
       if (historyRef.current.length > 0) {
         const previousRoute = historyRef.current.pop()!;
-        navigateTo(previousRoute, { pushHistory: false });
+        navigateTo(previousRoute, { pushHistory: false, restoreScroll: true });
         return;
       }
 
@@ -1258,7 +1341,10 @@ export function App() {
       if (curr !== 'home') {
         const currIsSecondary =
           curr !== 'tasks' && curr !== 'calendar' && curr !== 'alarms' && curr !== 'explore';
-        navigateTo(currIsSecondary ? 'explore' : 'home', { pushHistory: false });
+        navigateTo(currIsSecondary ? 'explore' : 'home', {
+          pushHistory: false,
+          restoreScroll: true,
+        });
         return;
       }
 
@@ -1268,7 +1354,7 @@ export function App() {
     const handlePopState = () => {
       if (historyRef.current.length > 0) {
         const previousRoute = historyRef.current.pop()!;
-        navigateTo(previousRoute, { pushHistory: false });
+        navigateTo(previousRoute, { pushHistory: false, restoreScroll: true });
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -1319,13 +1405,13 @@ export function App() {
           reencryptedRecords.push(updatedRec);
         }
 
-        const updatedSettings: SecuritySettings = {
+        const updatedWithBio = await syncBiometricAfterPinChange(newPin, {
           ...saved,
           pinHash: newPinHash,
           pinSalt: newSalt,
           updatedAt: new Date().toISOString(),
-        };
-        await putInStore('settings', updatedSettings);
+        });
+        await putInStore('settings', updatedWithBio);
 
         setVaultRecords(reencryptedRecords);
         setVaultKey(newKey);
@@ -1338,6 +1424,7 @@ export function App() {
   );
 
   const handleResetVaultLock = useCallback(async () => {
+    await clearStoredBiometricData();
     setVaultKey(null);
     setVaultRecords([]);
   }, []);
@@ -1456,6 +1543,10 @@ export function App() {
 
   const handleDismissInboxNotification = useCallback((id: string) => {
     setInboxNotifications((prev) => {
+      const target = prev.find((n) => n.id === id);
+      if (target?.dedupeKey) {
+        addDismissedNotificationKeys([target.dedupeKey]);
+      }
       const next = prev.filter((n) => n.id !== id);
       saveNotificationHistory(next);
       return next;
@@ -1463,9 +1554,20 @@ export function App() {
   }, []);
 
   const handleClearAllInboxNotifications = useCallback(() => {
-    setInboxNotifications([]);
-    saveNotificationHistory([]);
-  }, []);
+    setInboxNotifications((prev) => {
+      const keysToDismiss = prev.map((n) => n.dedupeKey).filter(Boolean);
+      const pendingMissed = collectMissedAndTodayInboxItems({
+        alarms: alarmsRef.current,
+        tasks: tasksRef.current,
+        eventSessions,
+        birthdays,
+        existingHistory: prev,
+      }).map((n) => n.dedupeKey);
+      addDismissedNotificationKeys([...keysToDismiss, ...pendingMissed]);
+      saveNotificationHistory([]);
+      return [];
+    });
+  }, [birthdays, eventSessions]);
 
   const unreadNotificationCount = useMemo(
     () => inboxNotifications.filter((n) => !n.read).length,
@@ -1520,7 +1622,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex flex-col transition-colors">
+    <div className="min-h-screen text-[#111827] dark:text-[#F1F3F6] flex flex-col transition-colors">
       {mapsQuotaExceeded && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
           <span>
@@ -1539,8 +1641,8 @@ export function App() {
       )}
 
       <div className="flex flex-1 min-h-0">
-      {/* Desktop Left Sanctuary Rail */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 border-r border-slate-900/[0.08] dark:border-white/[0.06] bg-white dark:bg-[#13161C] p-6 sticky top-0 h-screen justify-between transition-colors">
+      {/* Desktop Left Sanctuary Rail (Frosted Pastel Surface) */}
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 border-r border-slate-900/[0.08] dark:border-white/[0.08] bg-[#FAFDFB]/88 dark:bg-[#131722]/90 backdrop-blur-md p-6 sticky top-0 h-screen justify-between transition-colors">
         <div className="space-y-8 overflow-y-auto pr-1">
           <div className="flex items-start justify-between gap-2">
             <button
@@ -1551,7 +1653,7 @@ export function App() {
               <span className="font-display text-2xl font-medium text-[#111827] dark:text-[#F1F3F6] tracking-tight block">
                 My World
               </span>
-              <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
+              <span className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]">
                 Personal Sanctuary
               </span>
             </button>
@@ -1561,7 +1663,7 @@ export function App() {
               onClick={() => setNotificationsDrawerOpen(true)}
               aria-label="Open notifications"
               title="Notifications"
-              className="relative min-w-[40px] min-h-[40px] rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center shrink-0 transition-colors"
+              className="relative min-w-[40px] min-h-[40px] rounded-xl bg-white/85 dark:bg-[#1D2230] hover:bg-white dark:hover:bg-white/[0.09] border border-slate-900/[0.08] dark:border-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center shrink-0 transition-colors"
             >
               <Bell className="w-4 h-4" />
               {unreadNotificationCount > 0 && (
@@ -1572,7 +1674,7 @@ export function App() {
             </button>
           </div>
 
-          <nav className="space-y-1" aria-label="Primary sections">
+          <nav className="space-y-1.5" aria-label="Primary sections">
             {PRIMARY_TABS.map((tab) => {
               const Icon = tab.icon;
               const active = route === tab.id;
@@ -1581,13 +1683,13 @@ export function App() {
                   key={tab.id}
                   type="button"
                   onClick={() => navigateTo(tab.id)}
-                  className={`w-full min-h-[44px] px-3.5 rounded-2xl flex items-center gap-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                  className={`w-full min-h-[44px] px-3.5 rounded-2xl flex items-center gap-3 text-sm transition-all whitespace-nowrap border ${
                     active
-                      ? 'bg-[#9EC5AB]/20 text-[#2E6B48] dark:text-[#9EC5AB]'
-                      : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.04]'
+                      ? `${tab.activeBox} ${tab.activeText} font-semibold shadow-xs`
+                      : 'border-transparent text-[#5B6472] dark:text-[#98A2B3] font-medium hover:text-[#111827] dark:hover:text-[#F1F3F6] hover:bg-white/60 dark:hover:bg-white/[0.05]'
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? tab.activeText : tab.idleIcon}`} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -1607,11 +1709,11 @@ export function App() {
                     onClick={() => navigateTo(item.route)}
                     className={`w-full min-h-[42px] px-3.5 rounded-2xl flex items-center gap-3 text-xs font-medium transition-colors whitespace-nowrap ${
                       active
-                        ? 'bg-slate-900/[0.06] dark:bg-white/[0.08] text-[#111827] dark:text-[#F1F3F6]'
-                        : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.04]'
+                        ? 'bg-white/90 dark:bg-white/[0.1] text-[#111827] dark:text-[#F1F3F6] font-semibold shadow-xs border border-slate-900/[0.08] dark:border-white/[0.08]'
+                        : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] hover:bg-white/55 dark:hover:bg-white/[0.04]'
                     }`}
                   >
-                    <Icon className="w-4 h-4 shrink-0" />
+                    <Icon className={`w-4 h-4 shrink-0 ${item.iconColor}`} />
                     <span className="truncate">{item.label}</span>
                   </button>
                 );
@@ -1683,12 +1785,17 @@ export function App() {
       {/* Main Content Canvas */}
       <main className="flex-1 min-w-0 pb-24 lg:pb-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
-          {/* Mobile Account & Navigation Header (non-sticky) */}
+          {/* Mobile Account & Navigation Header (non-sticky, restores scroll on Back) */}
           <div className="mb-4 lg:hidden flex items-center justify-between gap-2">
             {isSecondaryRoute ? (
               <button
                 type="button"
-                onClick={() => navigateTo('explore')}
+                onClick={() => {
+                  if (historyRef.current[historyRef.current.length - 1] === 'explore') {
+                    historyRef.current.pop();
+                  }
+                  navigateTo('explore', { pushHistory: false, restoreScroll: true });
+                }}
                 className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -1697,7 +1804,12 @@ export function App() {
             ) : route !== 'home' ? (
               <button
                 type="button"
-                onClick={() => navigateTo('home')}
+                onClick={() => {
+                  if (historyRef.current[historyRef.current.length - 1] === 'home') {
+                    historyRef.current.pop();
+                  }
+                  navigateTo('home', { pushHistory: false, restoreScroll: true });
+                }}
                 className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -1708,22 +1820,22 @@ export function App() {
                 type="button"
                 onClick={() => setProfileDrawerOpen(true)}
                 aria-label="Open Profile & Settings"
-                className="min-h-[44px] px-2 -ml-2 rounded-2xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] inline-flex items-center gap-2.5 min-w-0 transition-colors"
+                className="min-h-[44px] px-2 -ml-2 rounded-2xl hover:bg-white/60 dark:hover:bg-white/[0.06] inline-flex items-center gap-2.5 min-w-0 transition-colors"
               >
                 {authUser.photoURL ? (
                   <img
                     src={authUser.photoURL}
                     alt={activeDisplayName}
                     referrerPolicy="no-referrer"
-                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                    className="w-8 h-8 rounded-full object-cover shrink-0 border border-[#9EC5AB]/40"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-[#9EC5AB]/25 text-[#2E6B48] dark:text-[#9EC5AB] text-xs font-semibold flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-[#9EC5AB]/35 text-[#245A3B] dark:text-[#9EC5AB] text-xs font-semibold flex items-center justify-center shrink-0">
                     {profileAvatarInitial}
                   </div>
                 )}
                 {preferredGreetingName && (
-                  <span className="text-xs font-medium text-[#334155] dark:text-[#D0D5DD] truncate max-w-[180px]">
+                  <span className="text-xs font-semibold text-[#334155] dark:text-[#D0D5DD] truncate max-w-[180px]">
                     {preferredGreetingName}
                   </span>
                 )}
@@ -1735,7 +1847,7 @@ export function App() {
                 type="button"
                 onClick={() => setNotificationsDrawerOpen(true)}
                 aria-label="Open notifications"
-                className="relative min-w-[44px] min-h-[44px] rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center transition-colors"
+                className="relative min-w-[44px] min-h-[44px] rounded-2xl bg-white/85 dark:bg-[#191E2B] border border-slate-900/[0.08] dark:border-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center transition-colors shadow-xs"
               >
                 <Bell className="w-4 h-4" />
                 {unreadNotificationCount > 0 && (
@@ -1750,7 +1862,7 @@ export function App() {
                   type="button"
                   onClick={() => setProfileDrawerOpen(true)}
                   aria-label="Open Profile & Settings"
-                  className="min-w-[44px] min-h-[44px] rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center transition-colors"
+                  className="min-w-[44px] min-h-[44px] rounded-2xl bg-white/85 dark:bg-[#191E2B] border border-slate-900/[0.08] dark:border-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center transition-colors shadow-xs"
                 >
                   <Settings className="w-4 h-4" />
                 </button>
@@ -2020,10 +2132,10 @@ export function App() {
       </main>
       </div>
 
-      {/* Mobile Fixed 5-Tab Bottom Navigation Bar (<= 15% sticky height cap) */}
+      {/* Mobile Fixed 5-Tab Bottom Navigation Bar with clear pastel per-tab highlights (<= 15% sticky height cap) */}
       <nav
         aria-label="Bottom Navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-white/90 dark:bg-[#13161C]/90 backdrop-blur-md border-t border-slate-900/[0.08] dark:border-white/[0.08] grid grid-cols-5 items-center px-1 transition-colors"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-[68px] bg-[#FAFDFB]/92 dark:bg-[#131722]/92 backdrop-blur-md border-t border-slate-900/[0.08] dark:border-white/[0.08] grid grid-cols-5 items-stretch px-1.5 pb-1 transition-colors shadow-[0_-4px_20px_rgba(15,23,42,0.05)]"
       >
         {PRIMARY_TABS.map((tab) => {
           const Icon = tab.icon;
@@ -2033,14 +2145,32 @@ export function App() {
               key={tab.id}
               type="button"
               onClick={() => navigateTo(tab.id)}
-              className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors ${
-                active
-                  ? 'text-[#2E6B48] dark:text-[#9EC5AB]'
-                  : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
-              }`}
+              aria-current={active ? 'page' : undefined}
+              className="relative min-h-[48px] flex flex-col items-center justify-center gap-1 pt-1 transition-all"
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[11px] font-medium tracking-tight leading-none whitespace-nowrap">
+              {/* Crisp top active indicator bar */}
+              <span
+                className={`absolute top-0 w-9 h-[3px] rounded-b-full transition-all duration-200 ${
+                  active ? `${tab.activeBar} opacity-100 scale-x-100` : 'opacity-0 scale-x-50'
+                }`}
+              />
+              {/* Distinct pastel container for active tab icon */}
+              <span
+                className={`px-3.5 py-1 rounded-2xl border transition-all duration-200 flex items-center justify-center ${
+                  active
+                    ? `${tab.activeBox} ${tab.activeText} shadow-xs scale-[1.03]`
+                    : `border-transparent ${tab.idleIcon}`
+                }`}
+              >
+                <Icon className="w-[19px] h-[19px]" />
+              </span>
+              <span
+                className={`text-[11px] tracking-tight leading-none whitespace-nowrap transition-colors ${
+                  active
+                    ? `${tab.activeText} font-semibold`
+                    : 'text-[#5B6472] dark:text-[#98A2B3] font-medium'
+                }`}
+              >
                 {tab.label}
               </span>
             </button>

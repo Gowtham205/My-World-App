@@ -581,9 +581,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <header className="rounded-3xl bg-gradient-to-br from-[#F4F1FA] via-[#FAF7FE] to-[#EEF5F0] dark:from-[#1D1A2B] dark:via-[#191826] dark:to-[#17211F] border border-[#BEB4DC]/40 dark:border-[#BEB4DC]/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 shadow-xs">
         <div>
-          <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]">Tasks & Smart Reminders</p>
+          <p className="text-xs font-medium text-[#5B4D8A] dark:text-[#D1C6F0]">Tasks & Smart Reminders</p>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             To-Do & Scheduled Breaks
           </h1>
@@ -591,7 +591,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
         <button
           type="button"
           onClick={toggleCreateForm}
-          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#BEB4DC] hover:bg-[#AEA2D2] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors whitespace-nowrap shadow-xs"
         >
           <Plus className="w-4 h-4" />
           New Task / Reminder
@@ -600,7 +600,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
       {/* Filter Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.06] self-start">
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/80 dark:bg-[#181C26]/90 border border-[#BEB4DC]/30 dark:border-white/[0.08] self-start">
           {(['active', 'completed', 'all'] as const).map((status) => (
             <button
               key={status}
@@ -608,7 +608,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               onClick={() => setFilterStatus(status)}
               className={`min-h-[38px] px-3.5 rounded-xl text-xs font-medium capitalize transition-colors whitespace-nowrap ${
                 filterStatus === status
-                  ? 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#111827] dark:text-[#F1F3F6]'
+                  ? 'bg-[#EFEAFB] dark:bg-[#2A233D] text-[#5B4D8A] dark:text-[#D1C6F0]'
                   : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
               }`}
             >
@@ -625,8 +625,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
               onClick={() => setCategoryFilter(cat)}
               className={`min-h-[40px] px-3.5 rounded-2xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 categoryFilter === cat
-                  ? 'bg-[#9EC5AB]/20 text-[#2E6B48] dark:text-[#9EC5AB] border border-[#9EC5AB]/30'
-                  : 'bg-white dark:bg-[#171A21] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
+                  ? 'bg-[#EFEAFB] dark:bg-[#2A233D] text-[#5B4D8A] dark:text-[#D1C6F0] border border-[#BEB4DC]/45'
+                  : 'bg-white/80 dark:bg-[#181C26]/90 text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.08]'
               }`}
             >
               {cat}
@@ -639,7 +639,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
       {showCreateForm && (
         <form
           onSubmit={(e) => void handleCreateSubmit(e)}
-          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/30 p-5 sm:p-7 space-y-4"
+          className="rounded-3xl bg-white/90 dark:bg-[#191D28]/95 border border-[#BEB4DC]/40 dark:border-[#BEB4DC]/25 p-5 sm:p-7 space-y-4 shadow-xs"
         >
           <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
             Create Task or Smart Reminder
@@ -662,7 +662,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
             </button>
             <button
               type="submit"
-              className="min-h-[44px] px-5 rounded-2xl bg-[#9EC5AB] text-[#0F1115] text-sm font-semibold"
+              className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] hover:bg-[#AEA2D2] text-[#0F1115] text-sm font-semibold"
             >
               Save Task
             </button>
@@ -672,13 +672,13 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
       {/* Task List */}
       {filteredTasks.length === 0 ? (
-        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
+        <div className="rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#BEB4DC]/30 dark:border-white/[0.08] p-10 text-center">
           <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
             Nothing in this view. Enjoy the breathing room or add a scheduled task.
           </p>
         </div>
       ) : (
-        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] divide-y divide-slate-900/[0.08] dark:divide-white/[0.06]">
+        <div className="rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#BEB4DC]/30 dark:border-white/[0.08] divide-y divide-slate-900/[0.08] dark:divide-white/[0.06] shadow-xs">
           {filteredTasks.map((task) => {
             if (editingTaskId === task.id) {
               return (

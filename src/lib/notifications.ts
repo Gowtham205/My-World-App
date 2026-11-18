@@ -9,7 +9,7 @@ import type {
   EventCalmSession,
   TaskReminderItem,
 } from '../types/sanctuary';
-import { createId } from './storage';
+import { createId, getDismissedNotificationKeys } from './storage';
 
 const ALARM_CHANNEL_ID = 'my-world-alarms';
 const REMINDER_CHANNEL_ID = 'my-world-reminders';
@@ -746,8 +746,11 @@ export function collectMissedAndTodayInboxItems(params: {
   eventSessions: EventCalmSession[];
   birthdays: BirthdayEntry[];
   existingHistory: AppNotificationItem[];
+  dismissedKeys?: Set<string>;
 }): AppNotificationItem[] {
   const existingKeys = new Set(params.existingHistory.map((item) => item.dedupeKey));
+  const dismissed = params.dismissedKeys ?? getDismissedNotificationKeys();
+  dismissed.forEach((k) => existingKeys.add(k));
   const additions: AppNotificationItem[] = [];
 
   const now = new Date();

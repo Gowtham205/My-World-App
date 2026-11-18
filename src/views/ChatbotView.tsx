@@ -95,9 +95,110 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
       ? customInstruction
       : PERSONA_PRESETS.find((p) => p.id === presetId)?.instruction || '';
 
-  const handleSend = async (e?: React.FormEvent) => {
+  const executeChatRequest = async (
+    historyForRequest: { role: 'user' | 'model'; text: string }[],
+    assistantId: string
+  ) => {
+    const payload = JSON.stringify({
+      messages: historyForRequest,
+      model,
+      systemInstruction: activeSystemInstruction,
+      thinkingLevel: model === 'gemini-4-hydrogen' ? thinkingLevel : undefined,
+    });
+
+    const url = getApiUrl('/api/gemini/chat');
+    let res: Response | null = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      });
+      if (res.status !== 503 && res.status !== 502 && res.status !== 504) {
+        break;
+      }
+      if (attempt < 2) {
+        await new Promise((r) => window.setTimeout(r, 900));
+      }
+    }
+
+    if (!res) {
+      throw new Error('Could not reach Gemini Companion right now.');
+    }
+
+    if (!res.ok) {
+      const rawText = await res.text().catch(() => '');
+      let parsedError = '';
+      if (rawText) {
+        try {
+          const errJson = JSON.parse(rawText) as { error?: string };
+          parsedError = errJson.error || '';
+        } catch {
+          parsedError = '';
+        }
+      }
+      if (res.status === 503 || res.status === 502 || res.status === 504) {
+        throw new Error(
+          parsedError ||
+            'Gemini Companion is temporarily busy (503). Tap Send again or switch to Gemini 3.1 Flash Lite in Tone & Model.'
+        );
+      }
+      throw new Error(parsedError || `Request failed (${res.status}). Please try again.`);
+    }
+
+    if (!res.body) {
+      throw new Error('Streaming response body unavailable.');
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+
+      for (const rawEvent of events) {
+        const line = rawEvent.trim();
+        if (!line.startsWith('data:')) continue;
+        const jsonStr = line.slice(5).trim();
+        if (!jsonStr) continue;
+
+        const parsed = JSON.parse(jsonStr) as {
+          text?: string;
+          modelUsed?: string;
+          done?: boolean;
+          error?: string;
+        };
+
+        if (parsed.error) {
+          throw new Error(parsed.error);
+        }
+
+        if (parsed.text) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    text: m.text + parsed.text,
+                    ...(parsed.modelUsed ? { modelUsed: parsed.modelUsed } : {}),
+                  }
+                : m
+            )
+          );
+        }
+      }
+    }
+  };
+
+  const handleSend = async (e?: React.FormEvent, overrideText?: string) => {
     e?.preventDefault();
-    const text = input.trim();
+    const text = (overrideText ?? input).trim();
     if (!text || isStreaming) return;
 
     setErrorMsg(null);
@@ -127,72 +228,19 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
         createdAt: new Date().toISOString(),
       },
     ]);
-    setInput('');
+    if (!overrideText) setInput('');
     setIsStreaming(true);
 
     try {
-      const res = await fetch(getApiUrl('/api/gemini/chat'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: historyForRequest,
-          model,
-          systemInstruction: activeSystemInstruction,
-          thinkingLevel: model === 'gemini-4-hydrogen' ? thinkingLevel : undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const errJson = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(errJson?.error || `Request failed (${res.status})`);
-      }
-
-      if (!res.body) {
-        throw new Error('Streaming response body unavailable.');
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
-
-        for (const rawEvent of events) {
-          const line = rawEvent.trim();
-          if (!line.startsWith('data:')) continue;
-          const jsonStr = line.slice(5).trim();
-          if (!jsonStr) continue;
-
-          const parsed = JSON.parse(jsonStr) as {
-            text?: string;
-            done?: boolean;
-            error?: string;
-          };
-
-          if (parsed.error) {
-            throw new Error(parsed.error);
-          }
-
-          if (parsed.text) {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, text: m.text + parsed.text } : m
-              )
-            );
-          }
-        }
-      }
+      await executeChatRequest(historyForRequest, assistantId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not complete Gemini chat request.';
       setErrorMsg(msg);
-      // Remove empty assistant placeholder on immediate failure
-      setMessages((prev) => prev.filter((m) => !(m.id === assistantId && !m.text.trim())));
+      if (!overrideText) setInput(text);
+      // Remove empty assistant placeholder & failed duplicate user turn so user can retry cleanly
+      setMessages((prev) =>
+        prev.filter((m) => m.id !== userMsg.id && !(m.id === assistantId && !m.text.trim()))
+      );
     } finally {
       setIsStreaming(false);
     }
@@ -227,9 +275,9 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <header className="rounded-3xl bg-gradient-to-br from-[#F4F0FA] via-[#FAF7FE] to-[#EFF5FB] dark:from-[#1D1A2B] dark:via-[#191826] dark:to-[#16202C] border border-[#BEB4DC]/40 dark:border-[#BEB4DC]/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 shadow-xs">
         <div>
-          <p className="text-xs text-[#5B4D8A] dark:text-[#BEB4DC]">Multi-Turn Sanctuary Assistant</p>
+          <p className="text-xs font-medium text-[#5B4D8A] dark:text-[#BEB4DC]">Multi-Turn Sanctuary Assistant</p>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Gemini Companion
           </h1>
@@ -243,7 +291,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
           <button
             type="button"
             onClick={() => setShowSettings((v) => !v)}
-            className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] inline-flex items-center gap-2"
+            className="min-h-[44px] px-4 rounded-2xl bg-white/85 dark:bg-[#1A1F2B] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] inline-flex items-center gap-2"
           >
             <SlidersHorizontal className="w-4 h-4 text-[#5B4D8A] dark:text-[#BEB4DC]" />
             Tone & Model
@@ -255,7 +303,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
                 setMessages([]);
                 setErrorMsg(null);
               }}
-              className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2] inline-flex items-center gap-2"
+              className="min-h-[44px] px-4 rounded-2xl bg-white/85 dark:bg-[#1A1F2B] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2] inline-flex items-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
               Clear Chat
@@ -265,7 +313,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
       </header>
 
       {showSettings && (
-        <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/25 p-5 sm:p-6 space-y-4">
+        <section className="rounded-3xl bg-white/90 dark:bg-[#191D28]/95 border border-[#BEB4DC]/35 p-5 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block">Model</label>
@@ -334,7 +382,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2]"
+          className="rounded-2xl bg-[#FDECE6] dark:bg-[#2F1E1A] border border-[#F2B8A2]/45 px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2]"
         >
           {errorMsg}
         </div>
@@ -347,7 +395,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
       )}
 
       {/* Conversation Thread */}
-      <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] flex flex-col h-[calc(100dvh-21rem)] min-h-[380px] max-h-[640px]">
+      <div className="rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#BEB4DC]/30 dark:border-white/[0.08] flex flex-col h-[calc(100dvh-21rem)] min-h-[380px] max-h-[640px] shadow-xs">
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4">

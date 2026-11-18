@@ -239,6 +239,8 @@ export interface SecuritySettings {
   pinSalt: string;
   biometricEnabled: boolean;
   webAuthnCredentialId?: string;
+  wrappedPinIv?: string;
+  wrappedPinCiphertext?: string;
   autoLockOnBackground: boolean;
   updatedAt: string;
 }

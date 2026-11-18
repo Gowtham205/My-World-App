@@ -61,6 +61,46 @@ interface ChatMessageInput {
   text: string;
 }
 
+function getErrorStatusCode(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const e = err as { status?: number; statusCode?: number; code?: number };
+  if (typeof e.status === 'number') return e.status;
+  if (typeof e.statusCode === 'number') return e.statusCode;
+  if (typeof e.code === 'number') return e.code;
+  return undefined;
+}
+
+function isTransientGeminiError(err: unknown): boolean {
+  const status = getErrorStatusCode(err);
+  if (status === 429 || status === 502 || status === 503 || status === 504) {
+    return true;
+  }
+  const msg = err instanceof Error ? err.message : String(err || '');
+  return /503|502|504|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|try again|temporarily unavailable|ECONNRESET|ETIMEDOUT/i.test(
+    msg
+  );
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withGeminiRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientGeminiError(err) || attempt === maxAttempts) {
+        throw err;
+      }
+      await sleepMs(300 * attempt);
+    }
+  }
+  throw lastErr;
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '25mb' }));
@@ -113,18 +153,8 @@ async function startServer() {
       ? body.model
       : 'gemini-4-hydrogen';
 
-    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders?.();
-
-    const writeEvent = (payload: Record<string, unknown>) => {
-      res.write(`data: ${JSON.stringify(payload)}\n\n`);
-    };
-
-    try {
+    const openChatStream = async (modelToUse: string) => {
       const ai = getAiClient();
-
       const history = messages.slice(0, -1).map((m) => ({
         role: m.role,
         parts: [{ text: m.text }],
@@ -139,7 +169,7 @@ async function startServer() {
         config.systemInstruction = body.systemInstruction.trim();
       }
 
-      if (requestedModel === 'gemini-4-hydrogen' && body.thinkingLevel) {
+      if (modelToUse === 'gemini-4-hydrogen' && body.thinkingLevel) {
         const levelMap: Record<'LOW' | 'MEDIUM' | 'HIGH', ThinkingLevel> = {
           LOW: ThinkingLevel.LOW,
           MEDIUM: ThinkingLevel.MEDIUM,
@@ -152,29 +182,79 @@ async function startServer() {
       }
 
       const chat = ai.chats.create({
-        model: requestedModel,
+        model: modelToUse,
         history,
         config,
       });
 
-      const streamResponse = await chat.sendMessageStream({
+      return chat.sendMessageStream({
         message: latest.text,
       });
+    };
 
+    let streamResponse: AsyncIterable<GenerateContentResponse>;
+    let activeModel = requestedModel;
+
+    try {
+      try {
+        streamResponse = await withGeminiRetry(() => openChatStream(requestedModel), 2);
+      } catch (primaryErr) {
+        if (
+          requestedModel === 'gemini-4-hydrogen' &&
+          isTransientGeminiError(primaryErr)
+        ) {
+          activeModel = 'gemini-3.1-flash-lite';
+          streamResponse = await withGeminiRetry(() => openChatStream(activeModel), 2);
+        } else {
+          throw primaryErr;
+        }
+      }
+    } catch (err) {
+      const rawMessage =
+        err instanceof Error ? err.message : 'Unable to reach Gemini API right now.';
+      console.error('[/api/gemini/chat] Init error:', err);
+      const isOverloaded = isTransientGeminiError(err);
+      const status = isOverloaded
+        ? 503
+        : rawMessage.includes('PERMISSION_DENIED') || rawMessage.includes('403')
+          ? 403
+          : 500;
+      res.status(status).json({
+        error: isOverloaded
+          ? 'Gemini is temporarily busy (503). Please try again in a few seconds.'
+          : rawMessage,
+      });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    const writeEvent = (payload: Record<string, unknown>) => {
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+
+    try {
       for await (const chunk of streamResponse) {
         const c = chunk as GenerateContentResponse;
         if (c.text) {
-          writeEvent({ text: c.text });
+          writeEvent({ text: c.text, modelUsed: activeModel });
         }
       }
 
-      writeEvent({ done: true });
+      writeEvent({ done: true, modelUsed: activeModel });
       res.end();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Unable to reach Gemini API right now.';
-      console.error('[/api/gemini/chat] Error:', err);
-      writeEvent({ error: message });
+      console.error('[/api/gemini/chat] Stream error:', err);
+      writeEvent({
+        error: isTransientGeminiError(err)
+          ? 'Gemini connection was interrupted (503). Please try again.'
+          : message,
+      });
       res.end();
     }
   });
@@ -194,37 +274,45 @@ async function startServer() {
 
     try {
       const ai = getAiClient();
-      const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-3.5-transcribe',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: body.mimeType,
-                data: body.audioBase64,
+      const response: GenerateContentResponse = await withGeminiRetry(() =>
+        ai.models.generateContent({
+          model: 'gemini-3.5-transcribe',
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: body.mimeType!,
+                  data: body.audioBase64!,
+                },
               },
-            },
-            {
-              text:
-                body.prompt?.trim() ||
-                'Transcribe this audio accurately with natural punctuation.',
-            },
-          ],
-        },
-      });
+              {
+                text:
+                  body.prompt?.trim() ||
+                  'Transcribe this audio accurately with natural punctuation.',
+              },
+            ],
+          },
+        })
+      );
 
       res.json({ text: response.text ?? '' });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Audio transcription request failed.';
       console.error('[/api/gemini/transcribe] Error:', err);
-      const status =
-        message.includes('PERMISSION_DENIED') || message.includes('403')
+      const isOverloaded = isTransientGeminiError(err);
+      const status = isOverloaded
+        ? 503
+        : message.includes('PERMISSION_DENIED') || message.includes('403')
           ? 403
           : message.includes('RESOURCE_EXHAUSTED') || message.includes('429')
             ? 429
             : 500;
-      res.status(status).json({ error: message });
+      res.status(status).json({
+        error: isOverloaded
+          ? 'Transcription service is temporarily busy (503). Please try again in a few seconds.'
+          : message,
+      });
     }
   });
 

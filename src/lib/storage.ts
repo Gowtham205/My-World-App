@@ -583,6 +583,44 @@ export function saveNotificationHistory(items: AppNotificationItem[]): void {
   }
 }
 
+const DISMISSED_NOTIFICATION_KEYS_STORAGE = 'my_world_dismissed_notif_keys_v1';
+const MAX_DISMISSED_NOTIFICATION_KEYS = 350;
+
+export function getDismissedNotificationKeys(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(DISMISSED_NOTIFICATION_KEYS_STORAGE);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((k): k is string => typeof k === 'string'));
+  } catch {
+    return new Set();
+  }
+}
+
+export function addDismissedNotificationKeys(keys: string[]): void {
+  if (typeof window === 'undefined' || keys.length === 0) return;
+  try {
+    const raw = localStorage.getItem(DISMISSED_NOTIFICATION_KEYS_STORAGE);
+    const existing: string[] = raw ? (JSON.parse(raw) as string[]) : [];
+    const merged = Array.isArray(existing) ? [...existing] : [];
+    const seen = new Set(merged);
+    for (const k of keys) {
+      if (typeof k === 'string' && k && !seen.has(k)) {
+        seen.add(k);
+        merged.push(k);
+      }
+    }
+    localStorage.setItem(
+      DISMISSED_NOTIFICATION_KEYS_STORAGE,
+      JSON.stringify(merged.slice(-MAX_DISMISSED_NOTIFICATION_KEYS))
+    );
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
 const DAILY_QUOTE_STORAGE_KEY = 'my_world_daily_quote_v1';
 
 export interface DailyQuoteSelection {

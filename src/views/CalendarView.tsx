@@ -150,9 +150,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <header className="rounded-3xl bg-gradient-to-br from-[#EDF5FC] via-[#F4F9FE] to-[#F3F1FA] dark:from-[#16222E] dark:via-[#171F2A] dark:to-[#1C1B2B] border border-[#9BC4E2]/40 dark:border-[#9BC4E2]/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 shadow-xs">
         <div>
-          <p className="text-xs text-[#255F8A] dark:text-[#9BC4E2]">General Calendar</p>
+          <p className="text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2]">General Calendar</p>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Plans, Birthdays & Reminders
           </h1>
@@ -164,7 +164,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <button
           type="button"
           onClick={openCreateForm}
-          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9BC4E2] hover:bg-[#8AB6D6] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap"
+          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9BC4E2] hover:bg-[#8AB6D6] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap shadow-xs"
         >
           <Plus className="w-4 h-4" />
           Add Event
@@ -174,7 +174,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {showAdd && (
         <form
           onSubmit={handleSubmit}
-          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#9BC4E2]/30 p-5 sm:p-7 space-y-4"
+          className="rounded-3xl bg-white/90 dark:bg-[#181C26]/95 border border-[#9BC4E2]/40 dark:border-[#9BC4E2]/25 p-5 sm:p-7 space-y-4 shadow-xs"
         >
           <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
             {editingEvent ? 'Edit Event' : `New Event on ${formatShortDate(eventDate || selectedDate)}`}
@@ -256,7 +256,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Monthly Grid */}
-        <section className="lg:col-span-7 rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6">
+        <section className="lg:col-span-7 rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#9BC4E2]/30 dark:border-white/[0.08] p-5 sm:p-6 shadow-xs">
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-display text-xl font-medium text-[#111827] dark:text-[#F1F3F6]">{monthLabel}</h2>
             <div className="flex items-center gap-1">
@@ -350,7 +350,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </section>
 
         {/* Selected Day Agenda */}
-        <section className="lg:col-span-5 rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 space-y-4">
+        <section className="lg:col-span-5 rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#9BC4E2]/30 dark:border-white/[0.08] p-5 sm:p-6 space-y-4 shadow-xs">
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Selected Day</p>
