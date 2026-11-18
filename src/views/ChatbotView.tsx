@@ -229,11 +229,11 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
     <div className="space-y-5">
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-xs text-[#BEB4DC]">Multi-Turn Sanctuary Assistant</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <p className="text-xs text-[#5B4D8A] dark:text-[#BEB4DC]">Multi-Turn Sanctuary Assistant</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Gemini Companion
           </h1>
-          <p className="text-sm text-[#98A2B3] mt-1">
+          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3] mt-1">
             Thoughtful, calm conversations with continuous context and one-tap saving to your
             local notes.
           </p>
@@ -243,9 +243,9 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
           <button
             type="button"
             onClick={() => setShowSettings((v) => !v)}
-            className="min-h-[44px] px-4 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#F1F3F6] inline-flex items-center gap-2"
+            className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] inline-flex items-center gap-2"
           >
-            <SlidersHorizontal className="w-4 h-4 text-[#BEB4DC]" />
+            <SlidersHorizontal className="w-4 h-4 text-[#5B4D8A] dark:text-[#BEB4DC]" />
             Tone & Model
           </button>
           {messages.length > 0 && (
@@ -255,7 +255,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
                 setMessages([]);
                 setErrorMsg(null);
               }}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#F2B8A2] inline-flex items-center gap-2"
+              className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2] inline-flex items-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
               Clear Chat
@@ -265,16 +265,16 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
       </header>
 
       {showSettings && (
-        <section className="rounded-3xl bg-[#171A21] border border-[#BEB4DC]/25 p-5 sm:p-6 space-y-4">
+        <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/25 p-5 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs text-[#98A2B3] block">Model</label>
+              <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block">Model</label>
               <select
                 value={model}
                 onChange={(e) =>
                   setModel(e.target.value as 'gemini-4-hydrogen' | 'gemini-3.1-flash-lite')
                 }
-                className="w-full min-h-[44px] px-3.5 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+                className="w-full min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               >
                 <option value="gemini-4-hydrogen">Gemini 4 Hydrogen (Balanced & Thoughtful)</option>
                 <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Fast)</option>
@@ -283,13 +283,13 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
 
             {model === 'gemini-4-hydrogen' && (
               <div className="space-y-1.5">
-                <label className="text-xs text-[#98A2B3] block">Reasoning Depth</label>
+                <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block">Reasoning Depth</label>
                 <select
                   value={thinkingLevel}
                   onChange={(e) =>
                     setThinkingLevel(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH')
                   }
-                  className="w-full min-h-[44px] px-3.5 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+                  className="w-full min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
                 >
                   <option value="LOW">Low (Quick response)</option>
                   <option value="MEDIUM">Medium (Balanced)</option>
@@ -300,7 +300,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs text-[#98A2B3] block">Companion Tone</label>
+            <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block">Companion Tone</label>
             <div className="flex flex-wrap gap-2">
               {PERSONA_PRESETS.map((preset) => (
                 <button
@@ -309,8 +309,8 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
                   onClick={() => setPresetId(preset.id)}
                   className={`min-h-[40px] px-3.5 rounded-2xl text-xs font-medium transition-colors ${
                     presetId === preset.id
-                      ? 'bg-[#BEB4DC]/20 text-[#BEB4DC] border border-[#BEB4DC]/40'
-                      : 'bg-[#1D212A] text-[#98A2B3] border border-white/[0.06]'
+                      ? 'bg-[#BEB4DC]/20 text-[#5B4D8A] dark:text-[#BEB4DC] border border-[#BEB4DC]/40'
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
                   }`}
                 >
                   {preset.label}
@@ -325,7 +325,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
               value={customInstruction}
               onChange={(e) => setCustomInstruction(e.target.value)}
               placeholder="Write custom system instructions..."
-              className="w-full p-3.5 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6] leading-relaxed"
+              className="w-full p-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] leading-relaxed"
             />
           )}
         </section>
@@ -334,31 +334,31 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#F2B8A2]"
+          className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2]"
         >
           {errorMsg}
         </div>
       )}
 
       {savedNotice && (
-        <p className="text-xs text-[#9EC5AB]" role="status">
+        <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]" role="status">
           {savedNotice}
         </p>
       )}
 
       {/* Conversation Thread */}
-      <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] flex flex-col h-[calc(100dvh-21rem)] min-h-[380px] max-h-[640px]">
+      <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] flex flex-col h-[calc(100dvh-21rem)] min-h-[380px] max-h-[640px]">
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-[#BEB4DC]/15 flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-[#BEB4DC]" />
+                <Sparkles className="w-6 h-6 text-[#5B4D8A] dark:text-[#BEB4DC]" />
               </div>
               <div className="space-y-1.5">
-                <h2 className="font-display text-lg font-medium text-[#F1F3F6]">
+                <h2 className="font-display text-lg font-medium text-[#111827] dark:text-[#F1F3F6]">
                   Quiet Space to Think
                 </h2>
-                <p className="text-xs text-[#98A2B3] leading-relaxed">
+                <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
                   Ask for help organizing a busy day, reframing an anxious thought, or drafting a
                   gentle note.
                 </p>
@@ -373,7 +373,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
                     key={prompt}
                     type="button"
                     onClick={() => setInput(prompt)}
-                    className="px-3.5 py-2 rounded-2xl bg-[#1D212A] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-[#D0D5DD] text-left"
+                    className="px-3.5 py-2 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.08] dark:border-white/[0.06] text-xs text-[#334155] dark:text-[#D0D5DD] text-left"
                   >
                     {prompt}
                   </button>
@@ -391,26 +391,26 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
                   <div
                     className={`max-w-[85%] sm:max-w-[78%] rounded-3xl px-4 py-3.5 space-y-2 ${
                       isUser
-                        ? 'bg-[#9EC5AB]/15 border border-[#9EC5AB]/25 text-[#F1F3F6]'
-                        : 'bg-[#1D212A] border border-white/[0.06] text-[#F1F3F6]'
+                        ? 'bg-[#9EC5AB]/15 border border-[#9EC5AB]/25 text-[#111827] dark:text-[#F1F3F6]'
+                        : 'bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.06] text-[#111827] dark:text-[#F1F3F6]'
                     }`}
                   >
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">
                       {msg.text || (isStreaming && !isUser ? 'Thinking...' : '')}
                     </p>
                     {!isUser && msg.text && (
-                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-white/[0.05]">
-                        <span className="text-[11px] text-[#98A2B3]">
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-900/[0.06] dark:border-white/[0.05]">
+                        <span className="text-[11px] text-[#5B6472] dark:text-[#98A2B3]">
                           {msg.modelUsed || model}
                         </span>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => void handleCopy(msg.id, msg.text)}
-                            className="text-[11px] text-[#98A2B3] hover:text-[#F1F3F6] inline-flex items-center gap-1"
+                            className="text-[11px] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] inline-flex items-center gap-1"
                           >
                             {copiedId === msg.id ? (
-                              <Check className="w-3 h-3 text-[#9EC5AB]" />
+                              <Check className="w-3 h-3 text-[#2E6B48] dark:text-[#9EC5AB]" />
                             ) : (
                               <Copy className="w-3 h-3" />
                             )}
@@ -419,7 +419,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
                           <button
                             type="button"
                             onClick={() => void handleSaveReplyToNotes(msg.text)}
-                            className="text-[11px] text-[#9BC4E2] hover:underline inline-flex items-center gap-1"
+                            className="text-[11px] text-[#255F8A] dark:text-[#9BC4E2] hover:underline inline-flex items-center gap-1"
                           >
                             <BookOpen className="w-3 h-3" />
                             Save to Notes
@@ -437,7 +437,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
 
         <form
           onSubmit={handleSend}
-          className="p-3 sm:p-4 border-t border-white/[0.06] flex items-end gap-2.5"
+          className="p-3 sm:p-4 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-end gap-2.5"
         >
           <textarea
             rows={1}
@@ -450,7 +450,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
               }
             }}
             placeholder="Share what is on your mind..."
-            className="flex-1 min-h-[44px] max-h-32 px-4 py-2.5 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/70 resize-none focus:outline-none focus:border-[#BEB4DC]/50"
+            className="flex-1 min-h-[44px] max-h-32 px-4 py-2.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/70 dark:placeholder-[#98A2B3]/70 resize-none focus:outline-none focus:border-[#BEB4DC]/50"
           />
           <button
             type="submit"

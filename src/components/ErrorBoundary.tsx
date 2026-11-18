@@ -36,16 +36,16 @@ export class ErrorBoundary extends React.Component<
   override render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#0F1115] text-[#F1F3F6] flex items-center justify-center p-6">
-          <div className="w-full max-w-md rounded-3xl bg-[#171A21] border border-white/[0.08] p-7 space-y-5 text-center">
+        <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex items-center justify-center p-6">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] p-7 space-y-5 text-center">
             <div className="w-12 h-12 rounded-2xl bg-[#F2B8A2]/15 flex items-center justify-center mx-auto">
-              <ShieldAlert className="w-6 h-6 text-[#F2B8A2]" />
+              <ShieldAlert className="w-6 h-6 text-[#A6482D] dark:text-[#F2B8A2]" />
             </div>
             <div className="space-y-2">
-              <h1 className="font-display text-xl font-medium text-[#F1F3F6]">
+              <h1 className="font-display text-xl font-medium text-[#111827] dark:text-[#F1F3F6]">
                 A Brief Pause
               </h1>
-              <p className="text-sm text-[#98A2B3] leading-relaxed">
+              <p className="text-sm text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
                 {this.state.message}
               </p>
             </div>

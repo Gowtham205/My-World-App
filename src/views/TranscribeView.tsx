@@ -254,11 +254,11 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-xs text-[#F2B8A2]">Speech-to-Text · Gemini Transcribe</p>
-        <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+        <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2]">Speech-to-Text · Gemini Transcribe</p>
+        <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
           Audio Transcription
         </h1>
-        <p className="text-sm text-[#98A2B3] mt-1 max-w-2xl">
+        <p className="text-sm text-[#5B6472] dark:text-[#98A2B3] mt-1 max-w-2xl">
           Record a voice memo or upload an audio file to convert spoken thoughts into clean text
           and save directly into your Personal Notes.
         </p>
@@ -267,20 +267,20 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#F2B8A2]"
+          className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2]"
         >
           {errorMsg}
         </div>
       )}
 
       {savedNotice && (
-        <p className="text-xs text-[#9EC5AB]" role="status">
+        <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]" role="status">
           {savedNotice}
         </p>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <section className="lg:col-span-5 rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 space-y-5">
+        <section className="lg:col-span-5 rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 space-y-5">
           <div className="flex flex-wrap items-center gap-3">
             {!recording ? (
               <button
@@ -295,7 +295,7 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
               <button
                 type="button"
                 onClick={stopRecording}
-                className="flex-1 min-h-[48px] px-4 rounded-2xl bg-[#F2B8A2]/20 border border-[#F2B8A2]/50 text-[#F2B8A2] text-sm font-semibold inline-flex items-center justify-center gap-2"
+                className="flex-1 min-h-[48px] px-4 rounded-2xl bg-[#F2B8A2]/20 border border-[#F2B8A2]/50 text-[#A6482D] dark:text-[#F2B8A2] text-sm font-semibold inline-flex items-center justify-center gap-2"
               >
                 <Square className="w-4 h-4" />
                 Stop · <span className="font-mono-tabular">{formatDuration(elapsedSec)}</span>
@@ -306,9 +306,9 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
               type="button"
               disabled={recording}
               onClick={() => fileInputRef.current?.click()}
-              className="min-h-[48px] px-4 rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-[#F1F3F6] inline-flex items-center gap-2 disabled:opacity-40"
+              className="min-h-[48px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] inline-flex items-center gap-2 disabled:opacity-40"
             >
-              <Upload className="w-4 h-4 text-[#9BC4E2]" />
+              <Upload className="w-4 h-4 text-[#255F8A] dark:text-[#9BC4E2]" />
               Upload Audio
             </button>
             <input
@@ -321,9 +321,9 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
           </div>
 
           {audioUrl && (
-            <div className="p-4 rounded-2xl bg-[#1D212A] border border-white/[0.06] space-y-3">
-              <div className="flex items-center gap-2 text-xs text-[#D0D5DD]">
-                <FileAudio className="w-4 h-4 text-[#9BC4E2] shrink-0" />
+            <div className="p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.06] space-y-3">
+              <div className="flex items-center gap-2 text-xs text-[#334155] dark:text-[#D0D5DD]">
+                <FileAudio className="w-4 h-4 text-[#255F8A] dark:text-[#9BC4E2] shrink-0" />
                 <span className="truncate">{audioLabel}</span>
               </div>
               <audio controls src={audioUrl} className="w-full h-10" />
@@ -331,7 +331,7 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
           )}
 
           <div className="space-y-2">
-            <label className="text-xs text-[#98A2B3] block">Transcription Style</label>
+            <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block">Transcription Style</label>
             <div className="flex flex-wrap gap-2">
               {PROMPT_MODES.map((m) => (
                 <button
@@ -340,8 +340,8 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
                   onClick={() => setPromptModeId(m.id)}
                   className={`min-h-[40px] px-3.5 rounded-2xl text-xs font-medium transition-colors ${
                     promptModeId === m.id
-                      ? 'bg-[#9BC4E2]/20 text-[#9BC4E2] border border-[#9BC4E2]/40'
-                      : 'bg-[#1D212A] text-[#98A2B3] border border-white/[0.06]'
+                      ? 'bg-[#9BC4E2]/20 text-[#255F8A] dark:text-[#9BC4E2] border border-[#9BC4E2]/40'
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
                   }`}
                 >
                   {m.label}
@@ -360,19 +360,19 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
           </button>
         </section>
 
-        <section className="lg:col-span-7 rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4 min-h-[360px]">
+        <section className="lg:col-span-7 rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4 min-h-[360px]">
           <div className="space-y-3 flex-1 flex flex-col">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-[#F1F3F6]">Transcript Output</h2>
+              <h2 className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6]">Transcript Output</h2>
               {transcript && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => void handleCopy()}
-                    className="min-h-[38px] px-3 rounded-xl bg-[#1D212A] text-xs text-[#D0D5DD] inline-flex items-center gap-1.5"
+                    className="min-h-[38px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] text-xs text-[#334155] dark:text-[#D0D5DD] inline-flex items-center gap-1.5"
                   >
                     {copied ? (
-                      <Check className="w-3.5 h-3.5 text-[#9EC5AB]" />
+                      <Check className="w-3.5 h-3.5 text-[#2E6B48] dark:text-[#9EC5AB]" />
                     ) : (
                       <Copy className="w-3.5 h-3.5" />
                     )}
@@ -381,7 +381,7 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
                   <button
                     type="button"
                     onClick={() => void handleSaveAsNote()}
-                    className="min-h-[38px] px-3 rounded-xl bg-[#9EC5AB]/15 text-xs font-medium text-[#9EC5AB] inline-flex items-center gap-1.5"
+                    className="min-h-[38px] px-3 rounded-xl bg-[#9EC5AB]/15 text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB] inline-flex items-center gap-1.5"
                   >
                     <BookOpen className="w-3.5 h-3.5" />
                     Save as Note
@@ -394,13 +394,13 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               placeholder="Your transcribed voice memo will appear here..."
-              className="flex-1 min-h-[220px] w-full p-4 rounded-2xl bg-[#1D212A] border border-white/[0.06] text-sm text-[#F1F3F6] leading-relaxed resize-none focus:outline-none"
+              className="flex-1 min-h-[220px] w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.06] text-sm text-[#111827] dark:text-[#F1F3F6] leading-relaxed resize-none focus:outline-none"
             />
           </div>
 
           {history.length > 0 && (
-            <div className="pt-3 border-t border-white/[0.06] space-y-2">
-              <p className="text-xs text-[#98A2B3]">Recent Transcripts</p>
+            <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] space-y-2">
+              <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Recent Transcripts</p>
               <div className="flex flex-wrap gap-2">
                 {history.slice(0, 4).map((item) => (
                   <button
@@ -410,7 +410,7 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
                       setTranscript(item.text);
                       setAudioLabel(item.title);
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-[#1D212A] hover:bg-white/[0.06] text-xs text-[#D0D5DD] max-w-[200px] truncate"
+                    className="px-3 py-1.5 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-xs text-[#334155] dark:text-[#D0D5DD] max-w-[200px] truncate"
                   >
                     {item.title}
                   </button>

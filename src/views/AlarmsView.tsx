@@ -70,7 +70,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
   const [label, setLabel] = useState('');
   const [time, setTime] = useState('07:30');
   const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [snoozeMinutes, setSnoozeMinutes] = useState(10);
+  const [snoozeMinutes, setSnoozeMinutes] = useState(5);
   const [selectedSoundId, setSelectedSoundId] = useState<string>(BUILTIN_TONES[0].id);
 
   // Audio upload state
@@ -159,7 +159,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
     setLabel('');
     setTime('07:30');
     setRepeatDays([1, 2, 3, 4, 5]);
-    setSnoozeMinutes(10);
+    setSnoozeMinutes(5);
     setSelectedSoundId(BUILTIN_TONES[0].id);
     setShowAdd((v) => !v);
   };
@@ -169,7 +169,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
     setLabel(alarm.label);
     setTime(alarm.time);
     setRepeatDays([...alarm.repeatDays]);
-    setSnoozeMinutes(alarm.snoozeMinutes);
+    setSnoozeMinutes(alarm.snoozeMinutes || 5);
     setSelectedSoundId(alarm.soundId || BUILTIN_TONES[0].id);
     setShowAdd(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -191,10 +191,12 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
       time,
       enabled: editingAlarm ? editingAlarm.enabled : true,
       repeatDays,
-      snoozeMinutes,
+      snoozeMinutes: snoozeMinutes || 5,
       soundId: selectedSoundId,
       soundName: resolveSoundName(customAudioTones, selectedSoundId),
       lastTriggeredMinute: scheduleChanged ? undefined : editingAlarm?.lastTriggeredMinute,
+      snoozedUntilDate: scheduleChanged ? undefined : editingAlarm?.snoozedUntilDate,
+      snoozedUntilTime: scheduleChanged ? undefined : editingAlarm?.snoozedUntilTime,
       createdAt: editingAlarm ? editingAlarm.createdAt : new Date().toISOString(),
     });
 
@@ -231,11 +233,11 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#F2B8A2]">Dedicated Alarms & Custom Audio</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2]">Dedicated Alarms & Custom Audio</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Wake-Up, Medicine & Break Alarms
           </h1>
-          <p className="text-xs text-[#98A2B3] mt-1">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1">
             Upload your own music or audio clips for alarm ringtones, reminder alerts, and
             notification chimes.
           </p>
@@ -253,9 +255,9 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
       {showAdd && (
         <form
           onSubmit={handleSaveForm}
-          className="rounded-3xl bg-[#171A21] border border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4"
+          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">
+          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
             {editingAlarm ? 'Edit Alarm' : 'Configure Alarm'}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -264,19 +266,19 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Label (e.g. Take medicine, Morning routine)"
-              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
             />
             <input
               type="time"
               required
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
             />
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs text-[#98A2B3]">Repeat Days (leave all off for one-time)</p>
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Repeat Days (leave all off for one-time)</p>
             <div className="flex flex-wrap gap-2">
               {WEEKDAYS.map((day, idx) => {
                 const active = repeatDays.includes(idx);
@@ -288,7 +290,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                     className={`min-w-[44px] min-h-[44px] rounded-2xl text-xs font-medium transition-colors ${
                       active
                         ? 'bg-[#F2B8A2] text-[#0F1115] font-semibold'
-                        : 'bg-[#1D212A] text-[#98A2B3] border border-white/[0.06]'
+                        : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
                     }`}
                   >
                     {day}
@@ -300,25 +302,27 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-[#98A2B3] mb-1">Snooze Duration</label>
+              <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
+                Auto-Stop (1m) &amp; Snooze Default
+              </label>
               <select
                 value={snoozeMinutes}
                 onChange={(e) => setSnoozeMinutes(Number(e.target.value))}
-                className="w-full min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+                className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               >
-                <option value={5}>5 minutes</option>
+                <option value={5}>5 minutes (Default)</option>
                 <option value={10}>10 minutes</option>
                 <option value={15}>15 minutes</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs text-[#98A2B3] mb-1">Alarm Ringtone</label>
+              <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Alarm Ringtone</label>
               <div className="flex items-center gap-2">
                 <select
                   value={selectedSoundId}
                   onChange={(e) => setSelectedSoundId(e.target.value)}
-                  className="flex-1 min-w-0 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+                  className="flex-1 min-w-0 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
                 >
                   <optgroup label="Built-In Sanctuary Tones">
                     {BUILTIN_TONES.map((tone) => (
@@ -343,7 +347,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                   onClick={() => handleTogglePreview(selectedSoundId)}
                   title={previewingId === selectedSoundId ? 'Stop preview' : 'Preview sound'}
                   aria-label="Preview alarm sound"
-                  className="min-w-[44px] min-h-[44px] rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-[#9EC5AB] flex items-center justify-center shrink-0"
+                  className="min-w-[44px] min-h-[44px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-[#2E6B48] dark:text-[#9EC5AB] flex items-center justify-center shrink-0"
                 >
                   {previewingId === selectedSoundId ? (
                     <Square className="w-4 h-4" />
@@ -357,7 +361,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                   onClick={() => inlineFileInputRef.current?.click()}
                   title="Upload custom audio file"
                   aria-label="Upload custom audio file"
-                  className="min-w-[44px] min-h-[44px] px-3 rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-[#9BC4E2] flex items-center gap-1.5 shrink-0"
+                  className="min-w-[44px] min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] flex items-center gap-1.5 shrink-0"
                 >
                   <Upload className="w-4 h-4" />
                   <span className="hidden md:inline">Upload</span>
@@ -383,7 +387,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                 setShowAdd(false);
                 setEditingAlarm(null);
               }}
-              className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
+              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
             >
               Cancel
             </button>
@@ -398,8 +402,8 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
       )}
 
       {sortedAlarms.length === 0 ? (
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-10 text-center">
-          <p className="text-sm text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
+          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
             No alarms configured. Add a wake-up alarm or link one from Tasks & Reminders.
           </p>
         </div>
@@ -410,27 +414,32 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
             return (
               <article
                 key={alarm.id}
-                className={`rounded-3xl bg-[#171A21] border p-5 sm:p-6 flex flex-col justify-between gap-4 transition-opacity ${
-                  alarm.enabled ? 'border-white/[0.08]' : 'border-white/[0.04] opacity-60'
+                className={`rounded-3xl bg-white dark:bg-[#171A21] border p-5 sm:p-6 flex flex-col justify-between gap-4 transition-opacity ${
+                  alarm.enabled ? 'border-slate-900/[0.10] dark:border-white/[0.08]' : 'border-slate-900/[0.06] dark:border-white/[0.04] opacity-60'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-xs text-[#98A2B3] flex items-center gap-1.5">
-                      <AlarmClock className="w-3.5 h-3.5 text-[#F2B8A2]" />
+                    <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] flex items-center gap-1.5">
+                      <AlarmClock className="w-3.5 h-3.5 text-[#A6482D] dark:text-[#F2B8A2]" />
                       <span>
                         {alarm.linkedReminderId ? 'Linked Reminder Alarm' : 'Dedicated Alarm'} ·
                         Snooze {alarm.snoozeMinutes}m
                       </span>
                     </p>
-                    <div className="font-mono-tabular text-3xl font-semibold text-[#F1F3F6] mt-1.5">
+                    <div className="font-mono-tabular text-3xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-1.5">
                       {formatTime12h(alarm.time)}
                     </div>
-                    <h2 className="text-sm font-medium text-[#D0D5DD] mt-1 truncate">
+                    <h2 className="text-sm font-medium text-[#334155] dark:text-[#D0D5DD] mt-1 truncate">
                       {alarm.label}
                     </h2>
+                    {alarm.snoozedUntilTime && (
+                      <p className="text-xs text-[#5B4D8A] dark:text-[#BEB4DC] mt-1 font-medium">
+                        Snoozed · next ring at {formatTime12h(alarm.snoozedUntilTime)}
+                      </p>
+                    )}
                     {alarm.linkedReminderNotes && (
-                      <p className="text-xs text-[#98A2B3] mt-1 line-clamp-2">
+                      <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 line-clamp-2">
                         {alarm.linkedReminderNotes}
                       </p>
                     )}
@@ -442,13 +451,20 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                     role="switch"
                     aria-checked={alarm.enabled}
                     aria-label={`Toggle ${alarm.label}`}
-                    onClick={() => onSaveAlarm({ ...alarm, enabled: !alarm.enabled })}
+                    onClick={() =>
+                      onSaveAlarm({
+                        ...alarm,
+                        enabled: !alarm.enabled,
+                        snoozedUntilDate: undefined,
+                        snoozedUntilTime: undefined,
+                      })
+                    }
                     className={`w-14 h-8 rounded-full p-1 transition-colors shrink-0 ${
-                      alarm.enabled ? 'bg-[#9EC5AB]' : 'bg-white/[0.12]'
+                      alarm.enabled ? 'bg-[#9EC5AB]' : 'bg-slate-900/[0.14] dark:bg-white/[0.12]'
                     }`}
                   >
                     <span
-                      className={`block w-6 h-6 rounded-full bg-[#0F1115] transition-transform ${
+                      className={`block w-6 h-6 rounded-full bg-[#F4F6F8] dark:bg-[#0F1115] transition-transform ${
                         alarm.enabled ? 'translate-x-6' : 'translate-x-0'
                       }`}
                     />
@@ -457,12 +473,12 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
 
                 {/* Per-Alarm Sound Picker */}
                 <div className="flex items-center gap-2">
-                  <Music2 className="w-3.5 h-3.5 text-[#9BC4E2] shrink-0" />
+                  <Music2 className="w-3.5 h-3.5 text-[#255F8A] dark:text-[#9BC4E2] shrink-0" />
                   <select
                     aria-label={`Ringtone for ${alarm.label}`}
                     value={currentSoundId}
                     onChange={(e) => void handleUpdateAlarmSound(alarm, e.target.value)}
-                    className="flex-1 min-w-0 min-h-[38px] px-3 rounded-xl bg-[#1D212A] border border-white/[0.06] text-xs text-[#D0D5DD]"
+                    className="flex-1 min-w-0 min-h-[38px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.06] text-xs text-[#334155] dark:text-[#D0D5DD]"
                   >
                     <optgroup label="Built-In Tones">
                       {BUILTIN_TONES.map((tone) => (
@@ -483,8 +499,8 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                   </select>
                 </div>
 
-                <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-3">
-                  <p className="text-xs text-[#98A2B3]">
+                <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-center justify-between gap-3">
+                  <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
                     {alarm.repeatDays.length === 7
                       ? 'Every day'
                       : alarm.repeatDays.length === 0
@@ -496,7 +512,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onTestRingAlarm(alarm)}
-                      className="min-h-[40px] px-3 rounded-xl hover:bg-white/[0.06] text-xs font-medium text-[#F2B8A2] flex items-center gap-1.5 whitespace-nowrap"
+                      className="min-h-[40px] px-3 rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2] flex items-center gap-1.5 whitespace-nowrap"
                     >
                       <BellRing className="w-3.5 h-3.5" />
                       Test Ring
@@ -505,7 +521,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                       type="button"
                       onClick={() => openEditForm(alarm)}
                       aria-label={`Edit ${alarm.label}`}
-                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F1F3F6] flex items-center justify-center"
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] flex items-center justify-center"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
@@ -513,7 +529,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                       type="button"
                       onClick={() => onDeleteAlarm(alarm.id)}
                       aria-label="Delete alarm"
-                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -526,14 +542,14 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
       )}
 
       {/* Custom Audio & Ringtones Library + Default Notification Sound */}
-      <section className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-7 space-y-5">
+      <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-7 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <p className="text-xs text-[#9BC4E2]">Local Audio Library · IndexedDB</p>
-            <h2 className="font-display text-xl font-medium text-[#F1F3F6] mt-0.5">
+            <p className="text-xs text-[#255F8A] dark:text-[#9BC4E2]">Local Audio Library · IndexedDB</p>
+            <h2 className="font-display text-xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-0.5">
               Custom Ringtones, Reminder & Notification Sounds
             </h2>
-            <p className="text-xs text-[#98A2B3] mt-1">
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1">
               Upload MP3, WAV, M4A, OGG, or AAC files from your device. Everything stays stored
               locally in your sanctuary.
             </p>
@@ -544,7 +560,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
               aria-label="Category for uploaded audio"
               value={uploadCategory}
               onChange={(e) => setUploadCategory(e.target.value as AudioToneCategory)}
-              className="min-h-[44px] px-3.5 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6]"
+              className="min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
             >
               {TONE_CATEGORIES.map((cat) => (
                 <option key={cat.id} value={cat.id}>
@@ -577,27 +593,27 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
         {uploadError && (
           <div
             role="alert"
-            className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#F2B8A2]"
+            className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2]"
           >
             {uploadError}
           </div>
         )}
 
         {uploadNotice && (
-          <p className="text-xs text-[#9EC5AB]" role="status">
+          <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]" role="status">
             {uploadNotice}
           </p>
         )}
 
         {/* Default Notification & Event Calm Chime Selector */}
-        <div className="rounded-2xl bg-[#1D212A] border border-white/[0.06] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.06] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
-            <Volume2 className="w-4 h-4 text-[#9EC5AB] mt-0.5 shrink-0" />
+            <Volume2 className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB] mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs font-medium text-[#F1F3F6]">
+              <p className="text-xs font-medium text-[#111827] dark:text-[#F1F3F6]">
                 Default Notification & Event Calm Sound
               </p>
-              <p className="text-xs text-[#98A2B3] mt-0.5">
+              <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
                 Plays for Event Calm Mode check-ins and scheduled reminder notifications.
               </p>
             </div>
@@ -608,7 +624,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
               aria-label="Default notification sound"
               value={defaultNotificationSoundId}
               onChange={(e) => onChangeDefaultNotificationSound(e.target.value)}
-              className="min-h-[42px] px-3.5 rounded-xl bg-[#13161C] border border-white/[0.08] text-xs text-[#F1F3F6] max-w-[220px]"
+              className="min-h-[42px] px-3.5 rounded-xl bg-white dark:bg-[#13161C] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] max-w-[220px]"
             >
               <optgroup label="Built-In Chimes">
                 {BUILTIN_TONES.map((tone) => (
@@ -631,7 +647,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
               type="button"
               onClick={() => handleTogglePreview(defaultNotificationSoundId)}
               aria-label="Preview default notification sound"
-              className="min-w-[42px] min-h-[42px] rounded-xl bg-[#13161C] hover:bg-white/[0.08] border border-white/[0.08] text-[#9EC5AB] flex items-center justify-center"
+              className="min-w-[42px] min-h-[42px] rounded-xl bg-white dark:bg-[#13161C] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-[#2E6B48] dark:text-[#9EC5AB] flex items-center justify-center"
             >
               {previewingId === defaultNotificationSoundId ? (
                 <Square className="w-4 h-4" />
@@ -644,12 +660,12 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
 
         {/* Uploaded Custom Sounds List */}
         {customAudioTones.length === 0 ? (
-          <p className="text-xs text-[#98A2B3] py-2">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] py-2">
             No custom audio files uploaded yet. Upload your favorite song snippet, calming chime, or
             voice reminder above to assign it to any alarm or reminder.
           </p>
         ) : (
-          <div className="divide-y divide-white/[0.06] rounded-2xl bg-[#1D212A] border border-white/[0.06]">
+          <div className="divide-y divide-slate-900/[0.08] dark:divide-white/[0.06] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.06]">
             {customAudioTones.map((tone) => {
               const isPlaying = previewingId === tone.id;
               return (
@@ -665,14 +681,14 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                       className={`min-w-[40px] min-h-[40px] rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                         isPlaying
                           ? 'bg-[#9EC5AB] text-[#0F1115]'
-                          : 'bg-[#13161C] text-[#9BC4E2] hover:bg-white/[0.08]'
+                          : 'bg-white dark:bg-[#13161C] text-[#255F8A] dark:text-[#9BC4E2] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08]'
                       }`}
                     >
                       {isPlaying ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                     </button>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-[#F1F3F6] truncate">{tone.name}</p>
-                      <p className="text-xs text-[#98A2B3]">
+                      <p className="text-sm font-medium text-[#111827] dark:text-[#F1F3F6] truncate">{tone.name}</p>
+                      <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
                         {TONE_CATEGORIES.find((c) => c.id === tone.category)?.label || tone.category}{' '}
                         · {formatFileSize(tone.sizeBytes)}
                       </p>
@@ -683,7 +699,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                     type="button"
                     onClick={() => void handleDeleteTone(tone.id)}
                     aria-label={`Delete ${tone.name}`}
-                    className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center shrink-0"
+                    className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center shrink-0"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

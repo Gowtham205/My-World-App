@@ -262,10 +262,10 @@ export const VaultView: React.FC<VaultViewProps> = ({
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6]">
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6]">
             Secrets & Passwords
           </h1>
-          <p className="text-xs text-[#98A2B3] mt-1">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1">
             Auto-locks automatically whenever you leave or minimize.
           </p>
         </div>
@@ -278,7 +278,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
               setPinUpdateError('');
               setShowAdd(false);
             }}
-            className="min-h-[44px] px-4 py-2 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#BEB4DC] flex items-center gap-2 whitespace-nowrap"
+            className="min-h-[44px] px-4 py-2 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#5B4D8A] dark:text-[#BEB4DC] flex items-center gap-2 whitespace-nowrap"
           >
             <KeyRound className="w-3.5 h-3.5" />
             Update PIN
@@ -286,7 +286,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
           <button
             type="button"
             onClick={onLock}
-            className="min-h-[44px] px-4 py-2 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#F2B8A2] flex items-center gap-2 whitespace-nowrap"
+            className="min-h-[44px] px-4 py-2 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2] flex items-center gap-2 whitespace-nowrap"
           >
             <Lock className="w-3.5 h-3.5" />
             Lock Now
@@ -303,13 +303,13 @@ export const VaultView: React.FC<VaultViewProps> = ({
       </header>
 
       {pinUpdateSuccess && (
-        <p className="text-xs text-[#9EC5AB]" role="status">
+        <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]" role="status">
           {pinUpdateSuccess}
         </p>
       )}
 
       {decryptError && (
-        <p className="text-xs text-[#F2B8A2]" role="alert">
+        <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2]" role="alert">
           {decryptError}
         </p>
       )}
@@ -317,11 +317,11 @@ export const VaultView: React.FC<VaultViewProps> = ({
       {showPinUpdate && (
         <form
           onSubmit={handlePinChangeSubmit}
-          className="rounded-3xl bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-6 space-y-4"
+          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-6 space-y-4"
         >
           <div>
-            <h2 className="text-base font-semibold text-[#F1F3F6]">Update Master Lock PIN</h2>
-            <p className="text-xs text-[#98A2B3] mt-0.5">
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">Update Master Lock PIN</h2>
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
               Applies to both Secrets & Passwords and Private Gallery.
             </p>
           </div>
@@ -334,7 +334,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
               value={currentPin}
               onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ''))}
               placeholder="Current PIN"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
             />
             <input
               type="password"
@@ -344,7 +344,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
               value={newPin}
               onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
               placeholder="New PIN (4–6 digits)"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
             />
             <input
               type="password"
@@ -354,11 +354,11 @@ export const VaultView: React.FC<VaultViewProps> = ({
               value={confirmNewPin}
               onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, ''))}
               placeholder="Confirm new PIN"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
             />
           </div>
           {pinUpdateError && (
-            <p className="text-xs text-[#F2B8A2]" role="alert">
+            <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2]" role="alert">
               {pinUpdateError}
             </p>
           )}
@@ -369,7 +369,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                 setShowPinUpdate(false);
                 setPinUpdateError('');
               }}
-              className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
+              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
             >
               Cancel
             </button>
@@ -387,9 +387,9 @@ export const VaultView: React.FC<VaultViewProps> = ({
       {showAdd && (
         <form
           onSubmit={handleSaveEntry}
-          className="rounded-3xl bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-7 space-y-4"
+          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-7 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">
+          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
             {editingItem ? 'Edit Secret Entry' : 'Add Secret Entry'}
           </h2>
 
@@ -401,8 +401,8 @@ export const VaultView: React.FC<VaultViewProps> = ({
                 onClick={() => setEntryType(t.value)}
                 className={`min-h-[40px] px-3 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
                   entryType === t.value
-                    ? 'bg-[#BEB4DC]/20 text-[#BEB4DC] border border-[#BEB4DC]/30'
-                    : 'bg-[#1D212A] text-[#98A2B3]'
+                    ? 'bg-[#BEB4DC]/20 text-[#5B4D8A] dark:text-[#BEB4DC] border border-[#BEB4DC]/30'
+                    : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3]'
                 }`}
               >
                 {t.label}
@@ -416,7 +416,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Entry title (e.g. Primary Bank, Home Wi-Fi, Private Journal)"
-            className="w-full min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+            className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
           />
 
           {entryType === 'login' && (
@@ -426,21 +426,21 @@ export const VaultView: React.FC<VaultViewProps> = ({
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Username or email"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               />
               <input
                 type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="Website URL (optional)"
-                className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+                className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               />
             </div>
           )}
@@ -452,28 +452,28 @@ export const VaultView: React.FC<VaultViewProps> = ({
                 value={cardNumber}
                 onChange={(e) => setCardNumber(e.target.value)}
                 placeholder="Card / Account number"
-                className="sm:col-span-3 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+                className="sm:col-span-3 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
               />
               <input
                 type="text"
                 value={expiry}
                 onChange={(e) => setExpiry(e.target.value)}
                 placeholder="Expiry (MM/YY)"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
               />
               <input
                 type="password"
                 value={cvv}
                 onChange={(e) => setCvv(e.target.value)}
                 placeholder="CVV / Security Code"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
               />
               <input
                 type="password"
                 value={pinCode}
                 onChange={(e) => setPinCode(e.target.value)}
                 placeholder="ATM PIN"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
               />
             </div>
           )}
@@ -484,7 +484,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
               value={pinCode}
               onChange={(e) => setPinCode(e.target.value)}
               placeholder="Secret PIN or passcode"
-              className="w-full min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+              className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
             />
           )}
 
@@ -493,17 +493,17 @@ export const VaultView: React.FC<VaultViewProps> = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Secret notes, recovery codes, personal relationship notes, or nicknames..."
-            className="w-full p-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+            className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
           />
 
           {/* Custom Key-Value Fields */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#98A2B3]">Custom Key-Value Fields</span>
+              <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Custom Key-Value Fields</span>
               <button
                 type="button"
                 onClick={addCustomField}
-                className="min-h-[36px] px-3 rounded-xl bg-white/[0.05] text-xs text-[#BEB4DC] hover:bg-white/[0.09]"
+                className="min-h-[36px] px-3 rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-xs text-[#5B4D8A] dark:text-[#BEB4DC] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09]"
               >
                 + Add Field
               </button>
@@ -519,7 +519,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                     )
                   }
                   placeholder="Field label"
-                  className="min-h-[40px] px-3 rounded-xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6]"
+                  className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
                 />
                 <input
                   type="text"
@@ -530,7 +530,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                     )
                   }
                   placeholder="Value"
-                  className="min-h-[40px] px-3 rounded-xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6]"
+                  className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
                 />
               </div>
             ))}
@@ -543,7 +543,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                 resetForm();
                 setShowAdd(false);
               }}
-              className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
+              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
             >
               Cancel
             </button>
@@ -558,8 +558,8 @@ export const VaultView: React.FC<VaultViewProps> = ({
       )}
 
       {items.length === 0 ? (
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-10 text-center">
-          <p className="text-sm text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
+          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
             Your encrypted Vault is empty. Store logins, bank cards, PINs, or private notes safely
             offline.
           </p>
@@ -574,15 +574,15 @@ export const VaultView: React.FC<VaultViewProps> = ({
             return (
               <article
                 key={item.id}
-                className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 space-y-3"
+                className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 space-y-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs text-[#98A2B3] flex items-center gap-1.5">
-                      <Icon className="w-3.5 h-3.5 text-[#BEB4DC]" />
+                    <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] flex items-center gap-1.5">
+                      <Icon className="w-3.5 h-3.5 text-[#5B4D8A] dark:text-[#BEB4DC]" />
                       <span>{typeMeta.label}</span>
                     </p>
-                    <h2 className="text-base font-semibold text-[#F1F3F6] mt-1 truncate">
+                    <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6] mt-1 truncate">
                       {item.title}
                     </h2>
                   </div>
@@ -592,7 +592,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                       type="button"
                       onClick={() => openEditForm(item)}
                       aria-label={`Edit ${item.title}`}
-                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#9BC4E2] flex items-center justify-center"
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#255F8A] dark:hover:text-[#9BC4E2] flex items-center justify-center"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
@@ -602,7 +602,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                         setRevealedIds((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
                       }
                       aria-label={revealed ? 'Hide secret fields' : 'Reveal secret fields'}
-                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#BEB4DC] flex items-center justify-center"
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#5B4D8A] dark:hover:text-[#BEB4DC] flex items-center justify-center"
                     >
                       {revealed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -610,7 +610,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                       type="button"
                       onClick={() => onDeleteEncrypted(item.id)}
                       aria-label="Delete encrypted entry"
-                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -619,14 +619,14 @@ export const VaultView: React.FC<VaultViewProps> = ({
 
                 <div className="space-y-2 text-xs">
                   {item.username && (
-                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-white/[0.05]">
-                      <span className="text-[#98A2B3]">Username</span>
+                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-900/[0.06] dark:border-white/[0.05]">
+                      <span className="text-[#5B6472] dark:text-[#98A2B3]">Username</span>
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[#F1F3F6] truncate">{item.username}</span>
+                        <span className="text-[#111827] dark:text-[#F1F3F6] truncate">{item.username}</span>
                         <button
                           type="button"
                           onClick={() => handleCopy(item.username!, `${item.id}-u`)}
-                          className="text-[#BEB4DC] hover:underline shrink-0"
+                          className="text-[#5B4D8A] dark:text-[#BEB4DC] hover:underline shrink-0"
                         >
                           {copiedKey === `${item.id}-u` ? 'Copied' : <Copy className="w-3.5 h-3.5" />}
                         </button>
@@ -635,16 +635,16 @@ export const VaultView: React.FC<VaultViewProps> = ({
                   )}
 
                   {item.password && (
-                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-white/[0.05]">
-                      <span className="text-[#98A2B3]">Password</span>
+                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-900/[0.06] dark:border-white/[0.05]">
+                      <span className="text-[#5B6472] dark:text-[#98A2B3]">Password</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono-tabular text-[#F1F3F6]">
+                        <span className="font-mono-tabular text-[#111827] dark:text-[#F1F3F6]">
                           {revealed ? item.password : '••••••••••••'}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleCopy(item.password!, `${item.id}-p`)}
-                          className="text-[#BEB4DC] shrink-0"
+                          className="text-[#5B4D8A] dark:text-[#BEB4DC] shrink-0"
                         >
                           {copiedKey === `${item.id}-p` ? 'Copied' : <Copy className="w-3.5 h-3.5" />}
                         </button>
@@ -653,23 +653,23 @@ export const VaultView: React.FC<VaultViewProps> = ({
                   )}
 
                   {item.url && (
-                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-white/[0.05]">
-                      <span className="text-[#98A2B3]">Website</span>
-                      <span className="text-[#9BC4E2] truncate max-w-[200px]">{item.url}</span>
+                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-900/[0.06] dark:border-white/[0.05]">
+                      <span className="text-[#5B6472] dark:text-[#98A2B3]">Website</span>
+                      <span className="text-[#255F8A] dark:text-[#9BC4E2] truncate max-w-[200px]">{item.url}</span>
                     </div>
                   )}
 
                   {item.cardNumber && (
-                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-white/[0.05]">
-                      <span className="text-[#98A2B3]">Card Number</span>
+                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-900/[0.06] dark:border-white/[0.05]">
+                      <span className="text-[#5B6472] dark:text-[#98A2B3]">Card Number</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono-tabular text-[#F1F3F6]">
+                        <span className="font-mono-tabular text-[#111827] dark:text-[#F1F3F6]">
                           {revealed ? item.cardNumber : `•••• ${item.cardNumber.slice(-4)}`}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleCopy(item.cardNumber!, `${item.id}-c`)}
-                          className="text-[#BEB4DC] shrink-0"
+                          className="text-[#5B4D8A] dark:text-[#BEB4DC] shrink-0"
                         >
                           {copiedKey === `${item.id}-c` ? 'Copied' : <Copy className="w-3.5 h-3.5" />}
                         </button>
@@ -678,18 +678,18 @@ export const VaultView: React.FC<VaultViewProps> = ({
                   )}
 
                   {(item.expiry || item.cvv) && (
-                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-white/[0.05]">
-                      <span className="text-[#98A2B3]">Expiry / CVV</span>
-                      <span className="font-mono-tabular text-[#F1F3F6]">
+                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-900/[0.06] dark:border-white/[0.05]">
+                      <span className="text-[#5B6472] dark:text-[#98A2B3]">Expiry / CVV</span>
+                      <span className="font-mono-tabular text-[#111827] dark:text-[#F1F3F6]">
                         {item.expiry || '--/--'} · {revealed ? item.cvv || '---' : '•••'}
                       </span>
                     </div>
                   )}
 
                   {item.pinCode && (
-                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-white/[0.05]">
-                      <span className="text-[#98A2B3]">PIN</span>
-                      <span className="font-mono-tabular text-[#F1F3F6]">
+                    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-900/[0.06] dark:border-white/[0.05]">
+                      <span className="text-[#5B6472] dark:text-[#98A2B3]">PIN</span>
+                      <span className="font-mono-tabular text-[#111827] dark:text-[#F1F3F6]">
                         {revealed ? item.pinCode : '••••'}
                       </span>
                     </div>
@@ -698,17 +698,17 @@ export const VaultView: React.FC<VaultViewProps> = ({
                   {item.customFields.map((cf) => (
                     <div
                       key={cf.id}
-                      className="flex items-center justify-between gap-2 py-1.5 border-b border-white/[0.05]"
+                      className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-900/[0.06] dark:border-white/[0.05]"
                     >
-                      <span className="text-[#98A2B3]">{cf.key}</span>
-                      <span className="text-[#F1F3F6]">
+                      <span className="text-[#5B6472] dark:text-[#98A2B3]">{cf.key}</span>
+                      <span className="text-[#111827] dark:text-[#F1F3F6]">
                         {revealed ? cf.value : '••••••'}
                       </span>
                     </div>
                   ))}
 
                   {item.notes && (
-                    <p className="text-xs text-[#D0D5DD] pt-1 leading-relaxed whitespace-pre-wrap">
+                    <p className="text-xs text-[#334155] dark:text-[#D0D5DD] pt-1 leading-relaxed whitespace-pre-wrap">
                       {revealed ? item.notes : 'Tap the eye icon to reveal protected notes.'}
                     </p>
                   )}

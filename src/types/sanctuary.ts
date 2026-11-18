@@ -184,6 +184,8 @@ export interface AlarmItem {
   soundId?: string;
   soundName?: string;
   lastTriggeredMinute?: string; // YYYY-MM-DDTHH:MM
+  snoozedUntilDate?: string; // YYYY-MM-DD
+  snoozedUntilTime?: string; // HH:MM
   createdAt: string;
 }
 

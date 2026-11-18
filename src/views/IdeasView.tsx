@@ -11,11 +11,11 @@ interface IdeasViewProps {
 
 const BOARDS: IdeaBoardType[] = ['Learn', 'Practice', 'Business', 'Projects', 'Moodboard'];
 const CARD_COLORS: { id: IdeaCardColor; label: string; bg: string; accent: string }[] = [
-  { id: 'sage', label: 'Sage', bg: 'bg-[#17211D]', accent: 'text-[#9EC5AB]' },
-  { id: 'lavender', label: 'Lavender', bg: 'bg-[#1D1B27]', accent: 'text-[#BEB4DC]' },
-  { id: 'peach', label: 'Peach', bg: 'bg-[#231B1A]', accent: 'text-[#F2B8A2]' },
-  { id: 'sky', label: 'Sky', bg: 'bg-[#171F27]', accent: 'text-[#9BC4E2]' },
-  { id: 'slate', label: 'Slate', bg: 'bg-[#171A21]', accent: 'text-[#D0D5DD]' },
+  { id: 'sage', label: 'Sage', bg: 'bg-[#EAF4EE] dark:bg-[#17211D]', accent: 'text-[#2E6B48] dark:text-[#9EC5AB]' },
+  { id: 'lavender', label: 'Lavender', bg: 'bg-[#EFEAF8] dark:bg-[#1D1B27]', accent: 'text-[#5B4D8A] dark:text-[#BEB4DC]' },
+  { id: 'peach', label: 'Peach', bg: 'bg-[#FCEEE9] dark:bg-[#231B1A]', accent: 'text-[#A6482D] dark:text-[#F2B8A2]' },
+  { id: 'sky', label: 'Sky', bg: 'bg-[#EAF2FA] dark:bg-[#171F27]', accent: 'text-[#255F8A] dark:text-[#9BC4E2]' },
+  { id: 'slate', label: 'Slate', bg: 'bg-white dark:bg-[#171A21]', accent: 'text-[#334155] dark:text-[#D0D5DD]' },
 ];
 
 export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDeleteIdea }) => {
@@ -103,8 +103,8 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#BEB4DC]">Creative Ideas Hub</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <p className="text-xs text-[#5B4D8A] dark:text-[#BEB4DC]">Creative Ideas Hub</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Sticky Cards, Moodboards & Sparks
           </h1>
         </div>
@@ -127,8 +127,8 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
             onClick={() => setBoardFilter(b)}
             className={`min-h-[42px] px-4 rounded-2xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
               boardFilter === b
-                ? 'bg-[#BEB4DC]/20 text-[#BEB4DC] border border-[#BEB4DC]/30'
-                : 'bg-[#171A21] text-[#98A2B3] border border-white/[0.06]'
+                ? 'bg-[#BEB4DC]/20 text-[#5B4D8A] dark:text-[#BEB4DC] border border-[#BEB4DC]/30'
+                : 'bg-white dark:bg-[#171A21] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
             }`}
           >
             {b}
@@ -139,9 +139,9 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
       {showAdd && (
         <form
           onSubmit={handleSaveForm}
-          className="rounded-3xl bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-7 space-y-4"
+          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-7 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">
+          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
             {editingIdea ? 'Edit Idea Card' : 'Pin an Idea Card'}
           </h2>
 
@@ -152,12 +152,12 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. I want to learn watercolor sketching"
-              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
             />
             <select
               value={board}
               onChange={(e) => setBoard(e.target.value as IdeaBoardType)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
             >
               {BOARDS.map((b) => (
                 <option key={b} value={b}>
@@ -168,7 +168,7 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
             <select
               value={connectTargetId}
               onChange={(e) => setConnectTargetId(e.target.value)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
             >
               <option value="">Connect to another idea (optional)</option>
               {ideas
@@ -186,11 +186,11 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Sketch out the concept, steps to practice, or inspiration..."
-            className="w-full p-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+            className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-[#98A2B3] mr-1">Card Tone:</span>
+            <span className="text-xs text-[#5B6472] dark:text-[#98A2B3] mr-1">Card Tone:</span>
             {CARD_COLORS.map((c) => (
               <button
                 key={c.id}
@@ -198,8 +198,8 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                 onClick={() => setColor(c.id)}
                 className={`min-h-[38px] px-3 rounded-xl text-xs font-medium border ${
                   color === c.id
-                    ? `${c.bg} ${c.accent} border-white/30`
-                    : 'bg-[#1D212A] text-[#98A2B3] border-white/[0.06]'
+                    ? `${c.bg} ${c.accent} border-slate-900/30 dark:border-white/30`
+                    : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border-slate-900/[0.08] dark:border-white/[0.06]'
                 }`}
               >
                 {c.label}
@@ -214,7 +214,7 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                 setShowAdd(false);
                 setEditingIdea(null);
               }}
-              className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
+              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
             >
               Cancel
             </button>
@@ -239,10 +239,10 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
           return (
             <article
               key={card.id}
-              className={`rounded-3xl ${style.bg} border border-white/[0.08] overflow-hidden flex flex-col justify-between`}
+              className={`rounded-3xl ${style.bg} border border-slate-900/[0.10] dark:border-white/[0.08] overflow-hidden flex flex-col justify-between`}
             >
               {card.imageUrl && (
-                <div className="aspect-[4/3] w-full overflow-hidden bg-[#13161C]">
+                <div className="aspect-[4/3] w-full overflow-hidden bg-white dark:bg-[#13161C]">
                   <img
                     src={card.imageUrl}
                     alt={card.title}
@@ -261,7 +261,7 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                         type="button"
                         onClick={() => openEditForm(card)}
                         aria-label={`Edit ${card.title}`}
-                        className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F1F3F6] flex items-center justify-center"
+                        className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] flex items-center justify-center"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
@@ -269,19 +269,19 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                         type="button"
                         onClick={() => onDeleteIdea(card.id)}
                         aria-label="Delete idea card"
-                        className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
+                        className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
-                  <h2 className="font-display text-lg font-medium text-[#F1F3F6] mt-1">
+                  <h2 className="font-display text-lg font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
                     {card.title}
                   </h2>
 
                   {card.body && (
-                    <p className="text-sm text-[#D0D5DD] mt-2 leading-relaxed whitespace-pre-wrap">
+                    <p className="text-sm text-[#334155] dark:text-[#D0D5DD] mt-2 leading-relaxed whitespace-pre-wrap">
                       {card.body}
                     </p>
                   )}
@@ -292,7 +292,7 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                         <div
                           key={hex}
                           title={hex}
-                          className="w-7 h-7 rounded-xl border border-white/15"
+                          className="w-7 h-7 rounded-xl border border-slate-900/15 dark:border-white/15"
                           style={{ backgroundColor: hex }}
                         />
                       ))}
@@ -301,7 +301,7 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                 </div>
 
                 {connectedTitles.length > 0 && (
-                  <div className="pt-3 border-t border-white/[0.08] flex items-center gap-1.5 text-xs text-[#98A2B3]">
+                  <div className="pt-3 border-t border-slate-900/[0.10] dark:border-white/[0.08] flex items-center gap-1.5 text-xs text-[#5B6472] dark:text-[#98A2B3]">
                     <Link2 className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">Connected: {connectedTitles.join(', ')}</span>
                   </div>

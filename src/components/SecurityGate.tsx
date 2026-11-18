@@ -55,7 +55,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
   }, []);
 
   const accentBg = accentColor === 'sky' ? 'bg-[#9BC4E2] text-[#0F1115]' : 'bg-[#BEB4DC] text-[#0F1115]';
-  const accentText = accentColor === 'sky' ? 'text-[#9BC4E2]' : 'text-[#BEB4DC]';
+  const accentText = accentColor === 'sky' ? 'text-[#255F8A] dark:text-[#9BC4E2]' : 'text-[#5B4D8A] dark:text-[#BEB4DC]';
 
   const handleDigit = (digit: string) => {
     setError('');
@@ -189,7 +189,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-sm text-[#98A2B3]">Preparing locked area...</p>
+        <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">Preparing locked area...</p>
       </div>
     );
   }
@@ -198,8 +198,8 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
 
   return (
     <div className="max-w-md mx-auto py-6 px-2">
-      <div className="bg-[#171A21] border border-white/[0.07] rounded-3xl p-6 sm:p-8 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center mx-auto mb-4">
+      <div className="bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] rounded-3xl p-6 sm:p-8 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] border border-slate-900/[0.10] dark:border-white/[0.08] flex items-center justify-center mx-auto mb-4">
           {settings ? (
             <Lock className={`w-5 h-5 ${accentText}`} />
           ) : (
@@ -207,10 +207,10 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
           )}
         </div>
 
-        <h2 className="font-display text-2xl font-medium text-[#F1F3F6] tracking-tight">
+        <h2 className="font-display text-2xl font-medium text-[#111827] dark:text-[#F1F3F6] tracking-tight">
           {settings ? areaTitle : 'Set Your Master PIN'}
         </h2>
-        <p className="text-sm text-[#98A2B3] mt-1.5 leading-relaxed">
+        <p className="text-sm text-[#5B6472] dark:text-[#98A2B3] mt-1.5 leading-relaxed">
           {settings
             ? areaSubtitle
             : setupStep === 'create'
@@ -230,7 +230,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
                     ? accentColor === 'sky'
                       ? 'bg-[#9BC4E2] scale-110'
                       : 'bg-[#BEB4DC] scale-110'
-                    : 'bg-white/[0.08] border border-white/[0.12]'
+                    : 'bg-slate-900/[0.08] dark:bg-white/[0.08] border border-slate-900/[0.14] dark:border-white/[0.12]'
                 }`}
               />
             );
@@ -238,7 +238,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
         </div>
 
         {error && (
-          <p className="text-xs text-[#F2B8A2] mb-4 min-h-[1rem]" role="alert">
+          <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2] mb-4 min-h-[1rem]" role="alert">
             {error}
           </p>
         )}
@@ -250,7 +250,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
               key={digit}
               type="button"
               onClick={() => handleDigit(digit)}
-              className="h-13 min-h-[48px] rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] active:scale-95 text-[#F1F3F6] font-mono-tabular text-lg font-medium transition-all focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
+              className="h-13 min-h-[48px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] active:scale-95 text-[#111827] dark:text-[#F1F3F6] font-mono-tabular text-lg font-medium transition-all focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
             >
               {digit}
             </button>
@@ -260,7 +260,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
             onClick={settings ? handleBiometricUnlock : () => setSetupStep('create')}
             disabled={busy}
             title={settings ? 'Biometric / Fingerprint' : 'Restart PIN'}
-            className="h-13 min-h-[48px] rounded-2xl bg-[#1D212A]/60 hover:bg-white/[0.07] text-[#98A2B3] flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
+            className="h-13 min-h-[48px] rounded-2xl bg-[#E2E6EC] dark:bg-[#1D212A]/60 hover:bg-slate-900/[0.07] dark:hover:bg-white/[0.07] text-[#5B6472] dark:text-[#98A2B3] flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
           >
             {settings ? (
               <Fingerprint className={`w-5 h-5 ${biometricSupported ? accentText : 'opacity-40'}`} />
@@ -271,7 +271,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
           <button
             type="button"
             onClick={() => handleDigit('0')}
-            className="h-13 min-h-[48px] rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] active:scale-95 text-[#F1F3F6] font-mono-tabular text-lg font-medium transition-all focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
+            className="h-13 min-h-[48px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] active:scale-95 text-[#111827] dark:text-[#F1F3F6] font-mono-tabular text-lg font-medium transition-all focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
           >
             0
           </button>
@@ -279,7 +279,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
             type="button"
             onClick={handleBackspace}
             aria-label="Delete digit"
-            className="h-13 min-h-[48px] rounded-2xl bg-[#1D212A]/60 hover:bg-white/[0.07] text-[#98A2B3] flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
+            className="h-13 min-h-[48px] rounded-2xl bg-[#E2E6EC] dark:bg-[#1D212A]/60 hover:bg-slate-900/[0.07] dark:hover:bg-white/[0.07] text-[#5B6472] dark:text-[#98A2B3] flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[#9EC5AB]"
           >
             <Delete className="w-5 h-5" />
           </button>
@@ -304,7 +304,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
           <button
             type="button"
             onClick={() => setShowResetConfirm(true)}
-            className="mt-4 min-h-[40px] px-3 rounded-xl text-xs text-[#98A2B3] hover:text-[#F2B8A2] inline-flex items-center justify-center gap-1.5 transition-colors"
+            className="mt-4 min-h-[40px] px-3 rounded-xl text-xs text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] inline-flex items-center justify-center gap-1.5 transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Forgot or Reset Lock
@@ -312,9 +312,9 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
         )}
 
         {settings && showResetConfirm && (
-          <div className="mt-4 p-4 rounded-2xl bg-[#1D212A] border border-[#F2B8A2]/30 text-left space-y-3">
-            <p className="text-xs font-medium text-[#F2B8A2]">Reset Master PIN?</p>
-            <p className="text-xs text-[#98A2B3] leading-relaxed">
+          <div className="mt-4 p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-[#F2B8A2]/30 text-left space-y-3">
+            <p className="text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2]">Reset Master PIN?</p>
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
               Resetting your PIN lets you set a new lock code. Previously saved Secrets Vault entries
               locked with the old PIN will be cleared; your Private Gallery photos, Notes, Tasks,
               and Birthdays will stay safe.
@@ -323,7 +323,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
               <button
                 type="button"
                 onClick={() => setShowResetConfirm(false)}
-                className="min-h-[38px] px-3 rounded-xl bg-white/[0.06] text-xs text-[#D0D5DD]"
+                className="min-h-[38px] px-3 rounded-xl bg-slate-900/[0.06] dark:bg-white/[0.06] text-xs text-[#334155] dark:text-[#D0D5DD]"
               >
                 Cancel
               </button>
@@ -339,7 +339,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({
           </div>
         )}
 
-        <p className="text-xs text-[#98A2B3] mt-4">
+        <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-4">
           Local device lock · Auto-locks whenever you leave or minimize
         </p>
       </div>

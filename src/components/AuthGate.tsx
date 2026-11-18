@@ -130,8 +130,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F1115] text-[#F1F3F6] flex items-center justify-center p-4 sm:p-8">
-      <div className="w-full max-w-5xl rounded-3xl bg-[#171A21] border border-white/[0.08] overflow-hidden grid grid-cols-1 lg:grid-cols-12 items-stretch">
+    <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex items-center justify-center p-4 sm:p-8">
+      <div className="w-full max-w-5xl rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] overflow-hidden grid grid-cols-1 lg:grid-cols-12 items-stretch">
         {/* Left Calm Sanctuary Panel */}
         <div className="lg:col-span-6 relative min-h-[220px] lg:min-h-[560px] flex flex-col justify-between p-7 sm:p-10 bg-gradient-to-br from-[#1C2229] via-[#151920] to-[#111419]">
           <img
@@ -144,7 +144,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
 
           <div className="relative space-y-2">
             <p className="text-xs text-[#9EC5AB] tracking-wide">
-              Personal Sanctuary · Private & Focused
+              Personal Sanctuary · Private &amp; Focused
             </p>
             <h1 className="font-display text-3xl sm:text-4xl font-medium text-[#F1F3F6] leading-tight text-balance">
               My World
@@ -156,7 +156,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
               A quiet space for your thoughts, schedules, soundscapes, and memories.
             </p>
 
-            <div className="space-y-3 pt-2 border-t border-white/[0.08]">
+            <div className="space-y-3 pt-2 border-t border-white/[0.12]">
               <div className="flex items-start gap-3">
                 <Lock className="w-4 h-4 text-[#9EC5AB] mt-0.5 shrink-0" />
                 <p className="text-xs sm:text-sm text-[#D0D5DD] leading-relaxed">
@@ -180,7 +180,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
             <div
               role="tablist"
               aria-label="Account access mode"
-              className="inline-flex p-1 rounded-2xl bg-[#11141A] border border-white/[0.06]"
+              className="inline-flex p-1 rounded-2xl bg-[#ECEFF3] dark:bg-[#11141A] border border-slate-900/[0.08] dark:border-white/[0.06]"
             >
               <button
                 type="button"
@@ -193,8 +193,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                 }}
                 className={`min-h-[40px] px-4 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
                   mode === 'signin'
-                    ? 'bg-[#1D212A] text-[#F1F3F6]'
-                    : 'text-[#98A2B3] hover:text-[#F1F3F6]'
+                    ? 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#111827] dark:text-[#F1F3F6]'
+                    : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
                 }`}
               >
                 Sign In
@@ -210,18 +210,18 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                 }}
                 className={`min-h-[40px] px-4 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
                   mode === 'signup'
-                    ? 'bg-[#1D212A] text-[#F1F3F6]'
-                    : 'text-[#98A2B3] hover:text-[#F1F3F6]'
+                    ? 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#111827] dark:text-[#F1F3F6]'
+                    : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
                 }`}
               >
                 Create Account
               </button>
             </div>
 
-            <h2 className="font-display text-2xl font-medium text-[#F1F3F6] pt-1">
+            <h2 className="font-display text-2xl font-medium text-[#111827] dark:text-[#F1F3F6] pt-1">
               {mode === 'signin' ? 'Welcome back' : 'Create your sanctuary'}
             </h2>
-            <p className="text-xs sm:text-sm text-[#98A2B3] leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
               {mode === 'signin'
                 ? 'Sign in with your email and password, or continue with Google.'
                 : 'Sign up with any email address or set up instantly using Google.'}
@@ -231,7 +231,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
           {errorMsg && (
             <div
               role="alert"
-              className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#F2B8A2] leading-relaxed"
+              className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2] leading-relaxed"
             >
               {errorMsg}
             </div>
@@ -240,7 +240,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
           {statusMsg && (
             <div
               role="status"
-              className="rounded-2xl bg-[#9EC5AB]/10 border border-[#9EC5AB]/30 px-4 py-3 text-xs text-[#9EC5AB] leading-relaxed"
+              className="rounded-2xl bg-[#9EC5AB]/10 border border-[#9EC5AB]/30 px-4 py-3 text-xs text-[#2E6B48] dark:text-[#9EC5AB] leading-relaxed"
             >
               {statusMsg}
             </div>
@@ -249,11 +249,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
           <form onSubmit={handleEmailSubmit} className="space-y-3.5">
             {mode === 'signup' && (
               <div>
-                <label htmlFor="auth-name" className="block text-xs text-[#98A2B3] mb-1">
+                <label htmlFor="auth-name" className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
                   Your Name
                 </label>
                 <div className="relative">
-                  <UserIcon className="w-4 h-4 text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <UserIcon className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     id="auth-name"
                     type="text"
@@ -262,18 +262,18 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Gowtham"
                     autoComplete="name"
-                    className="w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+                    className="w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/60 dark:placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label htmlFor="auth-email" className="block text-xs text-[#98A2B3] mb-1">
+              <label htmlFor="auth-email" className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Mail className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="auth-email"
                   type="email"
@@ -282,14 +282,14 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   autoComplete="email"
-                  className="w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+                  className="w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/60 dark:placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label htmlFor="auth-password" className="block text-xs text-[#98A2B3]">
+                <label htmlFor="auth-password" className="block text-xs text-[#5B6472] dark:text-[#98A2B3]">
                   Password
                 </label>
                 {mode === 'signin' && (
@@ -297,14 +297,14 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                     type="button"
                     disabled={loadingMethod !== null}
                     onClick={() => void handlePasswordReset()}
-                    className="text-xs text-[#9BC4E2] hover:underline disabled:opacity-50"
+                    className="text-xs text-[#255F8A] dark:text-[#9BC4E2] hover:underline disabled:opacity-50"
                   >
                     {loadingMethod === 'reset' ? 'Sending...' : 'Forgot password?'}
                   </button>
                 )}
               </div>
               <div className="relative">
-                <Lock className="w-4 h-4 text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Lock className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="auth-password"
                   type={showPassword ? 'text' : 'password'}
@@ -314,13 +314,13 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={mode === 'signup' ? 'At least 6 characters' : 'Enter your password'}
                   autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                  className="w-full min-h-[46px] pl-10 pr-11 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+                  className="w-full min-h-[46px] pl-10 pr-11 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/60 dark:placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="w-10 h-10 absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center text-[#98A2B3] hover:text-[#F1F3F6]"
+                  className="w-10 h-10 absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -346,16 +346,16 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
           </form>
 
           <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-white/[0.08]" />
-            <span className="text-xs text-[#98A2B3]">or</span>
-            <div className="h-px flex-1 bg-white/[0.08]" />
+            <div className="h-px flex-1 bg-slate-900/[0.08] dark:bg-white/[0.08]" />
+            <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">or</span>
+            <div className="h-px flex-1 bg-slate-900/[0.08] dark:bg-white/[0.08]" />
           </div>
 
           <button
             type="button"
             disabled={loadingMethod !== null}
             onClick={() => void handleGoogleAuth()}
-            className="w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.1] disabled:opacity-60 text-[#F1F3F6] text-sm font-medium flex items-center justify-center gap-3 transition-colors"
+            className="w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.12] dark:border-white/[0.1] disabled:opacity-60 text-[#111827] dark:text-[#F1F3F6] text-sm font-medium flex items-center justify-center gap-3 transition-colors"
           >
             <svg
               aria-hidden="true"
@@ -363,19 +363,19 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
               className="w-4 h-4 shrink-0"
             >
               <path
-                fill="#F1F3F6"
+                fill="currentColor"
                 d="M21.805 10.023H12.2v3.955h5.52c-.238 1.275-.957 2.355-2.04 3.08v2.56h3.302c1.932-1.78 3.048-4.4 3.048-7.508 0-.705-.064-1.384-.225-2.087Z"
               />
               <path
-                fill="#F1F3F6"
+                fill="currentColor"
                 d="M12.2 22c2.76 0 5.075-.915 6.767-2.382l-3.302-2.56c-.915.613-2.085.975-3.465.975-2.665 0-4.922-1.8-5.73-4.218H3.058v2.642C4.74 19.798 8.202 22 12.2 22Z"
               />
               <path
-                fill="#F1F3F6"
+                fill="currentColor"
                 d="M6.47 13.815A5.97 5.97 0 0 1 6.155 12c0-.63.11-1.242.315-1.815V7.543H3.058A9.992 9.992 0 0 0 2 12c0 1.615.388 3.144 1.058 4.457l3.412-2.642Z"
               />
               <path
-                fill="#F1F3F6"
+                fill="currentColor"
                 d="M12.2 5.967c1.501 0 2.848.516 3.908 1.53l2.931-2.931C17.27 2.912 14.955 2 12.2 2 8.202 2 4.74 4.202 3.058 7.543l3.412 2.642c.808-2.418 3.065-4.218 5.73-4.218Z"
               />
             </svg>
@@ -384,8 +384,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
             </span>
           </button>
 
-          <div className="pt-2 border-t border-white/[0.06] flex items-start gap-2.5 text-xs text-[#98A2B3] leading-relaxed">
-            <ShieldCheck className="w-4 h-4 text-[#9EC5AB] mt-0.5 shrink-0" />
+          <div className="pt-2 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-start gap-2.5 text-xs text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
+            <ShieldCheck className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB] mt-0.5 shrink-0" />
             <span>
               Secured by Firebase Authentication. Use Email & Password for mobile APK builds or
               Google Sign-In on the web.

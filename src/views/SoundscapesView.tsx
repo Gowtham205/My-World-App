@@ -105,11 +105,11 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#9EC5AB]">Soundscapes · Web Audio Engine</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]">Soundscapes · Web Audio Engine</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Ambient Soundscapes
           </h1>
-          <p className="text-sm text-[#98A2B3] mt-1">
+          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3] mt-1">
             Synthesized locally in real time for calm focus, reading, or unwinding—even completely
             offline.
           </p>
@@ -119,7 +119,7 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
           <button
             type="button"
             onClick={onStopAll}
-            className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-semibold text-[#F2B8A2] flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+            className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-semibold text-[#A6482D] dark:text-[#F2B8A2] flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
           >
             <Square className="w-3.5 h-3.5" />
             Stop All ({activeIds.length})
@@ -128,14 +128,14 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
       </header>
 
       {/* Master Mixer & Focus/Sleep Timer Bar */}
-      <section className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+      <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
         <div className="lg:col-span-6 space-y-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-[#D0D5DD] font-medium flex items-center gap-2">
-              <Volume2 className="w-4 h-4 text-[#9EC5AB]" />
+            <span className="text-[#334155] dark:text-[#D0D5DD] font-medium flex items-center gap-2">
+              <Volume2 className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />
               Master Sanctuary Volume
             </span>
-            <span className="font-mono-tabular text-[#98A2B3]">
+            <span className="font-mono-tabular text-[#5B6472] dark:text-[#98A2B3]">
               {Math.round(masterVolume * 100)}%
             </span>
           </div>
@@ -152,10 +152,10 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
         </div>
 
         <div className="lg:col-span-6 flex flex-wrap items-center justify-between lg:justify-end gap-2">
-          <span className="text-xs text-[#98A2B3] flex items-center gap-1.5 mr-1">
-            <Timer className="w-3.5 h-3.5 text-[#BEB4DC]" />
+          <span className="text-xs text-[#5B6472] dark:text-[#98A2B3] flex items-center gap-1.5 mr-1">
+            <Timer className="w-3.5 h-3.5 text-[#5B4D8A] dark:text-[#BEB4DC]" />
             {timerRemainingSec !== null ? (
-              <span className="font-mono-tabular text-[#BEB4DC]">
+              <span className="font-mono-tabular text-[#5B4D8A] dark:text-[#BEB4DC]">
                 Stops in {formatCountdown(timerRemainingSec)}
               </span>
             ) : (
@@ -173,8 +173,8 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
                   onClick={() => onSetTimerMinutes(mins)}
                   className={`min-h-[38px] px-3 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
                     isSelected
-                      ? 'bg-[#BEB4DC]/20 text-[#BEB4DC]'
-                      : 'bg-[#1D212A] hover:bg-white/[0.08] text-[#98A2B3] hover:text-[#F1F3F6]'
+                      ? 'bg-[#BEB4DC]/20 text-[#5B4D8A] dark:text-[#BEB4DC]'
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
                   }`}
                 >
                   {mins === null ? 'Off' : `${mins}m`}
@@ -187,17 +187,17 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
 
       {/* Curated Blends */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-[#F1F3F6]">Curated Blends</h2>
+        <h2 className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6]">Curated Blends</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {PRESETS.map((preset) => (
             <button
               key={preset.name}
               type="button"
               onClick={() => onApplyPreset(preset.mix)}
-              className="text-left rounded-3xl bg-[#171A21] hover:bg-[#1D212A] border border-white/[0.07] p-4 sm:p-5 transition-colors active:scale-[0.99]"
+              className="text-left rounded-3xl bg-white dark:bg-[#171A21] hover:bg-[#E2E6EC] dark:hover:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.07] p-4 sm:p-5 transition-colors active:scale-[0.99]"
             >
-              <p className="text-sm font-semibold text-[#F1F3F6]">{preset.name}</p>
-              <p className="text-xs text-[#98A2B3] mt-1 leading-relaxed">{preset.description}</p>
+              <p className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6]">{preset.name}</p>
+              <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 leading-relaxed">{preset.description}</p>
             </button>
           ))}
         </div>
@@ -212,8 +212,8 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
             onClick={() => setCategoryFilter(cat)}
             className={`min-h-[42px] px-4 rounded-2xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
               categoryFilter === cat
-                ? 'bg-[#9EC5AB]/20 text-[#9EC5AB] border border-[#9EC5AB]/30'
-                : 'bg-[#171A21] text-[#98A2B3] border border-white/[0.06]'
+                ? 'bg-[#9EC5AB]/20 text-[#2E6B48] dark:text-[#9EC5AB] border border-[#9EC5AB]/30'
+                : 'bg-white dark:bg-[#171A21] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
             }`}
           >
             {cat}
@@ -231,24 +231,24 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
           return (
             <article
               key={track.id}
-              className={`rounded-3xl bg-[#171A21] border p-5 sm:p-6 flex flex-col justify-between gap-5 transition-colors ${
-                playing ? 'border-white/[0.18]' : 'border-white/[0.07]'
+              className={`rounded-3xl bg-white dark:bg-[#171A21] border p-5 sm:p-6 flex flex-col justify-between gap-5 transition-colors ${
+                playing ? 'border-slate-900/[0.20] dark:border-white/[0.18]' : 'border-slate-900/[0.08] dark:border-white/[0.07]'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3.5 min-w-0">
-                  <div className="w-11 h-11 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
+                  <div className="w-11 h-11 rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.04] border border-slate-900/[0.08] dark:border-white/[0.06] flex items-center justify-center shrink-0">
                     <Icon className="w-5 h-5" style={{ color: track.accentColor }} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-[#98A2B3]">
+                    <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
                       {track.category}
                       {playing ? ' · Playing' : ''}
                     </p>
-                    <h3 className="text-base font-semibold text-[#F1F3F6] mt-0.5 truncate">
+                    <h3 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6] mt-0.5 truncate">
                       {track.title}
                     </h3>
-                    <p className="text-xs text-[#98A2B3] mt-1 leading-relaxed">
+                    <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 leading-relaxed">
                       {track.subtitle}
                     </p>
                   </div>
@@ -268,8 +268,8 @@ export const SoundscapesView: React.FC<SoundscapesViewProps> = ({
                 </button>
               </div>
 
-              <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
-                <div className="flex items-center justify-between text-xs text-[#98A2B3]">
+              <div className="space-y-1.5 pt-2 border-t border-slate-900/[0.08] dark:border-white/[0.06]">
+                <div className="flex items-center justify-between text-xs text-[#5B6472] dark:text-[#98A2B3]">
                   <span>Layer Mix</span>
                   <span className="font-mono-tabular">{Math.round(volume * 100)}%</span>
                 </div>

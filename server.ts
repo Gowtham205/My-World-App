@@ -15,7 +15,22 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = Number(process.env.PORT) || 3000;
+function resolvePort(): number {
+  const portFlagIndex = process.argv.indexOf('--port');
+  if (portFlagIndex !== -1) {
+    const cliPort = Number(process.argv[portFlagIndex + 1]);
+    if (Number.isFinite(cliPort) && cliPort > 0) {
+      return cliPort;
+    }
+  }
+  const envPort = Number(process.env.PORT);
+  if (Number.isFinite(envPort) && envPort > 0) {
+    return envPort;
+  }
+  return 3000;
+}
+
+const PORT = resolvePort();
 
 function getAiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -213,11 +228,18 @@ async function startServer() {
     }
   });
 
+  const server = http.createServer(app);
+
   // Mount Vite dev middleware or static dist files
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
+    const hmrDisabled = process.env.DISABLE_HMR === 'true';
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: hmrDisabled ? false : { server },
+        ...(hmrDisabled ? { ws: false } : {}),
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -229,7 +251,6 @@ async function startServer() {
     });
   }
 
-  const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (request, socket, head) => {

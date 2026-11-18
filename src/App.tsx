@@ -73,16 +73,19 @@ import {
   generateSalt,
   hashPin,
 } from './lib/crypto';
-import { getTodayStr } from './lib/dateUtils';
+import { formatTime12h, getTodayStr } from './lib/dateUtils';
 import {
   attachNotificationListeners,
   collectMissedAndTodayInboxItems,
   ensureNotificationSetup,
+  removeNotificationBySlotSeed,
   sendSystemNotification,
   syncScheduledNativeNotifications,
 } from './lib/notifications';
 import {
+  ALARM_MAX_RING_MS,
   playNotificationSound,
+  resolveSoundName,
   startAlarmRinging,
   stopAlarmRinging,
 } from './lib/sound';
@@ -210,6 +213,7 @@ export function App() {
 
   // Active overlays (Alarms, Reminder Notification Toast, & Event Calm Check-In)
   const [ringingAlarm, setRingingAlarm] = useState<AlarmItem | null>(null);
+  const [ringingStartedAtMs, setRingingStartedAtMs] = useState<number>(Date.now());
   const [activeReminderNotice, setActiveReminderNotice] = useState<TaskReminderItem | null>(null);
   const [breathingPromptState, setBreathingPromptState] = useState<{
     session: EventCalmSession;
@@ -222,6 +226,10 @@ export function App() {
 
   const ringingAlarmRef = useRef(ringingAlarm);
   ringingAlarmRef.current = ringingAlarm;
+  const alarmsRef = useRef(alarms);
+  alarmsRef.current = alarms;
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
   const activeReminderNoticeRef = useRef(activeReminderNotice);
   activeReminderNoticeRef.current = activeReminderNotice;
   const breathingPromptStateRef = useRef(breathingPromptState);
@@ -445,18 +453,236 @@ export function App() {
     };
   }, [reconcileMissedNotifications]);
 
-  // Setup Android notification channels, tap routing, & scheduled local notifications
+  const getAlarmSlotSeed = useCallback((alarm: AlarmItem, weekday = new Date().getDay()) => {
+    return alarm.repeatDays.length > 0 && alarm.repeatDays.length < 7
+      ? `alarm:${alarm.id}:w:${weekday}`
+      : `alarm:${alarm.id}`;
+  }, []);
+
+  const snoozeAlarmByEntity = useCallback(
+    async (
+      targetAlarm: AlarmItem,
+      minutes: number,
+      options?: { autoSnoozed?: boolean; slotSeed?: string }
+    ) => {
+      stopAlarmRinging();
+      const effectiveMinutes = minutes > 0 ? minutes : 5;
+      const snoozeTarget = new Date(Date.now() + effectiveMinutes * 60 * 1000);
+      const snoozeDate = `${snoozeTarget.getFullYear()}-${String(
+        snoozeTarget.getMonth() + 1
+      ).padStart(2, '0')}-${String(snoozeTarget.getDate()).padStart(2, '0')}`;
+      const snoozeTime = `${String(snoozeTarget.getHours()).padStart(2, '0')}:${String(
+        snoozeTarget.getMinutes()
+      ).padStart(2, '0')}`;
+
+      const updated: AlarmItem = {
+        ...targetAlarm,
+        enabled: true,
+        snoozedUntilDate: snoozeDate,
+        snoozedUntilTime: snoozeTime,
+        lastTriggeredMinute: undefined,
+      };
+      await putInStore('alarms', updated);
+      setAlarms((prev) => {
+        const exists = prev.some((a) => a.id === updated.id);
+        return exists ? prev.map((a) => (a.id === updated.id ? updated : a)) : [...prev, updated];
+      });
+      setRingingAlarm((curr) => (curr?.id === updated.id ? null : curr));
+
+      const slotSeed = options?.slotSeed || getAlarmSlotSeed(updated);
+      const alarmTitle = updated.linkedReminderTitle || updated.label || 'Sanctuary Alarm';
+      const formattedTime = formatTime12h(snoozeTime);
+
+      if (options?.autoSnoozed) {
+        const autoKey = `alarm:${updated.id}:autosnooze:${snoozeDate}T${snoozeTime}`;
+        pushInboxNotification({
+          dedupeKey: autoKey,
+          kind: 'alarm',
+          status: 'missed',
+          title: `Auto-snoozed ${effectiveMinutes}m · ${alarmTitle}`,
+          body: `Stopped ringing after 1 minute. Next ring at ${formattedTime}.`,
+          scheduledAt: snoozeTarget.toISOString(),
+          createdAt: new Date().toISOString(),
+          read: false,
+          route: 'alarms',
+        });
+
+        void sendSystemNotification({
+          dedupeKey: autoKey,
+          slotSeed,
+          title: `Snoozed ${effectiveMinutes}m · ${alarmTitle}`,
+          body: `Stopped after 1 min · Next alarm at ${formattedTime}`,
+          channel: 'alarm',
+          route: 'alarms',
+          entityId: updated.id,
+          isPlaying: false,
+          ongoing: false,
+          replaceInPlace: true,
+          snoozeMinutes: effectiveMinutes,
+          soundLabel: updated.soundName,
+        });
+      } else {
+        void removeNotificationBySlotSeed(slotSeed);
+      }
+    },
+    [getAlarmSlotSeed, pushInboxNotification]
+  );
+
+  const snoozeTaskReminder = useCallback(async (task: TaskReminderItem, minutes = 5) => {
+    const snoozeTarget = new Date(Date.now() + (minutes > 0 ? minutes : 5) * 60 * 1000);
+    const nextDate = `${snoozeTarget.getFullYear()}-${String(
+      snoozeTarget.getMonth() + 1
+    ).padStart(2, '0')}-${String(snoozeTarget.getDate()).padStart(2, '0')}`;
+    const nextTime = `${String(snoozeTarget.getHours()).padStart(2, '0')}:${String(
+      snoozeTarget.getMinutes()
+    ).padStart(2, '0')}`;
+
+    const updated: TaskReminderItem = {
+      ...task,
+      dueDate: nextDate,
+      dueTime: nextTime,
+      lastNotifiedMinute: undefined,
+    };
+    await putInStore('tasks', updated);
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    setActiveReminderNotice((curr) => (curr?.id === updated.id ? null : curr));
+    void removeNotificationBySlotSeed(`task:${updated.id}`);
+  }, []);
+
+  const triggerActiveAlarm = useCallback(
+    (alarm: AlarmItem, options?: { isTest?: boolean }) => {
+      const soundLabel =
+        alarm.soundName || resolveSoundName(customAudioTones, alarm.soundId);
+      const alarmWithSound: AlarmItem = {
+        ...alarm,
+        soundName: soundLabel,
+        snoozeMinutes: alarm.snoozeMinutes || 5,
+      };
+      setRingingAlarm(alarmWithSound);
+      setRingingStartedAtMs(Date.now());
+
+      const matchedTone = alarm.soundId
+        ? customAudioTones.find((t) => t.id === alarm.soundId)
+        : undefined;
+
+      startAlarmRinging(matchedTone, alarm.soundId, {
+        maxDurationMs: ALARM_MAX_RING_MS,
+        onAutoTimeout: () => {
+          const latestAlarm =
+            alarmsRef.current.find((a) => a.id === alarmWithSound.id) || alarmWithSound;
+          void snoozeAlarmByEntity(latestAlarm, latestAlarm.snoozeMinutes || 5, {
+            autoSnoozed: true,
+          });
+        },
+      });
+
+      const now = new Date();
+      const today = getTodayStr();
+      const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(
+        now.getMinutes()
+      ).padStart(2, '0')}`;
+      const minuteKey = `${today}T${currentHHMM}`;
+      const alarmDedupeKey = options?.isTest
+        ? `alarm:test:${alarm.id}:${Date.now()}`
+        : `alarm:${alarm.id}:${minuteKey}`;
+      const slotSeed = getAlarmSlotSeed(alarmWithSound, now.getDay());
+
+      if (!options?.isTest) {
+        pushInboxNotification({
+          dedupeKey: alarmDedupeKey,
+          kind: 'alarm',
+          status: 'delivered',
+          title: alarm.linkedReminderTitle || alarm.label,
+          body: alarm.linkedReminderNotes || `Alarm for ${formatTime12h(currentHHMM)} · ${soundLabel}`,
+          scheduledAt: now.toISOString(),
+          createdAt: now.toISOString(),
+          read: true,
+          route: 'alarms',
+        });
+      }
+
+      void sendSystemNotification({
+        dedupeKey: alarmDedupeKey,
+        slotSeed,
+        title: alarm.linkedReminderTitle || alarm.label,
+        body: alarm.linkedReminderNotes || `Scheduled for ${formatTime12h(alarm.time)}`,
+        channel: 'alarm',
+        route: 'alarms',
+        entityId: alarm.id,
+        isPlaying: true,
+        ongoing: true,
+        replaceInPlace: true,
+        soundLabel,
+        snoozeMinutes: alarmWithSound.snoozeMinutes,
+      });
+    },
+    [customAudioTones, getAlarmSlotSeed, pushInboxNotification, snoozeAlarmByEntity]
+  );
+
+  // Setup Android notification channels, tap routing, & action buttons (Snooze / Dismiss)
   useEffect(() => {
     if (!ready || !authUser) return;
     void ensureNotificationSetup();
     const detach = attachNotificationListeners({
       onNavigate: (targetRoute) => navigateTo(targetRoute),
       onNativeReceived: (item) => pushInboxNotification(item),
+      onActionPerformed: (payload) => {
+        if (payload.kind === 'reminder' && payload.entityId) {
+          const targetTask = tasksRef.current.find((t) => t.id === payload.entityId);
+          if (payload.actionId === 'snooze' && targetTask) {
+            void snoozeTaskReminder(targetTask, payload.snoozeMinutes || 5);
+          } else {
+            setActiveReminderNotice(null);
+            if (payload.slotSeed) void removeNotificationBySlotSeed(payload.slotSeed);
+          }
+          return;
+        }
+
+        const matchedAlarm =
+          (payload.entityId && alarmsRef.current.find((a) => a.id === payload.entityId)) ||
+          ringingAlarmRef.current ||
+          undefined;
+
+        if (payload.actionId === 'snooze') {
+          if (matchedAlarm) {
+            void snoozeAlarmByEntity(
+              matchedAlarm,
+              payload.snoozeMinutes || matchedAlarm.snoozeMinutes || 5,
+              { slotSeed: payload.slotSeed }
+            );
+          } else {
+            stopAlarmRinging();
+            setRingingAlarm(null);
+          }
+        } else if (payload.actionId === 'dismiss') {
+          stopAlarmRinging();
+          if (matchedAlarm && (matchedAlarm.snoozedUntilDate || matchedAlarm.snoozedUntilTime)) {
+            const cleaned: AlarmItem = {
+              ...matchedAlarm,
+              snoozedUntilDate: undefined,
+              snoozedUntilTime: undefined,
+            };
+            void putInStore('alarms', cleaned);
+            setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
+          }
+          if (payload.slotSeed) {
+            void removeNotificationBySlotSeed(payload.slotSeed);
+          }
+          setRingingAlarm(null);
+        }
+      },
     });
     return () => {
       detach();
     };
-  }, [ready, authUser, navigateTo, pushInboxNotification]);
+  }, [
+    ready,
+    authUser,
+    navigateTo,
+    pushInboxNotification,
+    snoozeAlarmByEntity,
+    snoozeTaskReminder,
+  ]);
 
   useEffect(() => {
     if (!ready || !authUser) return;
@@ -514,53 +740,30 @@ export function App() {
       const minuteKey = `${today}T${currentHHMM}`;
       const weekday = now.getDay();
 
-      // 1. Check Alarms
+      // 1. Check Alarms (regular schedule OR snoozed wake-up time)
       for (const alarm of alarms) {
         if (!alarm.enabled) continue;
-        if (alarm.time !== currentHHMM) continue;
         if (alarm.lastTriggeredMinute === minuteKey) continue;
-        if (alarm.repeatDays.length > 0 && !alarm.repeatDays.includes(weekday)) continue;
+
+        const isSnoozeDue =
+          alarm.snoozedUntilDate === today && alarm.snoozedUntilTime === currentHHMM;
+        const isRegularDue =
+          alarm.time === currentHHMM &&
+          (alarm.repeatDays.length === 0 || alarm.repeatDays.includes(weekday));
+
+        if (!isSnoozeDue && !isRegularDue) continue;
 
         const updatedAlarm: AlarmItem = {
           ...alarm,
           lastTriggeredMinute: minuteKey,
+          snoozedUntilDate: undefined,
+          snoozedUntilTime: undefined,
           enabled: alarm.repeatDays.length === 0 ? false : alarm.enabled,
         };
         setAlarms((prev) => prev.map((a) => (a.id === alarm.id ? updatedAlarm : a)));
         await putInStore('alarms', updatedAlarm);
 
-        setRingingAlarm(updatedAlarm);
-        const matchedTone = alarm.soundId
-          ? customAudioTones.find((t) => t.id === alarm.soundId)
-          : undefined;
-        startAlarmRinging(matchedTone, alarm.soundId);
-
-        const alarmDedupeKey = `alarm:${alarm.id}:${minuteKey}`;
-        const alarmSlotSeed =
-          alarm.repeatDays.length > 0 && alarm.repeatDays.length < 7
-            ? `alarm:${alarm.id}:w:${weekday}`
-            : `alarm:${alarm.id}`;
-
-        pushInboxNotification({
-          dedupeKey: alarmDedupeKey,
-          kind: 'alarm',
-          status: 'delivered',
-          title: alarm.linkedReminderTitle || alarm.label,
-          body: alarm.linkedReminderNotes || `Alarm for ${currentHHMM}`,
-          scheduledAt: now.toISOString(),
-          createdAt: now.toISOString(),
-          read: true,
-          route: 'alarms',
-        });
-
-        void sendSystemNotification({
-          dedupeKey: alarmDedupeKey,
-          slotSeed: alarmSlotSeed,
-          title: alarm.linkedReminderTitle || alarm.label,
-          body: alarm.linkedReminderNotes || `Alarm for ${currentHHMM}`,
-          channel: 'alarm',
-          route: 'alarms',
-        });
+        triggerActiveAlarm(updatedAlarm);
         break;
       }
 
@@ -570,17 +773,18 @@ export function App() {
         if (!task.dueTime || task.dueDate !== today || task.dueTime !== currentHHMM) continue;
         if (task.lastNotifiedMinute === minuteKey) continue;
 
+        const soundId = task.soundId || defaultNotificationSoundId;
+        const soundLabel = task.soundName || resolveSoundName(customAudioTones, soundId);
         const updatedTask: TaskReminderItem = {
           ...task,
+          soundId,
+          soundName: soundLabel,
           lastNotifiedMinute: minuteKey,
         };
         setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
         await putInStore('tasks', updatedTask);
 
-        playNotificationSound(
-          customAudioTones,
-          task.soundId || defaultNotificationSoundId
-        );
+        playNotificationSound(customAudioTones, soundId);
         setActiveReminderNotice(updatedTask);
 
         const taskDedupeKey = `task:${task.id}:${minuteKey}`;
@@ -589,7 +793,7 @@ export function App() {
           kind: 'reminder',
           status: 'delivered',
           title: task.title,
-          body: task.notes || `Scheduled reminder at ${currentHHMM}`,
+          body: task.notes || `Scheduled reminder at ${formatTime12h(currentHHMM)} · ${soundLabel}`,
           scheduledAt: now.toISOString(),
           createdAt: now.toISOString(),
           read: false,
@@ -600,9 +804,15 @@ export function App() {
           dedupeKey: taskDedupeKey,
           slotSeed: `task:${task.id}`,
           title: task.title,
-          body: task.notes || `Scheduled reminder at ${currentHHMM}`,
+          body: task.notes || `Scheduled reminder at ${formatTime12h(currentHHMM)}`,
           channel: 'reminder',
           route: 'tasks',
+          entityId: task.id,
+          isPlaying: true,
+          ongoing: false,
+          replaceInPlace: true,
+          soundLabel,
+          snoozeMinutes: 5,
         });
         break;
       }
@@ -673,7 +883,16 @@ export function App() {
 
     const interval = window.setInterval(tick, 4000);
     return () => window.clearInterval(interval);
-  }, [ready, alarms, tasks, activeEventSession, customAudioTones, defaultNotificationSoundId, pushInboxNotification]);
+  }, [
+    ready,
+    alarms,
+    tasks,
+    activeEventSession,
+    customAudioTones,
+    defaultNotificationSoundId,
+    pushInboxNotification,
+    triggerActiveAlarm,
+  ]);
 
   // Persistence Handlers
   const saveNote = async (note: PersonalNote) => {
@@ -850,25 +1069,28 @@ export function App() {
   };
 
   const handleSnoozeAlarm = async (minutes: number) => {
-    if (!ringingAlarm) return;
-    stopAlarmRinging();
-    const target = new Date(Date.now() + minutes * 60 * 1000);
-    const snoozeTime = `${String(target.getHours()).padStart(2, '0')}:${String(
-      target.getMinutes()
-    ).padStart(2, '0')}`;
-    await saveAlarm({
-      ...ringingAlarm,
-      time: snoozeTime,
-      enabled: true,
-      lastTriggeredMinute: undefined,
-    });
-    setRingingAlarm(null);
+    const active = ringingAlarmRef.current;
+    if (!active) return;
+    await snoozeAlarmByEntity(active, minutes);
   };
 
   const handleDismissAlarm = useCallback(() => {
+    const active = ringingAlarmRef.current;
     stopAlarmRinging();
+    if (active) {
+      void removeNotificationBySlotSeed(getAlarmSlotSeed(active));
+      if (active.snoozedUntilDate || active.snoozedUntilTime) {
+        const cleaned: AlarmItem = {
+          ...active,
+          snoozedUntilDate: undefined,
+          snoozedUntilTime: undefined,
+        };
+        void putInStore('alarms', cleaned);
+        setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
+      }
+    }
     setRingingAlarm(null);
-  }, []);
+  }, [getAlarmSlotSeed]);
 
   const handleCloseBreathingOverlay = useCallback(() => {
     const active = breathingPromptStateRef.current;
@@ -1601,11 +1823,7 @@ export function App() {
               onSaveAlarm={saveAlarm}
               onDeleteAlarm={deleteAlarm}
               onTestRingAlarm={(alarm) => {
-                setRingingAlarm(alarm);
-                const matchedTone = alarm.soundId
-                  ? customAudioTones.find((t) => t.id === alarm.soundId)
-                  : undefined;
-                startAlarmRinging(matchedTone, alarm.soundId);
+                triggerActiveAlarm(alarm, { isTest: true });
               }}
               onSaveCustomTone={saveCustomTone}
               onDeleteCustomTone={deleteCustomTone}
@@ -1742,6 +1960,7 @@ export function App() {
       {ringingAlarm && (
         <ActiveAlarmOverlay
           alarm={ringingAlarm}
+          startedAtMs={ringingStartedAtMs}
           onDismiss={handleDismissAlarm}
           onSnooze={handleSnoozeAlarm}
         />
@@ -1751,11 +1970,15 @@ export function App() {
       {activeReminderNotice && (
         <div
           role="status"
-          className="fixed bottom-20 lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/50 p-4 shadow-xl flex items-start justify-between gap-3"
+          className="fixed bottom-20 lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/50 p-4 shadow-xl space-y-3"
         >
           <div className="min-w-0">
-            <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB] font-medium">
-              Scheduled Reminder
+            <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB] font-medium flex items-center gap-1.5">
+              <span>▶</span>
+              <span>
+                Scheduled Reminder
+                {activeReminderNotice.soundName ? ` · ${activeReminderNotice.soundName}` : ''}
+              </span>
             </p>
             <p className="text-sm font-medium text-[#111827] dark:text-[#F1F3F6] mt-0.5 truncate">
               {activeReminderNotice.title}
@@ -1766,13 +1989,25 @@ export function App() {
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setActiveReminderNotice(null)}
-            className="min-h-[36px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-white/[0.06] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.1] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] shrink-0"
-          >
-            Dismiss
-          </button>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => void snoozeTaskReminder(activeReminderNotice, 5)}
+              className="min-h-[38px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-xs font-medium text-[#5B4D8A] dark:text-[#BEB4DC] shrink-0"
+            >
+              Snooze 5m
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void removeNotificationBySlotSeed(`task:${activeReminderNotice.id}`);
+                setActiveReminderNotice(null);
+              }}
+              className="min-h-[38px] px-3.5 rounded-xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-xs font-semibold text-[#0F1115] shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 

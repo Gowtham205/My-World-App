@@ -744,32 +744,32 @@ export const GameView: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Compact Perimeter HUD (No backdrop blur over canvas) */}
-      <div className="rounded-2xl bg-[#171A21] border border-white/[0.08] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
           <div>
-            <span className="text-[#98A2B3] mr-1.5">Score</span>
-            <span className="font-mono-tabular font-semibold text-[#F1F3F6]">{hud.score}</span>
+            <span className="text-[#5B6472] dark:text-[#98A2B3] mr-1.5">Score</span>
+            <span className="font-mono-tabular font-semibold text-[#111827] dark:text-[#F1F3F6]">{hud.score}</span>
           </div>
           <div>
-            <span className="text-[#98A2B3] mr-1.5">Streak</span>
-            <span className="font-mono-tabular font-semibold text-[#9EC5AB]">{hud.streak}x</span>
+            <span className="text-[#5B6472] dark:text-[#98A2B3] mr-1.5">Streak</span>
+            <span className="font-mono-tabular font-semibold text-[#2E6B48] dark:text-[#9EC5AB]">{hud.streak}x</span>
           </div>
           <div>
-            <span className="text-[#98A2B3] mr-1.5">Best</span>
-            <span className="font-mono-tabular font-semibold text-[#BEB4DC]">{hud.bestScore}</span>
+            <span className="text-[#5B6472] dark:text-[#98A2B3] mr-1.5">Best</span>
+            <span className="font-mono-tabular font-semibold text-[#5B4D8A] dark:text-[#BEB4DC]">{hud.bestScore}</span>
           </div>
           <div className="flex items-center gap-1" aria-label={`Serenity hearts: ${hud.hearts}`}>
             {[0, 1, 2].map((idx) => (
               <Heart
                 key={idx}
                 className={`w-4 h-4 ${
-                  idx < hud.hearts ? 'text-[#F2B8A2] fill-[#F2B8A2]' : 'text-white/15'
+                  idx < hud.hearts ? 'text-[#A6482D] dark:text-[#F2B8A2] fill-[#F2B8A2]' : 'text-slate-900/15 dark:text-white/15'
                 }`}
               />
             ))}
           </div>
           {hud.surgeActive && (
-            <span className="text-xs font-medium text-[#FDE68A] inline-flex items-center gap-1">
+            <span className="text-xs font-medium text-amber-700 dark:text-[#FDE68A] inline-flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5" />
               Serenity Surge
             </span>
@@ -781,7 +781,7 @@ export const GameView: React.FC = () => {
             type="button"
             onClick={() => setMuted((m) => !m)}
             aria-label={muted ? 'Unmute game audio' : 'Mute game audio'}
-            className="min-w-[44px] min-h-[44px] px-3 rounded-xl bg-[#1D212A] hover:bg-white/[0.08] text-[#D0D5DD] flex items-center justify-center"
+            className="min-w-[44px] min-h-[44px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center"
           >
             {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
@@ -790,10 +790,10 @@ export const GameView: React.FC = () => {
               type="button"
               onClick={togglePause}
               aria-label={gameState === 'PAUSED' ? 'Resume game' : 'Pause game'}
-              className="min-w-[44px] min-h-[44px] px-3 rounded-xl bg-[#1D212A] hover:bg-white/[0.08] text-[#D0D5DD] flex items-center justify-center"
+              className="min-w-[44px] min-h-[44px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center"
             >
               {gameState === 'PAUSED' ? (
-                <Play className="w-4 h-4 text-[#9EC5AB]" />
+                <Play className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />
               ) : (
                 <Pause className="w-4 h-4" />
               )}
@@ -805,7 +805,7 @@ export const GameView: React.FC = () => {
       {/* >=85% Unobstructed Playfield */}
       <div
         ref={containerRef}
-        className="relative w-full h-[calc(100dvh-13.5rem)] min-h-[460px] max-h-[760px] rounded-3xl overflow-hidden border border-white/[0.08] bg-[#0F131A] select-none touch-none"
+        className="relative w-full h-[calc(100dvh-13.5rem)] min-h-[460px] max-h-[760px] rounded-3xl overflow-hidden border border-slate-900/[0.10] dark:border-white/[0.08] bg-[#0F131A] select-none touch-none"
       >
         <canvas
           ref={canvasRef}
@@ -820,13 +820,13 @@ export const GameView: React.FC = () => {
 
         {gameState === 'TITLE_MENU' && (
           <div className="absolute inset-0 flex items-center justify-center p-6 bg-[#0F1115]/70">
-            <div className="max-w-md w-full rounded-3xl bg-[#171A21] border border-white/[0.1] p-7 text-center space-y-6 shadow-2xl">
+            <div className="max-w-md w-full rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.12] dark:border-white/[0.1] p-7 text-center space-y-6 shadow-2xl">
               <div className="space-y-2">
-                <p className="text-xs text-[#9EC5AB] tracking-wide">Zen Pond Arcade</p>
-                <h1 className="font-display text-3xl sm:text-4xl font-medium text-[#F1F3F6]">
+                <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB] tracking-wide">Zen Pond Arcade</p>
+                <h1 className="font-display text-3xl sm:text-4xl font-medium text-[#111827] dark:text-[#F1F3F6]">
                   Stillwater Lanterns
                 </h1>
-                <p className="text-xs sm:text-sm text-[#98A2B3] leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
                   Steer your lotus boat to gather drifting paper lanterns, trigger Serenity Surges,
                   and glide past dark storm snags.
                 </p>
@@ -838,8 +838,8 @@ export const GameView: React.FC = () => {
                   onClick={() => setMode('gentle')}
                   className={`min-h-[44px] px-3 rounded-2xl text-xs font-medium border transition-colors ${
                     mode === 'gentle'
-                      ? 'bg-[#9EC5AB]/15 border-[#9EC5AB]/50 text-[#9EC5AB]'
-                      : 'bg-[#1D212A] border-white/[0.06] text-[#98A2B3]'
+                      ? 'bg-[#9EC5AB]/15 border-[#9EC5AB]/50 text-[#2E6B48] dark:text-[#9EC5AB]'
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] border-slate-900/[0.08] dark:border-white/[0.06] text-[#5B6472] dark:text-[#98A2B3]'
                   }`}
                 >
                   Gentle Drift
@@ -849,8 +849,8 @@ export const GameView: React.FC = () => {
                   onClick={() => setMode('flow')}
                   className={`min-h-[44px] px-3 rounded-2xl text-xs font-medium border transition-colors ${
                     mode === 'flow'
-                      ? 'bg-[#9BC4E2]/15 border-[#9BC4E2]/50 text-[#9BC4E2]'
-                      : 'bg-[#1D212A] border-white/[0.06] text-[#98A2B3]'
+                      ? 'bg-[#9BC4E2]/15 border-[#9BC4E2]/50 text-[#255F8A] dark:text-[#9BC4E2]'
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] border-slate-900/[0.08] dark:border-white/[0.06] text-[#5B6472] dark:text-[#98A2B3]'
                   }`}
                 >
                   Current Flow
@@ -866,7 +866,7 @@ export const GameView: React.FC = () => {
                 Start Game
               </button>
 
-              <p className="text-[11px] text-[#98A2B3]">
+              <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3]">
                 Move: Arrow Keys, WASD, or Drag · Pause: Esc
               </p>
             </div>
@@ -875,8 +875,8 @@ export const GameView: React.FC = () => {
 
         {gameState === 'PAUSED' && (
           <div className="absolute inset-0 flex items-center justify-center p-6 bg-[#0F1115]/75">
-            <div className="max-w-xs w-full rounded-3xl bg-[#171A21] border border-white/[0.1] p-6 text-center space-y-4">
-              <h2 className="font-display text-2xl font-medium text-[#F1F3F6]">Paused</h2>
+            <div className="max-w-xs w-full rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.12] dark:border-white/[0.1] p-6 text-center space-y-4">
+              <h2 className="font-display text-2xl font-medium text-[#111827] dark:text-[#F1F3F6]">Paused</h2>
               <div className="space-y-2.5">
                 <button
                   type="button"
@@ -888,7 +888,7 @@ export const GameView: React.FC = () => {
                 <button
                   type="button"
                   onClick={startNewRun}
-                  className="w-full min-h-[44px] rounded-2xl bg-[#1D212A] text-[#F1F3F6] text-sm font-medium"
+                  className="w-full min-h-[44px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] text-[#111827] dark:text-[#F1F3F6] text-sm font-medium"
                 >
                   Restart Run
                 </button>
@@ -898,7 +898,7 @@ export const GameView: React.FC = () => {
                     stateRef.current = 'TITLE_MENU';
                     setGameState('TITLE_MENU');
                   }}
-                  className="w-full min-h-[44px] rounded-2xl bg-white/[0.04] text-[#98A2B3] text-xs"
+                  className="w-full min-h-[44px] rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.04] text-[#5B6472] dark:text-[#98A2B3] text-xs"
                 >
                   Title Menu
                 </button>
@@ -909,36 +909,36 @@ export const GameView: React.FC = () => {
 
         {gameState === 'GAME_OVER' && (
           <div className="absolute inset-0 flex items-center justify-center p-6 bg-[#0F1115]/80">
-            <div className="max-w-sm w-full rounded-3xl bg-[#171A21] border border-white/[0.1] p-7 text-center space-y-5">
+            <div className="max-w-sm w-full rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.12] dark:border-white/[0.1] p-7 text-center space-y-5">
               <div>
-                <p className="text-xs text-[#9BC4E2]">Pond Reflection</p>
-                <h2 className="font-display text-2xl font-medium text-[#F1F3F6] mt-1">
+                <p className="text-xs text-[#255F8A] dark:text-[#9BC4E2]">Pond Reflection</p>
+                <h2 className="font-display text-2xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
                   Lanterns Rested
                 </h2>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-left">
-                <div className="p-3.5 rounded-2xl bg-[#1D212A]">
-                  <p className="text-[11px] text-[#98A2B3]">Final Score</p>
-                  <p className="font-mono-tabular text-lg font-semibold text-[#F1F3F6]">
+                <div className="p-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A]">
+                  <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3]">Final Score</p>
+                  <p className="font-mono-tabular text-lg font-semibold text-[#111827] dark:text-[#F1F3F6]">
                     {hud.score}
                   </p>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-[#1D212A]">
-                  <p className="text-[11px] text-[#98A2B3]">Best Score</p>
-                  <p className="font-mono-tabular text-lg font-semibold text-[#BEB4DC]">
+                <div className="p-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A]">
+                  <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3]">Best Score</p>
+                  <p className="font-mono-tabular text-lg font-semibold text-[#5B4D8A] dark:text-[#BEB4DC]">
                     {hud.bestScore}
                   </p>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-[#1D212A]">
-                  <p className="text-[11px] text-[#98A2B3]">Lanterns Lit</p>
-                  <p className="font-mono-tabular text-lg font-semibold text-[#9EC5AB]">
+                <div className="p-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A]">
+                  <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3]">Lanterns Lit</p>
+                  <p className="font-mono-tabular text-lg font-semibold text-[#2E6B48] dark:text-[#9EC5AB]">
                     {hud.lanternsLit}
                   </p>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-[#1D212A]">
-                  <p className="text-[11px] text-[#98A2B3]">Peak Streak</p>
-                  <p className="font-mono-tabular text-lg font-semibold text-[#F2B8A2]">
+                <div className="p-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A]">
+                  <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3]">Peak Streak</p>
+                  <p className="font-mono-tabular text-lg font-semibold text-[#A6482D] dark:text-[#F2B8A2]">
                     {hud.peakStreak}x
                   </p>
                 </div>
@@ -959,7 +959,7 @@ export const GameView: React.FC = () => {
                     stateRef.current = 'TITLE_MENU';
                     setGameState('TITLE_MENU');
                   }}
-                  className="w-full min-h-[44px] rounded-2xl bg-[#1D212A] text-[#98A2B3] text-xs font-medium"
+                  className="w-full min-h-[44px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] text-xs font-medium"
                 >
                   Return to Title Menu
                 </button>

@@ -212,7 +212,7 @@ const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
   return (
     <div className="relative">
       <div className="relative flex items-center">
-        <span className="absolute left-3.5 text-[#98A2B3] pointer-events-none">{icon}</span>
+        <span className="absolute left-3.5 text-[#5B6472] dark:text-[#98A2B3] pointer-events-none">{icon}</span>
         <input
           type="text"
           value={value}
@@ -222,7 +222,7 @@ const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
           }}
           onFocus={() => setOpenDropdown(true)}
           placeholder={placeholder}
-          className="w-full min-h-[44px] pl-10 pr-9 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/70 focus:outline-none focus:border-[#9BC4E2]/50"
+          className="w-full min-h-[44px] pl-10 pr-9 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/70 dark:placeholder-[#98A2B3]/70 focus:outline-none focus:border-[#9BC4E2]/50"
         />
         {value && (
           <button
@@ -232,7 +232,7 @@ const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
               resetSession();
             }}
             aria-label="Clear search"
-            className="absolute right-2.5 w-7 h-7 rounded-xl text-[#98A2B3] hover:text-[#F1F3F6] flex items-center justify-center"
+            className="absolute right-2.5 w-7 h-7 rounded-xl text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] flex items-center justify-center"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -240,12 +240,12 @@ const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
       </div>
 
       {openDropdown && (suggestions.length > 0 || isLoading || searchError) && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 z-30 rounded-2xl bg-[#1D212A] border border-white/[0.1] shadow-xl overflow-hidden max-h-64 overflow-y-auto">
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-30 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.12] dark:border-white/[0.1] shadow-xl overflow-hidden max-h-64 overflow-y-auto">
           {isLoading && (
-            <p className="px-4 py-3 text-xs text-[#98A2B3]">Searching places...</p>
+            <p className="px-4 py-3 text-xs text-[#5B6472] dark:text-[#98A2B3]">Searching places...</p>
           )}
           {searchError && (
-            <p className="px-4 py-3 text-xs text-[#F2B8A2]">{searchError}</p>
+            <p className="px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2]">{searchError}</p>
           )}
           {suggestions.map((suggestion, idx) => {
             const label = suggestion.placePrediction?.text?.text;
@@ -255,9 +255,9 @@ const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
                 key={suggestion.placePrediction?.placeId || idx}
                 type="button"
                 onClick={() => void handleSelectSuggestion(suggestion)}
-                className="w-full text-left px-4 py-3 text-xs text-[#F1F3F6] hover:bg-white/[0.06] border-b border-white/[0.04] last:border-none flex items-start gap-2.5 min-h-[44px]"
+                className="w-full text-left px-4 py-3 text-xs text-[#111827] dark:text-[#F1F3F6] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border-b border-slate-900/[0.06] dark:border-white/[0.04] last:border-none flex items-start gap-2.5 min-h-[44px]"
               >
-                <MapPin className="w-3.5 h-3.5 text-[#9BC4E2] shrink-0 mt-0.5" />
+                <MapPin className="w-3.5 h-3.5 text-[#255F8A] dark:text-[#9BC4E2] shrink-0 mt-0.5" />
                 <span className="leading-relaxed">{label}</span>
               </button>
             );
@@ -513,26 +513,26 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 space-y-4">
+      <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 space-y-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
           <div className="space-y-1.5">
-            <label className="text-xs text-[#98A2B3] block">Destination / Venue</label>
+            <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block">Destination / Venue</label>
             <PlaceSearchInput
               placeholder="Search parks, cafés, wedding venues, quiet spots..."
               value={destinationQuery}
               onChange={setDestinationQuery}
               onPlaceSelected={handleSelectDestination}
-              icon={<Search className="w-4 h-4 text-[#9BC4E2]" />}
+              icon={<Search className="w-4 h-4 text-[#255F8A] dark:text-[#9BC4E2]" />}
             />
           </div>
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs text-[#98A2B3]">Starting Point (for route)</label>
+              <label className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Starting Point (for route)</label>
               <button
                 type="button"
                 onClick={handleUseCurrentLocation}
-                className="text-xs text-[#9EC5AB] hover:underline inline-flex items-center gap-1"
+                className="text-xs text-[#2E6B48] dark:text-[#9EC5AB] hover:underline inline-flex items-center gap-1"
               >
                 <Crosshair className="w-3.5 h-3.5" />
                 Use current location
@@ -543,12 +543,12 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
               value={originQuery}
               onChange={setOriginQuery}
               onPlaceSelected={handleSelectOrigin}
-              icon={<Compass className="w-4 h-4 text-[#9EC5AB]" />}
+              icon={<Compass className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />}
             />
           </div>
         </div>
 
-        {geoStatus && <p className="text-xs text-[#98A2B3]">{geoStatus}</p>}
+        {geoStatus && <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">{geoStatus}</p>}
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -568,8 +568,8 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
                   onClick={() => setTravelMode(mode.id)}
                   className={`min-h-[40px] px-3.5 rounded-2xl text-xs font-medium inline-flex items-center gap-1.5 transition-colors ${
                     active
-                      ? 'bg-[#9BC4E2]/20 text-[#9BC4E2] border border-[#9BC4E2]/40'
-                      : 'bg-[#1D212A] text-[#98A2B3] border border-white/[0.06] hover:text-[#F1F3F6]'
+                      ? 'bg-[#9BC4E2]/20 text-[#255F8A] dark:text-[#9BC4E2] border border-[#9BC4E2]/40'
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -580,20 +580,20 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
           </div>
 
           {routeSummary && (
-            <div className="text-xs text-[#F1F3F6] font-mono-tabular flex items-center gap-3">
+            <div className="text-xs text-[#111827] dark:text-[#F1F3F6] font-mono-tabular flex items-center gap-3">
               <span>{(routeSummary.distanceMeters / 1000).toFixed(1)} km</span>
-              <span className="text-[#98A2B3]">·</span>
-              <span className="text-[#9EC5AB] font-semibold">
+              <span className="text-[#5B6472] dark:text-[#98A2B3]">·</span>
+              <span className="text-[#2E6B48] dark:text-[#9EC5AB] font-semibold">
                 {Math.max(1, Math.round(routeSummary.durationMillis / 60000))} min
               </span>
             </div>
           )}
         </div>
 
-        {routeError && <p className="text-xs text-[#F2B8A2]">{routeError}</p>}
+        {routeError && <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2]">{routeError}</p>}
       </section>
 
-      <div className="rounded-3xl overflow-hidden border border-white/[0.08] bg-[#171A21] h-[420px] sm:h-[520px] w-full relative">
+      <div className="rounded-3xl overflow-hidden border border-slate-900/[0.10] dark:border-white/[0.08] bg-white dark:bg-[#171A21] h-[420px] sm:h-[520px] w-full relative">
         <GoogleMap
           mapId="DEMO_MAP_ID"
           defaultCenter={{ lat: 37.7749, lng: -122.4194 }}
@@ -646,30 +646,30 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
       </div>
 
       {destinationPlace && (
-        <section className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <p className="text-xs text-[#9BC4E2]">Selected Destination</p>
-            <h2 className="font-display text-lg font-medium text-[#F1F3F6]">
+            <p className="text-xs text-[#255F8A] dark:text-[#9BC4E2]">Selected Destination</p>
+            <h2 className="font-display text-lg font-medium text-[#111827] dark:text-[#F1F3F6]">
               {destinationPlace.name}
             </h2>
-            <p className="text-xs text-[#98A2B3]">{destinationPlace.address}</p>
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">{destinationPlace.address}</p>
             {destinationPlace.isOpenText && (
-              <p className="text-xs text-[#D0D5DD] pt-0.5">{destinationPlace.isOpenText}</p>
+              <p className="text-xs text-[#334155] dark:text-[#D0D5DD] pt-0.5">{destinationPlace.isOpenText}</p>
             )}
             {savedFeedback && (
               <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
-                <span className="text-[#9EC5AB]">{savedFeedback}</span>
+                <span className="text-[#2E6B48] dark:text-[#9EC5AB]">{savedFeedback}</span>
                 <button
                   type="button"
                   onClick={onNavigateToEventCalm}
-                  className="text-[#9BC4E2] underline"
+                  className="text-[#255F8A] dark:text-[#9BC4E2] underline"
                 >
                   Open Event Calm
                 </button>
                 <button
                   type="button"
                   onClick={onNavigateToCalendar}
-                  className="text-[#9BC4E2] underline"
+                  className="text-[#255F8A] dark:text-[#9BC4E2] underline"
                 >
                   Open Calendar
                 </button>
@@ -689,9 +689,9 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
             <button
               type="button"
               onClick={() => void handleAddToCalendar()}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-[#F1F3F6] inline-flex items-center gap-2 whitespace-nowrap"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] inline-flex items-center gap-2 whitespace-nowrap"
             >
-              <CalendarPlus className="w-4 h-4 text-[#9BC4E2]" />
+              <CalendarPlus className="w-4 h-4 text-[#255F8A] dark:text-[#9BC4E2]" />
               Add to Calendar
             </button>
             <a
@@ -700,7 +700,7 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-[#9BC4E2] inline-flex items-center gap-2 whitespace-nowrap"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] inline-flex items-center gap-2 whitespace-nowrap"
             >
               <Navigation className="w-4 h-4" />
               Open in Google Maps
@@ -716,24 +716,24 @@ export const MapsView: React.FC<MapsViewProps> = (props) => {
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-xs text-[#9BC4E2]">Places & Quiet Route Planner</p>
-        <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+        <p className="text-xs text-[#255F8A] dark:text-[#9BC4E2]">Places & Quiet Route Planner</p>
+        <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
           Sanctuary Maps
         </h1>
-        <p className="text-sm text-[#98A2B3] mt-1 max-w-2xl">
+        <p className="text-sm text-[#5B6472] dark:text-[#98A2B3] mt-1 max-w-2xl">
           Search venues, explore travel routes before leaving home, and link upcoming destinations
           to Event Calm Mode or your Calendar.
         </p>
       </header>
 
       {!MAPS_API_KEY ? (
-        <div className="rounded-3xl bg-[#171A21] border border-[#F2B8A2]/30 p-6 space-y-2">
-          <p className="text-sm font-medium text-[#F1F3F6]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#F2B8A2]/30 p-6 space-y-2">
+          <p className="text-sm font-medium text-[#111827] dark:text-[#F1F3F6]">
             Google Maps API key not detected in the client environment.
           </p>
-          <p className="text-xs text-[#98A2B3]">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
             Enable Google Maps in the AI Studio Google Maps panel or ensure{' '}
-            <code className="text-[#9BC4E2]">VITE_GOOGLE_MAPS_API_KEY</code> is available.
+            <code className="text-[#255F8A] dark:text-[#9BC4E2]">VITE_GOOGLE_MAPS_API_KEY</code> is available.
           </p>
         </div>
       ) : (

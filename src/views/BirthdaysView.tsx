@@ -116,8 +116,8 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#F2B8A2]">Birthday Tracker & Wishes</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2]">Birthday Tracker & Wishes</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             People Who Matter
           </h1>
         </div>
@@ -134,9 +134,9 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
       {showAdd && (
         <form
           onSubmit={handleSubmit}
-          className="rounded-3xl bg-[#171A21] border border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4"
+          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4"
         >
-          <h2 className="text-base font-semibold text-[#F1F3F6]">
+          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
             {editingEntry ? 'Edit Birthday & Alert Offsets' : 'Track Birthday & Alert Offsets'}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -146,21 +146,21 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Person's name"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
             />
             <input
               type="date"
               required
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
             />
             <input
               type="text"
               value={relationship}
               onChange={(e) => setRelationship(e.target.value)}
               placeholder="Relationship (e.g. Family, Friend)"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
             />
           </div>
 
@@ -169,12 +169,12 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
             value={wishTemplate}
             onChange={(e) => setWishTemplate(e.target.value)}
             placeholder="Pre-write a thoughtful birthday wish for one-tap copy or sharing..."
-            className="w-full p-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+            className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
           />
 
           {/* Customizable Notification Engine Offsets */}
           <div className="space-y-2.5">
-            <p className="text-xs text-[#98A2B3]">
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
               Linked Notification Engine (notify before birthday)
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -183,12 +183,12 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                 min={1}
                 value={offsetVal}
                 onChange={(e) => setOffsetVal(Number(e.target.value))}
-                className="w-20 min-h-[40px] px-3 rounded-xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6] font-mono-tabular"
+                className="w-20 min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
               />
               <select
                 value={offsetUnit}
                 onChange={(e) => setOffsetUnit(e.target.value as OffsetUnit)}
-                className="min-h-[40px] px-3 rounded-xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6]"
+                className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
               >
                 <option value="minutes">minutes before</option>
                 <option value="hours">hours before</option>
@@ -197,18 +197,18 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
               <button
                 type="button"
                 onClick={addOffset}
-                className="min-h-[40px] px-3.5 rounded-xl bg-white/[0.06] text-xs font-medium text-[#F2B8A2]"
+                className="min-h-[40px] px-3.5 rounded-xl bg-slate-900/[0.06] dark:bg-white/[0.06] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2]"
               >
                 Add Alert Offset
               </button>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs text-[#98A2B3]">
+            <div className="flex flex-wrap gap-2 text-xs text-[#5B6472] dark:text-[#98A2B3]">
               {offsets.map((off) => (
                 <button
                   key={off.id}
                   type="button"
                   onClick={() => setOffsets((prev) => prev.filter((o) => o.id !== off.id))}
-                  className="hover:text-[#F2B8A2]"
+                  className="hover:text-[#A6482D] dark:hover:text-[#F2B8A2]"
                 >
                   {off.value} {off.unit} before ×
                 </button>
@@ -223,7 +223,7 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                 resetForm();
                 setShowAdd(false);
               }}
-              className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
+              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
             >
               Cancel
             </button>
@@ -238,8 +238,8 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
       )}
 
       {sortedBirthdays.length === 0 ? (
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-10 text-center">
-          <p className="text-sm text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
+          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
             No birthdays added yet. Save dates, custom wishes, and advance reminders.
           </p>
         </div>
@@ -248,36 +248,36 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
           {sortedBirthdays.map(({ entry, info }) => (
             <article
               key={entry.id}
-              className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4"
+              className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4"
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs text-[#98A2B3]">
+                    <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
                       {entry.relationship} · {formatShortDate(entry.birthDate)}
                       {info.turningAge ? ` · Turning ${info.turningAge}` : ''}
                     </p>
-                    <h2 className="text-lg font-semibold text-[#F1F3F6] mt-1 flex items-center gap-2">
-                      <Cake className="w-4 h-4 text-[#F2B8A2]" />
+                    <h2 className="text-lg font-semibold text-[#111827] dark:text-[#F1F3F6] mt-1 flex items-center gap-2">
+                      <Cake className="w-4 h-4 text-[#A6482D] dark:text-[#F2B8A2]" />
                       {entry.name}
                     </h2>
                   </div>
                   <span
                     className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
-                      info.daysUntil <= 7 ? 'text-[#F2B8A2]' : 'text-[#9EC5AB]'
+                      info.daysUntil <= 7 ? 'text-[#A6482D] dark:text-[#F2B8A2]' : 'text-[#2E6B48] dark:text-[#9EC5AB]'
                     }`}
                   >
                     {info.label}
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[#1D212A] border border-white/[0.05]">
-                  <p className="text-xs text-[#98A2B3] mb-1">Pre-Written Wish</p>
-                  <p className="text-sm text-[#D0D5DD] leading-relaxed">{entry.wishTemplate}</p>
+                <div className="p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.06] dark:border-white/[0.05]">
+                  <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Pre-Written Wish</p>
+                  <p className="text-sm text-[#334155] dark:text-[#D0D5DD] leading-relaxed">{entry.wishTemplate}</p>
                 </div>
 
-                <p className="text-xs text-[#98A2B3] flex items-center gap-1.5 flex-wrap">
-                  <Bell className="w-3.5 h-3.5 text-[#F2B8A2]" />
+                <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] flex items-center gap-1.5 flex-wrap">
+                  <Bell className="w-3.5 h-3.5 text-[#A6482D] dark:text-[#F2B8A2]" />
                   <span>
                     Alerts:{' '}
                     {entry.offsets.length > 0
@@ -287,22 +287,22 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-2">
+              <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => void handleCopyWish(entry)}
-                    className="min-h-[40px] px-3.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-xs font-medium text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
+                    className="min-h-[40px] px-3.5 rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
                   >
-                    <Copy className="w-3.5 h-3.5 text-[#F2B8A2]" />
+                    <Copy className="w-3.5 h-3.5 text-[#A6482D] dark:text-[#F2B8A2]" />
                     {copiedId === entry.id ? 'Copied Wish' : 'Copy Wish'}
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleShareWish(entry)}
-                    className="min-h-[40px] px-3.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-xs font-medium text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
+                    className="min-h-[40px] px-3.5 rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
                   >
-                    <Share2 className="w-3.5 h-3.5 text-[#9BC4E2]" />
+                    <Share2 className="w-3.5 h-3.5 text-[#255F8A] dark:text-[#9BC4E2]" />
                     {sharedId === entry.id ? 'Shared' : 'Share'}
                   </button>
                 </div>
@@ -313,7 +313,7 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                     onClick={() => openEditForm(entry)}
                     aria-label={`Edit ${entry.name}`}
                     title="Edit birthday"
-                    className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#9BC4E2] flex items-center justify-center"
+                    className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#255F8A] dark:hover:text-[#9BC4E2] flex items-center justify-center"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
@@ -321,7 +321,7 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                     type="button"
                     onClick={() => onDeleteBirthday(entry.id)}
                     aria-label="Delete birthday"
-                    className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] text-[#98A2B3] hover:text-[#F2B8A2] flex items-center justify-center"
+                    className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

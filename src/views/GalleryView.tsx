@@ -174,10 +174,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6]">
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6]">
             Private Gallery
           </h1>
-          <p className="text-xs text-[#98A2B3] mt-1">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1">
             Stored privately inside your device · Auto-locks whenever you leave or minimize.
           </p>
         </div>
@@ -190,7 +190,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               setPinUpdateError('');
               setShowNewAlbum(false);
             }}
-            className="min-h-[44px] px-4 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#9BC4E2] flex items-center gap-2 whitespace-nowrap"
+            className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] flex items-center gap-2 whitespace-nowrap"
           >
             <KeyRound className="w-3.5 h-3.5" />
             Update PIN
@@ -198,7 +198,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           <button
             type="button"
             onClick={onLock}
-            className="min-h-[44px] px-4 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#F2B8A2] flex items-center gap-2 whitespace-nowrap"
+            className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2] flex items-center gap-2 whitespace-nowrap"
           >
             <Lock className="w-3.5 h-3.5" />
             Lock
@@ -209,9 +209,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               setShowNewAlbum((v) => !v);
               setShowPinUpdate(false);
             }}
-            className="min-h-[44px] px-4 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#F1F3F6] flex items-center gap-2 whitespace-nowrap"
+            className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] flex items-center gap-2 whitespace-nowrap"
           >
-            <FolderPlus className="w-4 h-4 text-[#9BC4E2]" />
+            <FolderPlus className="w-4 h-4 text-[#255F8A] dark:text-[#9BC4E2]" />
             New Folder
           </button>
           <label className="min-h-[44px] px-5 rounded-2xl bg-[#9BC4E2] hover:bg-[#8AB6D6] text-[#0F1115] text-sm font-semibold flex items-center gap-2 cursor-pointer whitespace-nowrap">
@@ -229,7 +229,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       </header>
 
       {pinUpdateSuccess && (
-        <p className="text-xs text-[#9EC5AB]" role="status">
+        <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]" role="status">
           {pinUpdateSuccess}
         </p>
       )}
@@ -237,11 +237,11 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       {showPinUpdate && (
         <form
           onSubmit={handlePinChangeSubmit}
-          className="rounded-3xl bg-[#171A21] border border-[#9BC4E2]/30 p-5 sm:p-6 space-y-4"
+          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#9BC4E2]/30 p-5 sm:p-6 space-y-4"
         >
           <div>
-            <h2 className="text-base font-semibold text-[#F1F3F6]">Update Master Lock PIN</h2>
-            <p className="text-xs text-[#98A2B3] mt-0.5">
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">Update Master Lock PIN</h2>
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
               Applies to both Private Gallery and Secrets & Passwords.
             </p>
           </div>
@@ -254,7 +254,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               value={currentPin}
               onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ''))}
               placeholder="Current PIN"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
             />
             <input
               type="password"
@@ -264,7 +264,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               value={newPin}
               onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
               placeholder="New PIN (4–6 digits)"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
             />
             <input
               type="password"
@@ -274,11 +274,11 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               value={confirmNewPin}
               onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, ''))}
               placeholder="Confirm new PIN"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] font-mono-tabular"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
             />
           </div>
           {pinUpdateError && (
-            <p className="text-xs text-[#F2B8A2]" role="alert">
+            <p className="text-xs text-[#A6482D] dark:text-[#F2B8A2]" role="alert">
               {pinUpdateError}
             </p>
           )}
@@ -289,7 +289,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 setShowPinUpdate(false);
                 setPinUpdateError('');
               }}
-              className="min-h-[44px] px-4 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD]"
+              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
             >
               Cancel
             </button>
@@ -307,7 +307,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       {showNewAlbum && (
         <form
           onSubmit={handleCreateAlbum}
-          className="rounded-3xl bg-[#171A21] border border-[#9BC4E2]/30 p-5 flex flex-col sm:flex-row gap-3"
+          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#9BC4E2]/30 p-5 flex flex-col sm:flex-row gap-3"
         >
           <input
             type="text"
@@ -315,7 +315,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             value={albumName}
             onChange={(e) => setAlbumName(e.target.value)}
             placeholder="Private folder name (e.g. Travel, IDs, Journal)"
-            className="flex-1 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6]"
+            className="flex-1 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
           />
           <button
             type="submit"
@@ -333,8 +333,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           onClick={() => setActiveAlbumId('all')}
           className={`min-h-[42px] px-4 rounded-2xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
             activeAlbumId === 'all'
-              ? 'bg-[#9BC4E2]/20 text-[#9BC4E2] border border-[#9BC4E2]/30'
-              : 'bg-[#171A21] text-[#98A2B3] border border-white/[0.06]'
+              ? 'bg-[#9BC4E2]/20 text-[#255F8A] dark:text-[#9BC4E2] border border-[#9BC4E2]/30'
+              : 'bg-white dark:bg-[#171A21] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
           }`}
         >
           All Private ({mediaItems.length})
@@ -346,8 +346,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             onClick={() => setActiveAlbumId(album.id)}
             className={`min-h-[42px] px-4 rounded-2xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
               activeAlbumId === album.id
-                ? 'bg-[#9BC4E2]/20 text-[#9BC4E2] border border-[#9BC4E2]/30'
-                : 'bg-[#171A21] text-[#98A2B3] border border-white/[0.06]'
+                ? 'bg-[#9BC4E2]/20 text-[#255F8A] dark:text-[#9BC4E2] border border-[#9BC4E2]/30'
+                : 'bg-white dark:bg-[#171A21] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
             }`}
           >
             {album.name}
@@ -357,10 +357,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
       {/* Media Grid */}
       {filteredItems.length === 0 ? (
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-10 text-center space-y-2">
-          <ImageIcon className="w-8 h-8 text-[#9BC4E2] mx-auto opacity-70" />
-          <p className="text-sm text-[#D0D5DD]">No private photos or videos in this folder yet.</p>
-          <p className="text-xs text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center space-y-2">
+          <ImageIcon className="w-8 h-8 text-[#255F8A] dark:text-[#9BC4E2] mx-auto opacity-70" />
+          <p className="text-sm text-[#334155] dark:text-[#D0D5DD]">No private photos or videos in this folder yet.</p>
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
             Tap “Import Media” to copy files into your private app folder.
           </p>
         </div>
@@ -371,7 +371,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             return (
               <div
                 key={item.id}
-                className="group relative rounded-3xl overflow-hidden bg-[#171A21] border border-white/[0.07] aspect-square"
+                className="group relative rounded-3xl overflow-hidden bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] aspect-square"
               >
                 <button
                   type="button"
@@ -379,9 +379,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   className="w-full h-full block focus-visible:outline-2 focus-visible:outline-[#9BC4E2]"
                 >
                   {item.kind === 'video' ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#1D212A] p-3">
-                      <Video className="w-8 h-8 text-[#9BC4E2] mb-2" />
-                      <span className="text-xs text-[#D0D5DD] truncate max-w-full">
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#ECEFF3] dark:bg-[#1D212A] p-3">
+                      <Video className="w-8 h-8 text-[#255F8A] dark:text-[#9BC4E2] mb-2" />
+                      <span className="text-xs text-[#334155] dark:text-[#D0D5DD] truncate max-w-full">
                         {item.name}
                       </span>
                     </div>
@@ -422,7 +422,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 type="button"
                 onClick={() => setPendingDeleteItem(viewerItem)}
                 aria-label={`Delete ${viewerItem.name}`}
-                className="w-11 h-11 rounded-full bg-white/[0.06] hover:bg-[#F2B8A2]/20 flex items-center justify-center text-[#F2B8A2]"
+                className="w-11 h-11 rounded-full bg-white/[0.08] hover:bg-[#F2B8A2]/20 flex items-center justify-center text-[#F2B8A2]"
               >
                 <Trash2 className="w-5 h-5" />
               </button>
@@ -430,7 +430,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 type="button"
                 onClick={() => setViewerItem(null)}
                 aria-label="Close viewer"
-                className="w-11 h-11 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-[#F1F3F6]"
+                className="w-11 h-11 rounded-full bg-white/[0.08] hover:bg-white/[0.16] flex items-center justify-center text-[#F1F3F6]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -459,34 +459,34 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       {/* Delete Confirmation Modal */}
       {pendingDeleteItem && (
         <div
-          className="fixed inset-0 z-[60] bg-[#0F1115]/85 backdrop-blur-sm flex items-center justify-center p-5"
+          className="fixed inset-0 z-[60] bg-slate-900/60 dark:bg-[#0F1115]/85 backdrop-blur-sm flex items-center justify-center p-5"
           role="dialog"
           aria-modal="true"
           aria-label="Confirm media deletion"
         >
-          <div className="max-w-sm w-full rounded-3xl bg-[#171A21] border border-white/[0.1] p-6 space-y-4">
+          <div className="max-w-sm w-full rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.12] dark:border-white/[0.1] p-6 space-y-4">
             <div className="flex items-center gap-3">
               {pendingDeleteItem.kind === 'image' && objectUrls[pendingDeleteItem.id] ? (
                 <img
                   src={objectUrls[pendingDeleteItem.id]}
                   alt={pendingDeleteItem.name}
                   referrerPolicy="no-referrer"
-                  className="w-12 h-12 rounded-2xl object-cover shrink-0 border border-white/[0.08]"
+                  className="w-12 h-12 rounded-2xl object-cover shrink-0 border border-slate-900/[0.10] dark:border-white/[0.08]"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-2xl bg-[#1D212A] flex items-center justify-center shrink-0">
-                  <Trash2 className="w-5 h-5 text-[#F2B8A2]" />
+                <div className="w-12 h-12 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-[#A6482D] dark:text-[#F2B8A2]" />
                 </div>
               )}
               <div className="min-w-0">
-                <h2 className="text-base font-semibold text-[#F1F3F6]">
+                <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
                   Delete from Private Gallery?
                 </h2>
-                <p className="text-xs text-[#98A2B3] truncate mt-0.5">{pendingDeleteItem.name}</p>
+                <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] truncate mt-0.5">{pendingDeleteItem.name}</p>
               </div>
             </div>
 
-            <p className="text-xs text-[#D0D5DD] leading-relaxed">
+            <p className="text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
               This private {pendingDeleteItem.kind} will be permanently removed from your app
               storage.
             </p>
@@ -495,7 +495,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               <button
                 type="button"
                 onClick={() => setPendingDeleteItem(null)}
-                className="min-h-[44px] px-4 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] text-sm font-medium text-[#D0D5DD]"
+                className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.06] dark:bg-white/[0.06] hover:bg-slate-900/[0.10] dark:hover:bg-white/[0.1] text-sm font-medium text-[#334155] dark:text-[#D0D5DD]"
               >
                 Cancel
               </button>

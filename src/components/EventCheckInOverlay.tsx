@@ -39,22 +39,22 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#0F1115]/95 backdrop-blur-xl flex items-center justify-center p-5"
+      className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-[#0F1115]/95 backdrop-blur-xl flex items-center justify-center p-5"
       role="dialog"
       aria-modal="true"
       aria-label="Event Calm Grounding"
     >
-      <div className="max-w-lg w-full bg-[#171A21] border border-white/[0.08] rounded-3xl p-7 sm:p-9 relative text-center">
+      <div className="max-w-lg w-full bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] rounded-3xl p-7 sm:p-9 relative text-center">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close grounding screen"
-          className="absolute top-5 right-5 w-11 h-11 rounded-full bg-white/[0.04] hover:bg-white/[0.09] flex items-center justify-center text-[#98A2B3] hover:text-[#F1F3F6] transition-colors"
+          className="absolute top-5 right-5 w-11 h-11 rounded-full bg-slate-900/[0.04] dark:bg-white/[0.04] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center justify-center gap-2 text-xs text-[#9EC5AB] mb-2">
+        <div className="flex items-center justify-center gap-2 text-xs text-[#2E6B48] dark:text-[#9EC5AB] mb-2">
           <Wind className="w-4 h-4" />
           <span>Event Calm Mode · {session.eventName}</span>
         </div>
@@ -63,15 +63,15 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
         <div className="relative flex items-center justify-center my-8 h-48">
           <div className="w-40 h-40 rounded-full bg-[#9EC5AB]/10 border border-[#9EC5AB]/30 flex items-center justify-center animate-breathe">
             <div className="w-28 h-28 rounded-full bg-[#9EC5AB]/15 border border-[#9EC5AB]/40 flex flex-col items-center justify-center px-3">
-              <span className="text-sm font-medium text-[#F1F3F6]">{currentPhase.label}</span>
-              <span className="text-xs text-[#9EC5AB] mt-0.5 tabular-nums">
+              <span className="text-sm font-medium text-[#111827] dark:text-[#F1F3F6]">{currentPhase.label}</span>
+              <span className="text-xs text-[#2E6B48] dark:text-[#9EC5AB] mt-0.5 tabular-nums">
                 {currentPhase.seconds}s cadence
               </span>
             </div>
           </div>
         </div>
 
-        <blockquote className="font-display text-xl sm:text-2xl text-[#F1F3F6] leading-relaxed text-balance px-2">
+        <blockquote className="font-display text-xl sm:text-2xl text-[#111827] dark:text-[#F1F3F6] leading-relaxed text-balance px-2">
           “{promptMessage}”
         </blockquote>
 
@@ -81,7 +81,7 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
               href={buildGoogleMapsDirectionsUrl(session.venue)}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full sm:w-auto min-h-[48px] px-5 py-3 rounded-2xl bg-[#1D212A] hover:bg-white/[0.08] border border-white/[0.08] text-sm font-medium text-[#9BC4E2] flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+              className="w-full sm:w-auto min-h-[48px] px-5 py-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm font-medium text-[#255F8A] dark:text-[#9BC4E2] flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
             >
               <Navigation className="w-4 h-4" />
               Navigate to Venue

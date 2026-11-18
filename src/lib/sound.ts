@@ -14,8 +14,11 @@ export const BUILTIN_TONES: BuiltinToneOption[] = [
   { id: 'builtin:sunrise-harp', label: 'Warm Sunrise Arpeggio', kind: 'alarm' },
 ];
 
+export const ALARM_MAX_RING_MS = 60_000;
+
 let audioCtx: AudioContext | null = null;
 let alarmLoopTimer: number | null = null;
+let alarmMaxTimeoutTimer: number | null = null;
 let activeAlarmAudio: HTMLAudioElement | null = null;
 let activeAlarmObjectUrl: string | null = null;
 let activePreviewAudio: HTMLAudioElement | null = null;
@@ -95,9 +98,18 @@ function playBuiltinById(soundId?: string) {
 
 export function startAlarmRinging(
   customTone?: CustomAudioTone | null,
-  soundId?: string
+  soundId?: string,
+  options?: { maxDurationMs?: number; onAutoTimeout?: () => void }
 ) {
   stopAlarmRinging();
+
+  const maxDurationMs = options?.maxDurationMs ?? ALARM_MAX_RING_MS;
+  if (maxDurationMs > 0) {
+    alarmMaxTimeoutTimer = window.setTimeout(() => {
+      stopAlarmRinging();
+      options?.onAutoTimeout?.();
+    }, maxDurationMs);
+  }
 
   if (customTone?.blob) {
     try {
@@ -108,8 +120,19 @@ export function startAlarmRinging(
       activeAlarmObjectUrl = url;
       activeAlarmAudio = audio;
       audio.play().catch(() => {
-        // Fallback to synthesized chime if autoplay/codec fails
-        stopAlarmRinging();
+        // Fallback to synthesized chime if autoplay/codec fails (preserve safety timer)
+        if (activeAlarmAudio) {
+          try {
+            activeAlarmAudio.pause();
+          } catch {
+            // ignore
+          }
+          activeAlarmAudio = null;
+        }
+        if (activeAlarmObjectUrl) {
+          URL.revokeObjectURL(activeAlarmObjectUrl);
+          activeAlarmObjectUrl = null;
+        }
         playBuiltinById(soundId);
         alarmLoopTimer = window.setInterval(() => playBuiltinById(soundId), 2600);
       });
@@ -126,6 +149,10 @@ export function startAlarmRinging(
 }
 
 export function stopAlarmRinging() {
+  if (alarmMaxTimeoutTimer !== null) {
+    window.clearTimeout(alarmMaxTimeoutTimer);
+    alarmMaxTimeoutTimer = null;
+  }
   if (alarmLoopTimer !== null) {
     window.clearInterval(alarmLoopTimer);
     alarmLoopTimer = null;

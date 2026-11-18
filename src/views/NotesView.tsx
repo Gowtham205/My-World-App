@@ -112,7 +112,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
             href={part}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#9BC4E2] hover:underline inline-flex items-center gap-1 break-all"
+            className="text-[#255F8A] dark:text-[#9BC4E2] hover:underline inline-flex items-center gap-1 break-all"
           >
             {part}
             <ExternalLink className="w-3 h-3 shrink-0" />
@@ -127,8 +127,8 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#9BC4E2]">Personal Notes</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <p className="text-xs text-[#255F8A] dark:text-[#9BC4E2]">Personal Notes</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Thoughts, Links & Checklists
           </h1>
         </div>
@@ -145,13 +145,13 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
       {/* Search & Folder Tabs */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-[#98A2B3] absolute left-4 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] absolute left-4 top-1/2 -translate-y-1/2" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search notes, tags, or saved links..."
-            className="w-full min-h-[44px] pl-11 pr-4 rounded-2xl bg-[#171A21] border border-white/[0.08] text-sm text-[#F1F3F6] placeholder-[#98A2B3]/70 focus:outline-none focus:border-[#9BC4E2]/50"
+            className="w-full min-h-[44px] pl-11 pr-4 rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/70 dark:placeholder-[#98A2B3]/70 focus:outline-none focus:border-[#9BC4E2]/50"
           />
         </div>
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -162,8 +162,8 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
               onClick={() => setFolderFilter(folder)}
               className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 folderFilter === folder
-                  ? 'bg-[#9BC4E2]/20 text-[#9BC4E2] border border-[#9BC4E2]/30'
-                  : 'bg-[#171A21] text-[#98A2B3] border border-white/[0.06] hover:text-[#F1F3F6]'
+                  ? 'bg-[#9BC4E2]/20 text-[#255F8A] dark:text-[#9BC4E2] border border-[#9BC4E2]/30'
+                  : 'bg-white dark:bg-[#171A21] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
               }`}
             >
               {folder}
@@ -176,10 +176,10 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
       {editing && (
         <form
           onSubmit={handleSave}
-          className="rounded-3xl bg-[#171A21] border border-[#9BC4E2]/30 p-5 sm:p-7 space-y-4"
+          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#9BC4E2]/30 p-5 sm:p-7 space-y-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-[#F1F3F6]">
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
               {notes.some((n) => n.id === editing.id) ? 'Edit Note' : 'Create Note'}
             </h2>
             <div className="flex items-center gap-2">
@@ -188,8 +188,8 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                 onClick={() => setEditing({ ...editing, isTodoIntent: !editing.isTodoIntent })}
                 className={`min-h-[40px] px-3 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
                   editing.isTodoIntent
-                    ? 'bg-[#F2B8A2]/20 text-[#F2B8A2] border border-[#F2B8A2]/30'
-                    : 'bg-[#1D212A] text-[#98A2B3]'
+                    ? 'bg-[#F2B8A2]/20 text-[#A6482D] dark:text-[#F2B8A2] border border-[#F2B8A2]/30'
+                    : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3]'
                 }`}
               >
                 {editing.isTodoIntent ? 'I have to do this: Yes' : 'Mark "I have to do this"'}
@@ -199,8 +199,8 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                 onClick={() => setEditing({ ...editing, pinned: !editing.pinned })}
                 className={`min-h-[40px] px-3 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap ${
                   editing.pinned
-                    ? 'bg-[#9BC4E2]/20 text-[#9BC4E2]'
-                    : 'bg-[#1D212A] text-[#98A2B3]'
+                    ? 'bg-[#9BC4E2]/20 text-[#255F8A] dark:text-[#9BC4E2]'
+                    : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3]'
                 }`}
               >
                 <Pin className="w-3.5 h-3.5" />
@@ -215,14 +215,14 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
               value={editing.title}
               onChange={(e) => setEditing({ ...editing, title: e.target.value })}
               placeholder="Note title..."
-              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] focus:outline-none focus:border-[#9BC4E2]/50"
+              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] focus:outline-none focus:border-[#9BC4E2]/50"
             />
             <input
               type="text"
               value={editing.folder}
               onChange={(e) => setEditing({ ...editing, folder: e.target.value })}
               placeholder="Folder (e.g. Personal)"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] focus:outline-none focus:border-[#9BC4E2]/50"
+              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] focus:outline-none focus:border-[#9BC4E2]/50"
             />
           </div>
 
@@ -231,12 +231,12 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
             value={editing.content}
             onChange={(e) => setEditing({ ...editing, content: e.target.value })}
             placeholder="Write thoughts, paste links (https://...), or capture ideas..."
-            className="w-full p-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-sm text-[#F1F3F6] leading-relaxed focus:outline-none focus:border-[#9BC4E2]/50"
+            className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] leading-relaxed focus:outline-none focus:border-[#9BC4E2]/50"
           />
 
           {/* Checklist Builder */}
           <div className="space-y-2.5">
-            <p className="text-xs text-[#98A2B3]">Interactive Checklist</p>
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Interactive Checklist</p>
             {editing.checklist.map((item) => (
               <div key={item.id} className="flex items-center gap-2">
                 <input
@@ -250,7 +250,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                       ),
                     })
                   }
-                  className="flex-1 min-h-[40px] px-3 rounded-xl bg-[#1D212A] border border-white/[0.06] text-xs text-[#F1F3F6]"
+                  className="flex-1 min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.06] text-xs text-[#111827] dark:text-[#F1F3F6]"
                 />
                 <button
                   type="button"
@@ -261,7 +261,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                     })
                   }
                   aria-label="Remove checklist item"
-                  className="min-w-[40px] min-h-[40px] rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-[#98A2B3] flex items-center justify-center"
+                  className="min-w-[40px] min-h-[40px] rounded-xl bg-slate-900/[0.04] dark:bg-white/[0.04] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-[#5B6472] dark:text-[#98A2B3] flex items-center justify-center"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -279,12 +279,12 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                   }
                 }}
                 placeholder="Add checklist step..."
-                className="flex-1 min-h-[44px] px-4 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6]"
+                className="flex-1 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
               />
               <button
                 type="button"
                 onClick={addChecklistItem}
-                className="min-h-[44px] px-4 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] text-xs font-medium text-[#F1F3F6] whitespace-nowrap"
+                className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.06] dark:bg-white/[0.06] hover:bg-slate-900/[0.10] dark:hover:bg-white/[0.1] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] whitespace-nowrap"
               >
                 Add Step
               </button>
@@ -308,7 +308,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                 }
               }}
               placeholder="Type tag & press Enter..."
-              className="min-h-[40px] px-3 rounded-xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6]"
+              className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
             />
             {editing.tags.map((tag) => (
               <button
@@ -317,7 +317,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                 onClick={() =>
                   setEditing({ ...editing, tags: editing.tags.filter((t) => t !== tag) })
                 }
-                className="text-xs text-[#98A2B3] hover:text-[#F2B8A2]"
+                className="text-xs text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2]"
               >
                 #{tag} ×
               </button>
@@ -328,7 +328,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
             <button
               type="button"
               onClick={() => setEditing(null)}
-              className="min-h-[44px] px-4 py-2 rounded-2xl bg-white/[0.05] text-sm text-[#D0D5DD] hover:bg-white/[0.09] whitespace-nowrap"
+              className="min-h-[44px] px-4 py-2 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09] whitespace-nowrap"
             >
               Cancel
             </button>
@@ -344,8 +344,8 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
 
       {/* Notes Grid */}
       {filteredNotes.length === 0 ? (
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-10 text-center">
-          <p className="text-sm text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
+          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
             No notes match this filter yet. Tap “New Note” to write down a thought or save a link.
           </p>
         </div>
@@ -354,28 +354,28 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
           {filteredNotes.map((note) => (
             <article
               key={note.id}
-              className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4"
+              className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4"
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs text-[#98A2B3] flex items-center gap-1.5 flex-wrap">
-                      <Folder className="w-3.5 h-3.5 text-[#9BC4E2]" />
+                    <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] flex items-center gap-1.5 flex-wrap">
+                      <Folder className="w-3.5 h-3.5 text-[#255F8A] dark:text-[#9BC4E2]" />
                       <span>{note.folder}</span>
                       {note.isTodoIntent && (
                         <>
                           <span aria-hidden="true">·</span>
-                          <span className="text-[#F2B8A2]">I have to do this</span>
+                          <span className="text-[#A6482D] dark:text-[#F2B8A2]">I have to do this</span>
                         </>
                       )}
                       {note.pinned && (
                         <>
                           <span aria-hidden="true">·</span>
-                          <span className="text-[#9BC4E2]">Pinned</span>
+                          <span className="text-[#255F8A] dark:text-[#9BC4E2]">Pinned</span>
                         </>
                       )}
                     </p>
-                    <h2 className="text-base font-semibold text-[#F1F3F6] mt-1">
+                    <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6] mt-1">
                       {note.title}
                     </h2>
                   </div>
@@ -385,15 +385,15 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                       type="button"
                       onClick={() => onSaveNote({ ...note, pinned: !note.pinned })}
                       aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
-                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] flex items-center justify-center text-[#98A2B3] hover:text-[#9BC4E2]"
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#255F8A] dark:hover:text-[#9BC4E2]"
                     >
-                      <Pin className={`w-4 h-4 ${note.pinned ? 'text-[#9BC4E2]' : ''}`} />
+                      <Pin className={`w-4 h-4 ${note.pinned ? 'text-[#255F8A] dark:text-[#9BC4E2]' : ''}`} />
                     </button>
                     <button
                       type="button"
                       onClick={() => onDeleteNote(note.id)}
                       aria-label="Delete note"
-                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-white/[0.06] flex items-center justify-center text-[#98A2B3] hover:text-[#F2B8A2]"
+                      className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2]"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -401,7 +401,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                 </div>
 
                 {note.content && (
-                  <p className="text-sm text-[#D0D5DD] whitespace-pre-wrap leading-relaxed">
+                  <p className="text-sm text-[#334155] dark:text-[#D0D5DD] whitespace-pre-wrap leading-relaxed">
                     {renderContentWithLinks(note.content)}
                   </p>
                 )}
@@ -413,14 +413,14 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                         key={item.id}
                         type="button"
                         onClick={() => toggleChecklistInCard(note, item.id)}
-                        className="w-full min-h-[38px] text-left flex items-center gap-2.5 text-sm text-[#D0D5DD] hover:text-white transition-colors"
+                        className="w-full min-h-[38px] text-left flex items-center gap-2.5 text-sm text-[#334155] dark:text-[#D0D5DD] hover:text-[#111827] dark:hover:text-white transition-colors"
                       >
                         {item.done ? (
-                          <CheckSquare className="w-4 h-4 text-[#9EC5AB] shrink-0" />
+                          <CheckSquare className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB] shrink-0" />
                         ) : (
-                          <Square className="w-4 h-4 text-[#98A2B3] shrink-0" />
+                          <Square className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] shrink-0" />
                         )}
-                        <span className={item.done ? 'line-through text-[#98A2B3]' : ''}>
+                        <span className={item.done ? 'line-through text-[#5B6472] dark:text-[#98A2B3]' : ''}>
                           {item.text}
                         </span>
                       </button>
@@ -429,8 +429,8 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                 )}
               </div>
 
-              <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-3">
-                <p className="text-xs text-[#98A2B3] truncate">
+              <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-center justify-between gap-3">
+                <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] truncate">
                   {note.tags.length > 0
                     ? note.tags.map((t) => `#${t}`).join(' · ')
                     : `Updated ${formatShortDate(note.updatedAt.slice(0, 10))}`}
@@ -438,7 +438,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
                 <button
                   type="button"
                   onClick={() => setEditing(note)}
-                  className="min-h-[38px] px-3 rounded-xl hover:bg-white/[0.06] text-xs font-medium text-[#9BC4E2] whitespace-nowrap"
+                  className="min-h-[38px] px-3 rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] whitespace-nowrap"
                 >
                   Edit
                 </button>

@@ -364,11 +364,11 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-xs text-[#9EC5AB]">Real-Time Bidirectional Voice · Gemini Live</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]">Real-Time Bidirectional Voice · Gemini Live</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Live Voice Sanctuary
           </h1>
-          <p className="text-sm text-[#98A2B3] mt-1">
+          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3] mt-1">
             Speak naturally in real time—interrupt anytime, listen calmly, and capture reflections.
           </p>
         </div>
@@ -377,7 +377,7 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
           <button
             type="button"
             onClick={() => void handleSaveTranscript()}
-            className="min-h-[44px] px-4 rounded-2xl bg-[#171A21] hover:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-[#9BC4E2] inline-flex items-center gap-2 whitespace-nowrap shrink-0"
+            className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] inline-flex items-center gap-2 whitespace-nowrap shrink-0"
           >
             <BookOpen className="w-4 h-4" />
             Save Transcript to Notes
@@ -388,28 +388,28 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#F2B8A2]"
+          className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2]"
         >
           {errorMsg}
         </div>
       )}
 
       {savedNotice && (
-        <p className="text-xs text-[#9EC5AB]" role="status">
+        <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]" role="status">
           {savedNotice}
         </p>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <section className="lg:col-span-5 rounded-3xl bg-[#171A21] border border-white/[0.07] p-6 flex flex-col items-center justify-between gap-5">
+        <section className="lg:col-span-5 rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-6 flex flex-col items-center justify-between gap-5">
           <div className="w-full grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-[#98A2B3] block mb-1">Voice</label>
+              <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block mb-1">Voice</label>
               <select
                 disabled={status !== 'idle'}
                 value={voice}
                 onChange={(e) => setVoice(e.target.value as (typeof VOICES)[number])}
-                className="w-full min-h-[42px] px-3 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6] disabled:opacity-50"
+                className="w-full min-h-[42px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] disabled:opacity-50"
               >
                 {VOICES.map((v) => (
                   <option key={v} value={v}>
@@ -419,14 +419,14 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
               </select>
             </div>
             <div>
-              <label className="text-xs text-[#98A2B3] block mb-1">Companion Mode</label>
+              <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block mb-1">Companion Mode</label>
               <select
                 disabled={status !== 'idle'}
                 value={persona}
                 onChange={(e) =>
                   setPersona(e.target.value as (typeof PERSONAS)[number]['id'])
                 }
-                className="w-full min-h-[42px] px-3 rounded-2xl bg-[#1D212A] border border-white/[0.08] text-xs text-[#F1F3F6] disabled:opacity-50"
+                className="w-full min-h-[42px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] disabled:opacity-50"
               >
                 {PERSONAS.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -442,10 +442,10 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <Volume2
                 className={`w-7 h-7 ${
-                  status === 'live' ? 'text-[#9EC5AB]' : 'text-[#9BC4E2]'
+                  status === 'live' ? 'text-[#2E6B48] dark:text-[#9EC5AB]' : 'text-[#255F8A] dark:text-[#9BC4E2]'
                 }`}
               />
-              <span className="text-xs font-medium text-[#D0D5DD] mt-2">
+              <span className="text-xs font-medium text-[#334155] dark:text-[#D0D5DD] mt-2">
                 {status === 'idle'
                   ? 'Ready'
                   : status === 'connecting'
@@ -474,8 +474,8 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
                   onClick={() => setMuted((m) => !m)}
                   className={`min-h-[48px] px-4 rounded-2xl border text-xs font-medium inline-flex items-center justify-center gap-2 ${
                     muted
-                      ? 'bg-[#F2B8A2]/15 border-[#F2B8A2]/40 text-[#F2B8A2]'
-                      : 'bg-[#1D212A] border-white/[0.08] text-[#F1F3F6]'
+                      ? 'bg-[#F2B8A2]/15 border-[#F2B8A2]/40 text-[#A6482D] dark:text-[#F2B8A2]'
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] border-slate-900/[0.10] dark:border-white/[0.08] text-[#111827] dark:text-[#F1F3F6]'
                   }`}
                 >
                   {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -494,14 +494,14 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
           </div>
         </section>
 
-        <section className="lg:col-span-7 rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 flex flex-col h-[420px]">
-          <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-            <h2 className="text-sm font-semibold text-[#F1F3F6]">Live Transcript</h2>
+        <section className="lg:col-span-7 rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col h-[420px]">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-900/[0.08] dark:border-white/[0.06]">
+            <h2 className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6]">Live Transcript</h2>
             {transcripts.length > 0 && (
               <button
                 type="button"
                 onClick={() => setTranscripts([])}
-                className="text-xs text-[#98A2B3] hover:text-[#F1F3F6]"
+                className="text-xs text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
               >
                 Clear
               </button>
@@ -510,7 +510,7 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
 
           <div className="flex-1 overflow-y-auto pt-4 space-y-3">
             {transcripts.length === 0 ? (
-              <p className="text-xs text-[#98A2B3] leading-relaxed">
+              <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
                 Start a live voice session and speak whenever you are ready. Both your spoken words
                 and Gemini’s responses appear here automatically.
               </p>
@@ -518,16 +518,16 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
               transcripts.map((entry) => (
                 <div
                   key={entry.id}
-                  className="rounded-2xl bg-[#1D212A] border border-white/[0.05] p-3.5 space-y-1"
+                  className="rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.06] dark:border-white/[0.05] p-3.5 space-y-1"
                 >
                   <p
                     className={`text-[11px] font-medium ${
-                      entry.speaker === 'You' ? 'text-[#9BC4E2]' : 'text-[#9EC5AB]'
+                      entry.speaker === 'You' ? 'text-[#255F8A] dark:text-[#9BC4E2]' : 'text-[#2E6B48] dark:text-[#9EC5AB]'
                     }`}
                   >
                     {entry.speaker}
                   </p>
-                  <p className="text-xs sm:text-sm text-[#F1F3F6] leading-relaxed">
+                  <p className="text-xs sm:text-sm text-[#111827] dark:text-[#F1F3F6] leading-relaxed">
                     {entry.text}
                   </p>
                 </div>

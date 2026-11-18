@@ -65,12 +65,12 @@ interface CustomTooltipProps {
 const SanctuaryTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
   return (
-    <div className="rounded-2xl bg-[#13161C] border border-white/[0.12] px-3.5 py-2.5 shadow-lg">
-      <p className="text-xs font-medium text-[#F1F3F6] mb-1.5">{label}</p>
+    <div className="rounded-2xl bg-white dark:bg-[#13161C] border border-slate-900/[0.14] dark:border-white/[0.12] px-3.5 py-2.5 shadow-lg">
+      <p className="text-xs font-medium text-[#111827] dark:text-[#F1F3F6] mb-1.5">{label}</p>
       <div className="space-y-1">
         {payload.map((entry, idx) => (
           <div key={idx} className="flex items-center justify-between gap-4 text-xs">
-            <span className="text-[#98A2B3]">{entry.name}</span>
+            <span className="text-[#5B6472] dark:text-[#98A2B3]">{entry.name}</span>
             <span className="font-mono-tabular font-medium" style={{ color: entry.color }}>
               {entry.value}
             </span>
@@ -183,17 +183,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[#9EC5AB]">Analytics · Local Activity Trends</p>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#F1F3F6] mt-1">
+          <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]">Analytics · Local Activity Trends</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Productivity & Wellbeing
           </h1>
-          <p className="text-sm text-[#98A2B3] mt-1">
+          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3] mt-1">
             Derived strictly from your local tasks, notes, and Event Calm Mode sessions.
           </p>
         </div>
 
         {/* Time Range Switcher */}
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#171A21] border border-white/[0.06] self-start sm:self-auto">
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.06] self-start sm:self-auto">
           {([7, 14, 30] as TimeRangeDays[]).map((days) => (
             <button
               key={days}
@@ -202,7 +202,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               className={`min-h-[38px] px-3.5 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
                 rangeDays === days
                   ? 'bg-[#9EC5AB] text-[#0F1115] font-semibold'
-                  : 'text-[#98A2B3] hover:text-[#F1F3F6]'
+                  : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
               }`}
             >
               {days} Days
@@ -213,72 +213,72 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
       {/* Top 4 KPI Summary Cards */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5">
-          <div className="flex items-center justify-between text-xs text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5">
+          <div className="flex items-center justify-between text-xs text-[#5B6472] dark:text-[#98A2B3]">
             <span>Tasks Completed</span>
-            <CheckCircle2 className="w-4 h-4 text-[#9EC5AB]" />
+            <CheckCircle2 className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />
           </div>
-          <p className="font-mono-tabular text-2xl sm:text-3xl font-semibold text-[#F1F3F6] mt-2">
+          <p className="font-mono-tabular text-2xl sm:text-3xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-2">
             {totals.tasksDoneInRange}
           </p>
-          <p className="text-xs text-[#98A2B3] mt-1 tabular-nums">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 tabular-nums">
             {totals.completionRate}% overall completion
           </p>
         </div>
 
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5">
-          <div className="flex items-center justify-between text-xs text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5">
+          <div className="flex items-center justify-between text-xs text-[#5B6472] dark:text-[#98A2B3]">
             <span>Notes Activity</span>
-            <FileText className="w-4 h-4 text-[#9BC4E2]" />
+            <FileText className="w-4 h-4 text-[#255F8A] dark:text-[#9BC4E2]" />
           </div>
-          <p className="font-mono-tabular text-2xl sm:text-3xl font-semibold text-[#F1F3F6] mt-2">
+          <p className="font-mono-tabular text-2xl sm:text-3xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-2">
             {totals.notesInRange}
           </p>
-          <p className="text-xs text-[#98A2B3] mt-1 tabular-nums">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 tabular-nums">
             {totals.checklistDone} checklist steps done
           </p>
         </div>
 
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5">
-          <div className="flex items-center justify-between text-xs text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5">
+          <div className="flex items-center justify-between text-xs text-[#5B6472] dark:text-[#98A2B3]">
             <span>Event Calm Mode</span>
-            <Wind className="w-4 h-4 text-[#BEB4DC]" />
+            <Wind className="w-4 h-4 text-[#5B4D8A] dark:text-[#BEB4DC]" />
           </div>
-          <p className="font-mono-tabular text-2xl sm:text-3xl font-semibold text-[#F1F3F6] mt-2">
+          <p className="font-mono-tabular text-2xl sm:text-3xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-2">
             {totals.calmInRange}m
           </p>
-          <p className="text-xs text-[#98A2B3] mt-1 tabular-nums">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 tabular-nums">
             {eventSessions.length} sessions configured
           </p>
         </div>
 
-        <div className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5">
-          <div className="flex items-center justify-between text-xs text-[#98A2B3]">
+        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5">
+          <div className="flex items-center justify-between text-xs text-[#5B6472] dark:text-[#98A2B3]">
             <span>Ideas & Grounding</span>
-            <Lightbulb className="w-4 h-4 text-[#F2B8A2]" />
+            <Lightbulb className="w-4 h-4 text-[#A6482D] dark:text-[#F2B8A2]" />
           </div>
-          <p className="font-mono-tabular text-2xl sm:text-3xl font-semibold text-[#F1F3F6] mt-2">
+          <p className="font-mono-tabular text-2xl sm:text-3xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-2">
             {ideas.length + quotes.length}
           </p>
-          <p className="text-xs text-[#98A2B3] mt-1 tabular-nums">
+          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 tabular-nums">
             {ideas.length} ideas · {quotes.length} quotes
           </p>
         </div>
       </section>
 
       {/* Primary Daily Trend Area Chart */}
-      <section className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-7 space-y-5">
+      <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-7 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-[#F1F3F6]">
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
               Daily Activity & Calm Rhythm
             </h2>
-            <p className="text-xs text-[#98A2B3] mt-0.5">
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
               Compare tasks finished, notes written, and minutes spent in Event Calm Mode
             </p>
           </div>
 
-          <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#13161C] border border-white/[0.06] self-start sm:self-auto">
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white dark:bg-[#13161C] border border-slate-900/[0.08] dark:border-white/[0.06] self-start sm:self-auto">
             {(
               [
                 { id: 'all', label: 'All Metrics' },
@@ -292,8 +292,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 onClick={() => setMetricFocus(opt.id)}
                 className={`min-h-[36px] px-3 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
                   metricFocus === opt.id
-                    ? 'bg-[#1D212A] text-[#F1F3F6]'
-                    : 'text-[#98A2B3] hover:text-[#F1F3F6]'
+                    ? 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#111827] dark:text-[#F1F3F6]'
+                    : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
                 }`}
               >
                 {opt.label}
@@ -319,17 +319,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   <stop offset="95%" stopColor="#BEB4DC" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+              <CartesianGrid stroke="rgba(148,163,184,0.2)" vertical={false} />
               <XAxis
                 dataKey="label"
-                stroke="#98A2B3"
-                tick={{ fill: '#98A2B3', fontSize: 11 }}
+                stroke="#64748B"
+                tick={{ fill: '#64748B', fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                stroke="#98A2B3"
-                tick={{ fill: '#98A2B3', fontSize: 11 }}
+                stroke="#64748B"
+                tick={{ fill: '#64748B', fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
@@ -373,7 +373,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </div>
 
         {/* Clean Unboxed Legend */}
-        <div className="flex flex-wrap items-center gap-5 text-xs text-[#98A2B3] pt-1">
+        <div className="flex flex-wrap items-center gap-5 text-xs text-[#5B6472] dark:text-[#98A2B3] pt-1">
           {(metricFocus === 'all' || metricFocus === 'productivity') && (
             <>
               <span className="inline-flex items-center gap-2">
@@ -398,10 +398,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       {/* Secondary 2-Column Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Balance Bar Chart */}
-        <section className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 space-y-4">
+        <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-[#F1F3F6]">Tasks by Life Area</h2>
-            <p className="text-xs text-[#98A2B3] mt-0.5">
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">Tasks by Life Area</h2>
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
               Completed vs. open reminders across your categories
             </p>
           </div>
@@ -412,17 +412,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 data={categoryBreakdown}
                 margin={{ top: 8, right: 8, left: -24, bottom: 0 }}
               >
-                <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <CartesianGrid stroke="rgba(148,163,184,0.2)" vertical={false} />
                 <XAxis
                   dataKey="category"
-                  stroke="#98A2B3"
-                  tick={{ fill: '#98A2B3', fontSize: 11 }}
+                  stroke="#64748B"
+                  tick={{ fill: '#64748B', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  stroke="#98A2B3"
-                  tick={{ fill: '#98A2B3', fontSize: 11 }}
+                  stroke="#64748B"
+                  tick={{ fill: '#64748B', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   allowDecimals={false}
@@ -436,12 +436,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </section>
 
         {/* Event Calm Mode Daily Minutes Bar Chart */}
-        <section className="rounded-3xl bg-[#171A21] border border-white/[0.07] p-5 sm:p-6 space-y-4 flex flex-col justify-between">
+        <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 space-y-4 flex flex-col justify-between">
           <div>
-            <h2 className="text-base font-semibold text-[#F1F3F6]">
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
               Event Calm & Breathing Time
             </h2>
-            <p className="text-xs text-[#98A2B3] mt-0.5">
+            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
               Minutes spent in grounding sessions and active Event Mode windows
             </p>
           </div>
@@ -449,17 +449,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           <div className="h-52 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailySeries} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <CartesianGrid stroke="rgba(148,163,184,0.2)" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  stroke="#98A2B3"
-                  tick={{ fill: '#98A2B3', fontSize: 11 }}
+                  stroke="#64748B"
+                  tick={{ fill: '#64748B', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  stroke="#98A2B3"
-                  tick={{ fill: '#98A2B3', fontSize: 11 }}
+                  stroke="#64748B"
+                  tick={{ fill: '#64748B', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   allowDecimals={false}
@@ -475,10 +475,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             </ResponsiveContainer>
           </div>
 
-          <div className="pt-3 border-t border-white/[0.06] text-xs text-[#98A2B3] flex flex-wrap items-center justify-between gap-2">
+          <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] text-xs text-[#5B6472] dark:text-[#98A2B3] flex flex-wrap items-center justify-between gap-2">
             <span>
               Most focused day:{' '}
-              <span className="text-[#F1F3F6] font-medium">
+              <span className="text-[#111827] dark:text-[#F1F3F6] font-medium">
                 {totals.bestFocusDay &&
                 totals.bestFocusDay.tasksCompleted + totals.bestFocusDay.notesWritten > 0
                   ? `${totals.bestFocusDay.label} (${
@@ -489,7 +489,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             </span>
             <span>
               Calmest day:{' '}
-              <span className="text-[#BEB4DC] font-medium">
+              <span className="text-[#5B4D8A] dark:text-[#BEB4DC] font-medium">
                 {totals.bestCalmDay && totals.bestCalmDay.calmMinutes > 0
                   ? `${totals.bestCalmDay.label} (${totals.bestCalmDay.calmMinutes}m)`
                   : 'Try Calm Breathing anytime'}
