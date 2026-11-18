@@ -53,6 +53,7 @@ import {
   deleteFromStore,
   getAllFromStore,
   getCalmMinutesByDate,
+  getDailyQuoteSelection,
   getDefaultNotificationSoundId,
   getLocalPreferredName,
   getNotificationHistory,
@@ -60,6 +61,7 @@ import {
   getSetting,
   putInStore,
   recordCalmMinutes,
+  saveDailyQuoteSelection,
   saveLocalPreferredName,
   saveNotificationHistory,
   saveTheme,
@@ -88,6 +90,7 @@ import {
   resolveSoundName,
   startAlarmRinging,
   stopAlarmRinging,
+  stopSoundPreview,
 } from './lib/sound';
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
@@ -459,6 +462,19 @@ export function App() {
       : `alarm:${alarm.id}`;
   }, []);
 
+  const handleStopAllSoundscapes = useCallback(() => {
+    soundscapeEngine.stopAll();
+    setActiveSoundscapes({
+      rain: false,
+      forest: false,
+      ocean: false,
+      'white-noise': false,
+      'brown-noise': false,
+      hearth: false,
+    });
+    setSoundTimerRemainingSec(null);
+  }, []);
+
   const snoozeAlarmByEntity = useCallback(
     async (
       targetAlarm: AlarmItem,
@@ -500,7 +516,7 @@ export function App() {
           kind: 'alarm',
           status: 'missed',
           title: `Auto-snoozed ${effectiveMinutes}m · ${alarmTitle}`,
-          body: `Stopped ringing after 1 minute. Next ring at ${formattedTime}.`,
+          body: updated.linkedReminderNotes || `Next alarm at ${formattedTime}.`,
           scheduledAt: snoozeTarget.toISOString(),
           createdAt: new Date().toISOString(),
           read: false,
@@ -511,7 +527,7 @@ export function App() {
           dedupeKey: autoKey,
           slotSeed,
           title: `Snoozed ${effectiveMinutes}m · ${alarmTitle}`,
-          body: `Stopped after 1 min · Next alarm at ${formattedTime}`,
+          body: updated.linkedReminderNotes || `Next alarm at ${formattedTime}`,
           channel: 'alarm',
           route: 'alarms',
           entityId: updated.id,
@@ -550,7 +566,7 @@ export function App() {
   }, []);
 
   const triggerActiveAlarm = useCallback(
-    (alarm: AlarmItem, options?: { isTest?: boolean }) => {
+    async (alarm: AlarmItem, options?: { isTest?: boolean }) => {
       const soundLabel =
         alarm.soundName || resolveSoundName(customAudioTones, alarm.soundId);
       const alarmWithSound: AlarmItem = {
@@ -560,21 +576,6 @@ export function App() {
       };
       setRingingAlarm(alarmWithSound);
       setRingingStartedAtMs(Date.now());
-
-      const matchedTone = alarm.soundId
-        ? customAudioTones.find((t) => t.id === alarm.soundId)
-        : undefined;
-
-      startAlarmRinging(matchedTone, alarm.soundId, {
-        maxDurationMs: ALARM_MAX_RING_MS,
-        onAutoTimeout: () => {
-          const latestAlarm =
-            alarmsRef.current.find((a) => a.id === alarmWithSound.id) || alarmWithSound;
-          void snoozeAlarmByEntity(latestAlarm, latestAlarm.snoozeMinutes || 5, {
-            autoSnoozed: true,
-          });
-        },
-      });
 
       const now = new Date();
       const today = getTodayStr();
@@ -593,7 +594,7 @@ export function App() {
           kind: 'alarm',
           status: 'delivered',
           title: alarm.linkedReminderTitle || alarm.label,
-          body: alarm.linkedReminderNotes || `Alarm for ${formatTime12h(currentHHMM)} · ${soundLabel}`,
+          body: alarm.linkedReminderNotes || `Alarm for ${formatTime12h(currentHHMM)}`,
           scheduledAt: now.toISOString(),
           createdAt: now.toISOString(),
           read: true,
@@ -601,11 +602,12 @@ export function App() {
         });
       }
 
-      void sendSystemNotification({
+      // 1. Post the notification tray card FIRST before starting alarm audio
+      await sendSystemNotification({
         dedupeKey: alarmDedupeKey,
         slotSeed,
         title: alarm.linkedReminderTitle || alarm.label,
-        body: alarm.linkedReminderNotes || `Scheduled for ${formatTime12h(alarm.time)}`,
+        body: (alarm.linkedReminderNotes || '').trim(),
         channel: 'alarm',
         route: 'alarms',
         entityId: alarm.id,
@@ -615,8 +617,36 @@ export function App() {
         soundLabel,
         snoozeMinutes: alarmWithSound.snoozeMinutes,
       });
+
+      // Brief yield so the OS posts the notification before sound begins
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
+
+      // 2. Stop any playing soundscapes or audio previews, then ring alarm (which also claims OS audio focus)
+      handleStopAllSoundscapes();
+      stopSoundPreview();
+
+      const matchedTone = alarm.soundId
+        ? customAudioTones.find((t) => t.id === alarm.soundId)
+        : undefined;
+
+      startAlarmRinging(matchedTone, alarm.soundId, {
+        maxDurationMs: ALARM_MAX_RING_MS,
+        onAutoTimeout: () => {
+          const latestAlarm =
+            alarmsRef.current.find((a) => a.id === alarmWithSound.id) || alarmWithSound;
+          void snoozeAlarmByEntity(latestAlarm, latestAlarm.snoozeMinutes || 5, {
+            autoSnoozed: true,
+          });
+        },
+      });
     },
-    [customAudioTones, getAlarmSlotSeed, pushInboxNotification, snoozeAlarmByEntity]
+    [
+      customAudioTones,
+      getAlarmSlotSeed,
+      handleStopAllSoundscapes,
+      pushInboxNotification,
+      snoozeAlarmByEntity,
+    ]
   );
 
   // Setup Android notification channels, tap routing, & action buttons (Snooze / Dismiss)
@@ -747,7 +777,10 @@ export function App() {
 
         const isSnoozeDue =
           alarm.snoozedUntilDate === today && alarm.snoozedUntilTime === currentHHMM;
+        const matchesDateIfOneTime =
+          !alarm.date || alarm.repeatDays.length > 0 || alarm.date === today;
         const isRegularDue =
+          matchesDateIfOneTime &&
           alarm.time === currentHHMM &&
           (alarm.repeatDays.length === 0 || alarm.repeatDays.includes(weekday));
 
@@ -763,15 +796,48 @@ export function App() {
         setAlarms((prev) => prev.map((a) => (a.id === alarm.id ? updatedAlarm : a)));
         await putInStore('alarms', updatedAlarm);
 
-        triggerActiveAlarm(updatedAlarm);
+        void triggerActiveAlarm(updatedAlarm);
         break;
       }
 
-      // 1b. Check Unlinked Smart Task Reminders for custom reminder/notification sound
+      // 1b. Check Smart Task Reminders (linked fallback if alarm missing, plus unlinked reminders)
       for (const task of tasks) {
-        if (task.completed || task.linkedAlarmId) continue;
+        if (task.completed) continue;
         if (!task.dueTime || task.dueDate !== today || task.dueTime !== currentHHMM) continue;
         if (task.lastNotifiedMinute === minuteKey) continue;
+
+        if (task.linkedAlarmId) {
+          const linkedAlarm = alarms.find((a) => a.id === task.linkedAlarmId);
+          // If linkedAlarm exists, loop #1 above handles it. Only fall back if orphaned/missing.
+          if (linkedAlarm) continue;
+
+          const soundId = task.soundId || defaultNotificationSoundId;
+          const soundLabel = task.soundName || resolveSoundName(customAudioTones, soundId);
+          const fallbackAlarm: AlarmItem = {
+            id: task.linkedAlarmId,
+            label: task.title,
+            time: task.dueTime,
+            date: task.dueDate,
+            enabled: false,
+            repeatDays: task.recurrence === 'Daily' ? [0, 1, 2, 3, 4, 5, 6] : [],
+            snoozeMinutes: 5,
+            linkedReminderId: task.id,
+            linkedReminderTitle: task.title,
+            linkedReminderNotes: task.notes,
+            soundId,
+            soundName: soundLabel,
+            lastTriggeredMinute: minuteKey,
+            createdAt: task.createdAt,
+          };
+          const updatedTask: TaskReminderItem = {
+            ...task,
+            lastNotifiedMinute: minuteKey,
+          };
+          setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
+          await putInStore('tasks', updatedTask);
+          void triggerActiveAlarm(fallbackAlarm);
+          break;
+        }
 
         const soundId = task.soundId || defaultNotificationSoundId;
         const soundLabel = task.soundName || resolveSoundName(customAudioTones, soundId);
@@ -784,27 +850,24 @@ export function App() {
         setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
         await putInStore('tasks', updatedTask);
 
-        playNotificationSound(customAudioTones, soundId);
-        setActiveReminderNotice(updatedTask);
-
         const taskDedupeKey = `task:${task.id}:${minuteKey}`;
         pushInboxNotification({
           dedupeKey: taskDedupeKey,
           kind: 'reminder',
           status: 'delivered',
           title: task.title,
-          body: task.notes || `Scheduled reminder at ${formatTime12h(currentHHMM)} · ${soundLabel}`,
+          body: task.notes || `Scheduled reminder at ${formatTime12h(currentHHMM)}`,
           scheduledAt: now.toISOString(),
           createdAt: now.toISOString(),
           read: false,
           route: 'tasks',
         });
 
-        void sendSystemNotification({
+        await sendSystemNotification({
           dedupeKey: taskDedupeKey,
           slotSeed: `task:${task.id}`,
           title: task.title,
-          body: task.notes || `Scheduled reminder at ${formatTime12h(currentHHMM)}`,
+          body: (task.notes || '').trim(),
           channel: 'reminder',
           route: 'tasks',
           entityId: task.id,
@@ -814,6 +877,10 @@ export function App() {
           soundLabel,
           snoozeMinutes: 5,
         });
+
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
+        setActiveReminderNotice(updatedTask);
+        playNotificationSound(customAudioTones, soundId);
         break;
       }
 
@@ -943,8 +1010,16 @@ export function App() {
   };
 
   const deleteTask = async (id: string) => {
+    const target = tasks.find((t) => t.id === id);
     await deleteFromStore('tasks', id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    void removeNotificationBySlotSeed(`task:${id}`);
+
+    if (target?.linkedAlarmId) {
+      await deleteFromStore('alarms', target.linkedAlarmId);
+      setAlarms((prev) => prev.filter((a) => a.id !== target.linkedAlarmId));
+      void removeNotificationBySlotSeed(`alarm:${target.linkedAlarmId}`);
+    }
   };
 
   const saveBirthday = async (entry: BirthdayEntry) => {
@@ -1048,16 +1123,61 @@ export function App() {
     persistDefaultNotificationSoundId(soundId);
   };
 
+  const [dailyQuoteId, setDailyQuoteId] = useState<string | null>(() => {
+    const saved = getDailyQuoteSelection();
+    return saved && saved.date === getTodayStr() ? saved.quoteId : null;
+  });
+
+  useEffect(() => {
+    if (quotes.length === 0) return;
+    const today = getTodayStr();
+    const saved = getDailyQuoteSelection();
+
+    if (saved && saved.date === today && quotes.some((q) => q.id === saved.quoteId)) {
+      if (dailyQuoteId !== saved.quoteId) {
+        setDailyQuoteId(saved.quoteId);
+      }
+      return;
+    }
+
+    // New day: automatically select a fresh daily quote different from yesterday's quote
+    const daysSinceEpoch = Math.floor(Date.now() / 86_400_000);
+    const pool =
+      quotes.length > 1 && saved?.quoteId
+        ? quotes.filter((q) => q.id !== saved.quoteId)
+        : quotes;
+    const chosen = pool[daysSinceEpoch % pool.length] || quotes[0];
+    if (chosen) {
+      saveDailyQuoteSelection(today, chosen.id);
+      setDailyQuoteId(chosen.id);
+    }
+  }, [quotes, dailyQuoteId]);
+
+  const featuredDailyQuote = useMemo(() => {
+    if (quotes.length === 0) return null;
+    return (
+      (dailyQuoteId ? quotes.find((q) => q.id === dailyQuoteId) : undefined) ||
+      quotes.find((q) => q.pinnedToHome) ||
+      quotes[0]
+    );
+  }, [quotes, dailyQuoteId]);
+
   const handleShuffleHomeQuote = async () => {
     if (quotes.length <= 1) return;
-    const currentPinned = quotes.find((q) => q.pinnedToHome);
-    const candidates = quotes.filter((q) => q.id !== currentPinned?.id);
+    const currentId = featuredDailyQuote?.id;
+    const candidates = quotes.filter((q) => q.id !== currentId);
     const next = candidates[Math.floor(Math.random() * candidates.length)];
     if (!next) return;
-    if (currentPinned) {
-      await saveQuote({ ...currentPinned, pinnedToHome: false });
+    const today = getTodayStr();
+    saveDailyQuoteSelection(today, next.id);
+    setDailyQuoteId(next.id);
+    const prevPinned = quotes.find((q) => q.pinnedToHome);
+    if (prevPinned && prevPinned.id !== next.id) {
+      await saveQuote({ ...prevPinned, pinnedToHome: false });
     }
-    await saveQuote({ ...next, pinnedToHome: true });
+    if (!next.pinnedToHome) {
+      await saveQuote({ ...next, pinnedToHome: true });
+    }
   };
 
   const handleOpenBreathing = (session: EventCalmSession) => {
@@ -1246,18 +1366,7 @@ export function App() {
     soundscapeEngine.setMasterVolume(vol);
   };
 
-  const handleStopAllSoundscapes = () => {
-    soundscapeEngine.stopAll();
-    setActiveSoundscapes({
-      rain: false,
-      forest: false,
-      ocean: false,
-      'white-noise': false,
-      'brown-noise': false,
-      hearth: false,
-    });
-    setSoundTimerRemainingSec(null);
-  };
+  // handleStopAllSoundscapes defined above triggerActiveAlarm
 
   const handleApplySoundPreset = (mix: Partial<Record<SoundscapeId, number>>) => {
     soundscapeEngine.stopAll();
@@ -1363,13 +1472,21 @@ export function App() {
     [inboxNotifications]
   );
 
-  const activeDisplayName =
+  const preferredGreetingName = (
     localPreferredName ||
     userProfile?.preferredName ||
     userProfile?.displayName ||
     authUser?.displayName ||
+    ''
+  ).trim();
+
+  const activeDisplayName =
+    preferredGreetingName ||
     authUser?.email?.split('@')[0] ||
     'My World';
+
+  const profileAvatarInitial =
+    (preferredGreetingName || authUser?.email || 'M')[0]?.toUpperCase() || 'M';
 
   const handleSignOut = async () => {
     setVaultKey(null);
@@ -1591,23 +1708,25 @@ export function App() {
                 type="button"
                 onClick={() => setProfileDrawerOpen(true)}
                 aria-label="Open Profile & Settings"
-                className="min-h-[44px] px-2.5 -ml-2 rounded-2xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] inline-flex items-center gap-2.5 min-w-0 transition-colors"
+                className="min-h-[44px] px-2 -ml-2 rounded-2xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] inline-flex items-center gap-2.5 min-w-0 transition-colors"
               >
                 {authUser.photoURL ? (
                   <img
                     src={authUser.photoURL}
                     alt={activeDisplayName}
                     referrerPolicy="no-referrer"
-                    className="w-7 h-7 rounded-full object-cover shrink-0"
+                    className="w-8 h-8 rounded-full object-cover shrink-0"
                   />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-[#9EC5AB]/25 text-[#2E6B48] dark:text-[#9EC5AB] text-xs font-semibold flex items-center justify-center shrink-0">
-                    {(activeDisplayName || authUser.email || 'M')[0]?.toUpperCase()}
+                  <div className="w-8 h-8 rounded-full bg-[#9EC5AB]/25 text-[#2E6B48] dark:text-[#9EC5AB] text-xs font-semibold flex items-center justify-center shrink-0">
+                    {profileAvatarInitial}
                   </div>
                 )}
-                <span className="text-xs font-medium text-[#334155] dark:text-[#D0D5DD] truncate max-w-[200px]">
-                  {authUser.email}
-                </span>
+                {preferredGreetingName && (
+                  <span className="text-xs font-medium text-[#334155] dark:text-[#D0D5DD] truncate max-w-[180px]">
+                    {preferredGreetingName}
+                  </span>
+                )}
               </button>
             )}
 
@@ -1626,14 +1745,16 @@ export function App() {
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setProfileDrawerOpen(true)}
-                aria-label="Open Profile & Settings"
-                className="min-w-[44px] min-h-[44px] rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
+              {route !== 'home' && (
+                <button
+                  type="button"
+                  onClick={() => setProfileDrawerOpen(true)}
+                  aria-label="Open Profile & Settings"
+                  className="min-w-[44px] min-h-[44px] rounded-2xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] text-[#334155] dark:text-[#D0D5DD] flex items-center justify-center transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1707,8 +1828,9 @@ export function App() {
 
           {route === 'home' && (
             <HomeView
-              userName={activeDisplayName}
+              userName={preferredGreetingName}
               quotes={quotes}
+              featuredQuote={featuredDailyQuote}
               tasks={tasks}
               birthdays={birthdays}
               eventSessions={eventSessions}
@@ -1778,6 +1900,7 @@ export function App() {
               onSaveTask={saveTask}
               onDeleteTask={deleteTask}
               onCreateLinkedAlarm={saveAlarm}
+              onDeleteLinkedAlarm={deleteAlarm}
               onSaveCustomTone={saveCustomTone}
             />
           )}
@@ -1823,7 +1946,7 @@ export function App() {
               onSaveAlarm={saveAlarm}
               onDeleteAlarm={deleteAlarm}
               onTestRingAlarm={(alarm) => {
-                triggerActiveAlarm(alarm, { isTest: true });
+                void triggerActiveAlarm(alarm, { isTest: true });
               }}
               onSaveCustomTone={saveCustomTone}
               onDeleteCustomTone={deleteCustomTone}
@@ -1930,7 +2053,7 @@ export function App() {
         open={profileDrawerOpen}
         onClose={() => setProfileDrawerOpen(false)}
         authUser={authUser}
-        currentDisplayName={activeDisplayName}
+        currentDisplayName={preferredGreetingName}
         isEmailVerified={isEmailVerified}
         theme={theme}
         onChangeTheme={setTheme}

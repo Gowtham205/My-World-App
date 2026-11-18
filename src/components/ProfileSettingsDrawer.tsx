@@ -162,7 +162,7 @@ export const ProfileSettingsDrawer: React.FC<ProfileSettingsDrawerProps> = ({
               )}
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6] truncate">
-                  {currentDisplayName}
+                  {currentDisplayName || authUser.email?.split('@')[0] || 'My World'}
                 </p>
                 <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] truncate">
                   {authUser.email}
@@ -187,7 +187,7 @@ export const ProfileSettingsDrawer: React.FC<ProfileSettingsDrawerProps> = ({
                   maxLength={60}
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Your name"
+                  placeholder="Add preferred greeting name"
                   className="flex-1 min-w-0 min-h-[44px] px-3.5 rounded-2xl bg-white dark:bg-[#1D212A] border border-slate-900/[0.1] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
                 />
                 <button

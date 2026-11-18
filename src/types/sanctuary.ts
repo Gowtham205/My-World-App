@@ -175,6 +175,7 @@ export interface AlarmItem {
   id: string;
   label: string;
   time: string; // HH:MM (24h)
+  date?: string; // Optional YYYY-MM-DD for one-time date-bound task alarms
   enabled: boolean;
   repeatDays: number[]; // 0=Sun..6=Sat, empty = once
   snoozeMinutes: number;

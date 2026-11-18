@@ -224,17 +224,8 @@ export async function sendSystemNotification(params: {
   }
   markOccurrenceDispatched(dedupeKey);
 
-  const displayTitle = isPlaying ? `▶ Playing · ${title}` : title;
-  const effectiveSummary =
-    summaryText ||
-    (isPlaying
-      ? `▶ ${soundLabel || 'Alarm Ringtone'} · Stops in 1m`
-      : soundLabel
-        ? `Sound: ${soundLabel}`
-        : undefined);
-  const fullBody = isPlaying
-    ? `${body ? `${body} · ` : ''}Playing: ${soundLabel || 'Default Chime'} (auto-snoozes ${snoozeMinutes}m after 1m)`
-    : body;
+  const displayTitle = isPlaying ? `▶ ${title}` : title;
+  const cleanBody = body.trim();
 
   if (Capacitor.isNativePlatform()) {
     try {
@@ -265,9 +256,9 @@ export async function sendSystemNotification(params: {
           {
             id,
             title: displayTitle,
-            body: fullBody,
-            largeBody: fullBody,
-            summaryText: effectiveSummary,
+            body: cleanBody,
+            ...(cleanBody ? { largeBody: cleanBody } : {}),
+            ...(summaryText ? { summaryText } : {}),
             channelId,
             group: slotSeed,
             actionTypeId,
@@ -285,7 +276,7 @@ export async function sendSystemNotification(params: {
               slotSeed,
             },
             schedule: {
-              at: new Date(Date.now() + 100),
+              at: new Date(Date.now() + 15),
               allowWhileIdle: true,
             },
           },
@@ -299,7 +290,10 @@ export async function sendSystemNotification(params: {
 
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
-      new Notification(displayTitle, { body: fullBody, tag: slotSeed });
+      new Notification(displayTitle, {
+        ...(cleanBody ? { body: cleanBody } : {}),
+        tag: slotSeed,
+      });
     } catch {
       // ignore browser notification restrictions
     }
@@ -338,6 +332,7 @@ function buildScheduleFingerprint(params: {
     id: a.id,
     label: a.linkedReminderTitle || a.label,
     notes: a.linkedReminderNotes || '',
+    date: a.date || '',
     time: a.time,
     enabled: a.enabled,
     repeatDays: a.repeatDays,
@@ -430,9 +425,7 @@ export function syncScheduledNativeNotifications(params: {
         const title = `▶ ${baseTitle}`;
         const snoozeMins = alarm.snoozeMinutes || 5;
         const soundLabel = alarm.soundName || 'Sanctuary Chime';
-        const body = alarm.linkedReminderNotes
-          ? `${alarm.linkedReminderNotes} · Sound: ${soundLabel}`
-          : `Scheduled alarm (${alarm.time}) · Sound: ${soundLabel}`;
+        const body = (alarm.linkedReminderNotes || '').trim();
         const slotSeed = `alarm:${alarm.id}`;
 
         // Schedule active snooze wake-up if present
@@ -443,8 +436,7 @@ export function syncScheduledNativeNotifications(params: {
               id: hashToNotificationId(slotSeed),
               title,
               body,
-              largeBody: body,
-              summaryText: `▶ Snoozed alarm · ${soundLabel}`,
+              ...(body ? { largeBody: body } : {}),
               channelId: ALARM_CHANNEL_ID,
               group: slotSeed,
               actionTypeId: ALARM_ACTION_TYPE_ID,
@@ -465,14 +457,17 @@ export function syncScheduledNativeNotifications(params: {
         }
 
         if (alarm.repeatDays.length === 0) {
-          const at = alarm.snoozedUntilDate ? null : getNextDateForTime(alarm.time);
+          const at = alarm.snoozedUntilDate
+            ? null
+            : alarm.date
+              ? getDateForDueTask(alarm.date, alarm.time)
+              : getNextDateForTime(alarm.time);
           if (at) {
             pushUnique({
               id: hashToNotificationId(slotSeed),
               title,
               body,
-              largeBody: body,
-              summaryText: `▶ ${soundLabel} · Snooze ${snoozeMins}m`,
+              ...(body ? { largeBody: body } : {}),
               channelId: ALARM_CHANNEL_ID,
               group: slotSeed,
               actionTypeId: ALARM_ACTION_TYPE_ID,
@@ -497,8 +492,7 @@ export function syncScheduledNativeNotifications(params: {
             id: hashToNotificationId(slotSeed),
             title,
             body,
-            largeBody: body,
-            summaryText: `▶ ${soundLabel} · Snooze ${snoozeMins}m`,
+            ...(body ? { largeBody: body } : {}),
             channelId: ALARM_CHANNEL_ID,
             group: slotSeed,
             actionTypeId: ALARM_ACTION_TYPE_ID,
@@ -528,8 +522,7 @@ export function syncScheduledNativeNotifications(params: {
               id: hashToNotificationId(daySlotSeed),
               title,
               body,
-              largeBody: body,
-              summaryText: `▶ ${soundLabel} · Snooze ${snoozeMins}m`,
+              ...(body ? { largeBody: body } : {}),
               channelId: ALARM_CHANNEL_ID,
               group: slotSeed,
               actionTypeId: ALARM_ACTION_TYPE_ID,
@@ -561,12 +554,12 @@ export function syncScheduledNativeNotifications(params: {
         if (!at) continue;
 
         const slotSeed = `task:${task.id}`;
+        const taskBody = (task.notes || '').trim();
         pushUnique({
           id: hashToNotificationId(slotSeed),
           title: `▶ ${task.title}`,
-          body: task.notes || `Reminder · ${task.category}`,
-          largeBody: task.notes || `Reminder · ${task.category}`,
-          summaryText: task.soundName ? `Sound: ${task.soundName}` : `Reminder · ${task.category}`,
+          body: taskBody,
+          ...(taskBody ? { largeBody: taskBody } : {}),
           channelId: REMINDER_CHANNEL_ID,
           group: slotSeed,
           actionTypeId: REMINDER_ACTION_TYPE_ID,
@@ -776,6 +769,7 @@ export function collectMissedAndTodayInboxItems(params: {
   for (const alarm of params.alarms) {
     if (!alarm.enabled || !alarm.time) continue;
     if (alarm.snoozedUntilDate === todayStr && alarm.snoozedUntilTime) continue;
+    if (alarm.date && alarm.repeatDays.length === 0 && alarm.date !== todayStr) continue;
     if (alarm.repeatDays.length > 0 && !alarm.repeatDays.includes(todayWeekday)) continue;
 
     const [hh, mm] = alarm.time.split(':').map(Number);

@@ -583,6 +583,37 @@ export function saveNotificationHistory(items: AppNotificationItem[]): void {
   }
 }
 
+const DAILY_QUOTE_STORAGE_KEY = 'my_world_daily_quote_v1';
+
+export interface DailyQuoteSelection {
+  date: string;
+  quoteId: string;
+}
+
+export function getDailyQuoteSelection(): DailyQuoteSelection | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(DAILY_QUOTE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<DailyQuoteSelection>;
+    if (typeof parsed.date === 'string' && typeof parsed.quoteId === 'string') {
+      return { date: parsed.date, quoteId: parsed.quoteId };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDailyQuoteSelection(date: string, quoteId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DAILY_QUOTE_STORAGE_KEY, JSON.stringify({ date, quoteId }));
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
 export type {
   PersonalNote,
   EncryptedVaultRecord,

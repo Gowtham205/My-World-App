@@ -96,11 +96,84 @@ function playBuiltinById(soundId?: string) {
   }
 }
 
+const builtinWavBlobCache = new Map<string, Blob>();
+
+function buildBuiltinAlarmWavBlob(soundId?: string): Blob {
+  const key = soundId || 'builtin:sanctuary-chime';
+  const cached = builtinWavBlobCache.get(key);
+  if (cached) return cached;
+
+  const sampleRate = 22050;
+  const durationSec = 2.6;
+  const numSamples = Math.floor(sampleRate * durationSec);
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+
+  // Standard 16-bit mono PCM WAV header
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+
+  const notes =
+    key === 'builtin:calm-chime'
+      ? [432, 540]
+      : key === 'builtin:sunrise-harp'
+        ? [392.0, 493.88, 587.33, 783.99]
+        : [523.25, 659.25, 783.99];
+
+  const isTriangle = key === 'builtin:sunrise-harp';
+  const peakAmp = key === 'builtin:calm-chime' ? 0.28 : 0.34;
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    let sample = 0;
+
+    for (let nIdx = 0; nIdx < notes.length; nIdx++) {
+      const startT = nIdx * 0.2;
+      const localT = t - startT;
+      if (localT >= 0 && localT <= 1.55) {
+        const attack = Math.min(1, localT / 0.05);
+        const decay = Math.exp(-localT * 2.6);
+        const freq = notes[nIdx];
+        const phase = freq * localT;
+        const wave = isTriangle
+          ? 2 * Math.abs(2 * (phase - Math.floor(phase + 0.5))) - 1
+          : Math.sin(2 * Math.PI * phase);
+        sample += wave * attack * decay * peakAmp;
+      }
+    }
+
+    const clamped = Math.max(-0.95, Math.min(0.95, sample));
+    view.setInt16(44 + i * 2, Math.round(clamped * 32767), true);
+  }
+
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  builtinWavBlobCache.set(key, blob);
+  return blob;
+}
+
 export function startAlarmRinging(
   customTone?: CustomAudioTone | null,
   soundId?: string,
   options?: { maxDurationMs?: number; onAutoTimeout?: () => void }
 ) {
+  stopSoundPreview();
   stopAlarmRinging();
 
   const maxDurationMs = options?.maxDurationMs ?? ALARM_MAX_RING_MS;
@@ -111,35 +184,37 @@ export function startAlarmRinging(
     }, maxDurationMs);
   }
 
-  if (customTone?.blob) {
-    try {
-      const url = URL.createObjectURL(customTone.blob);
-      const audio = new Audio(url);
-      audio.loop = true;
-      audio.volume = 0.9;
-      activeAlarmObjectUrl = url;
-      activeAlarmAudio = audio;
-      audio.play().catch(() => {
-        // Fallback to synthesized chime if autoplay/codec fails (preserve safety timer)
-        if (activeAlarmAudio) {
-          try {
-            activeAlarmAudio.pause();
-          } catch {
-            // ignore
-          }
-          activeAlarmAudio = null;
+  // Always prefer HTMLAudioElement (for both custom audio and synthesized built-in WAV)
+  // so Android WebView acquires exclusive audio focus and pauses any playing music.
+  const audioBlob = customTone?.blob ?? buildBuiltinAlarmWavBlob(soundId);
+
+  try {
+    const url = URL.createObjectURL(audioBlob);
+    const audio = new Audio(url);
+    audio.loop = true;
+    audio.volume = 0.92;
+    activeAlarmObjectUrl = url;
+    activeAlarmAudio = audio;
+    audio.play().catch(() => {
+      // Fallback to Web Audio API synthesis if HTMLAudioElement playback is blocked
+      if (activeAlarmAudio) {
+        try {
+          activeAlarmAudio.pause();
+        } catch {
+          // ignore
         }
-        if (activeAlarmObjectUrl) {
-          URL.revokeObjectURL(activeAlarmObjectUrl);
-          activeAlarmObjectUrl = null;
-        }
-        playBuiltinById(soundId);
-        alarmLoopTimer = window.setInterval(() => playBuiltinById(soundId), 2600);
-      });
-      return;
-    } catch {
-      // Fallback below
-    }
+        activeAlarmAudio = null;
+      }
+      if (activeAlarmObjectUrl) {
+        URL.revokeObjectURL(activeAlarmObjectUrl);
+        activeAlarmObjectUrl = null;
+      }
+      playBuiltinById(soundId);
+      alarmLoopTimer = window.setInterval(() => playBuiltinById(soundId), 2600);
+    });
+    return;
+  } catch {
+    // Fallback below
   }
 
   playBuiltinById(soundId);

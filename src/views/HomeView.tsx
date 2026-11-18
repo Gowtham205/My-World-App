@@ -26,6 +26,7 @@ import {
 interface HomeViewProps {
   userName?: string;
   quotes: MotivationalQuote[];
+  featuredQuote?: MotivationalQuote | null;
   tasks: TaskReminderItem[];
   birthdays: BirthdayEntry[];
   eventSessions: EventCalmSession[];
@@ -39,6 +40,7 @@ interface HomeViewProps {
 export const HomeView: React.FC<HomeViewProps> = ({
   userName,
   quotes,
+  featuredQuote: featuredQuoteProp,
   tasks,
   birthdays,
   eventSessions,
@@ -52,7 +54,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const formattedDate = formatFullDate();
 
   const featuredQuote =
-    quotes.find((q) => q.pinnedToHome) || quotes[0] || null;
+    featuredQuoteProp || quotes.find((q) => q.pinnedToHome) || quotes[0] || null;
 
   const pendingTasks = tasks
     .filter((t) => !t.completed)
