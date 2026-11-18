@@ -132,9 +132,9 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <header className="rounded-3xl bg-gradient-to-br from-[#ECF6F0] via-[#F5FAF7] to-[#EEF5FB] dark:from-[#172420] dark:via-[#161F22] dark:to-[#17212B] border border-[#9EC5AB]/40 dark:border-[#9EC5AB]/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 shadow-xs">
         <div>
-          <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]">Event Calm & Social Anxiety Companion</p>
+          <p className="text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB]">Event Calm & Social Anxiety Companion</p>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Event Mode
           </h1>
@@ -147,7 +147,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
         <button
           type="button"
           onClick={openAddForm}
-          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap shrink-0 shadow-xs"
         >
           <Plus className="w-4 h-4" />
           New Event Session
@@ -157,7 +157,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
       {showAdd && (
         <form
           onSubmit={handleSaveForm}
-          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/30 p-5 sm:p-7 space-y-5"
+          className="rounded-3xl bg-white/90 dark:bg-[#181C26]/95 border border-[#9EC5AB]/40 dark:border-[#9EC5AB]/25 p-5 sm:p-7 space-y-5 shadow-xs"
         >
           <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
             {editingSession ? 'Edit Event Calm Session' : 'Configure Event Calm Session'}
@@ -378,11 +378,22 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
                       : `Every ${session.intervalMinutes} minutes`}
                   </p>
 
-                  <div className="p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.06] dark:border-white/[0.05] space-y-2">
-                    <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Grounding Prompts ({allPrompts.length})</p>
-                    <p className="text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed italic">
-                      “{allPrompts[0] || BUILT_IN_PROMPTS[0]}”
+                  <div className="p-4 rounded-2xl bg-[#F3F8F5] dark:bg-[#1D212A] border border-[#9EC5AB]/25 dark:border-white/[0.06] space-y-2">
+                    <p className="text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB]">
+                      Selected Grounding Prompts ({allPrompts.length})
                     </p>
+                    <ul className="space-y-1.5 text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
+                      {(allPrompts.length > 0 ? allPrompts : [BUILT_IN_PROMPTS[0]]).map(
+                        (promptItem, pIdx) => (
+                          <li key={`${session.id}-p-${pIdx}`} className="flex items-start gap-2">
+                            <span className="text-[#2E6B48] dark:text-[#9EC5AB] font-medium shrink-0">
+                              {pIdx + 1}.
+                            </span>
+                            <span>{promptItem}</span>
+                          </li>
+                        )
+                      )}
+                    </ul>
                   </div>
                 </div>
 

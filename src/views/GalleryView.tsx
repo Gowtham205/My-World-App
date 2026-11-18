@@ -11,6 +11,10 @@ import {
 } from 'lucide-react';
 import type { MediaAlbum, PrivateMediaItem } from '../types/sanctuary';
 import { createId } from '../lib/storage';
+import {
+  importPrivateMediaFile,
+  loadPrivateMediaObjectUrl,
+} from '../lib/privateMediaStorage';
 import { SecurityGate } from '../components/SecurityGate';
 
 interface GalleryViewProps {
@@ -45,6 +49,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [pendingDeleteItem, setPendingDeleteItem] = useState<PrivateMediaItem | null>(null);
   const [objectUrls, setObjectUrls] = useState<Record<string, string>>({});
 
+  const [importingCount, setImportingCount] = useState(0);
+  const [importNotice, setImportNotice] = useState('');
+
   // Update PIN state
   const [showPinUpdate, setShowPinUpdate] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
@@ -55,20 +62,43 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [pinBusy, setPinBusy] = useState(false);
 
   useEffect(() => {
-    const urls: Record<string, string> = {};
-    for (const item of mediaItems) {
-      try {
-        urls[item.id] = URL.createObjectURL(item.blob);
-      } catch {
-        // ignore invalid blob
-      }
+    if (!unlocked) {
+      setObjectUrls((prev) => {
+        Object.values(prev).forEach((u) => URL.revokeObjectURL(u));
+        return {};
+      });
+      return;
     }
-    setObjectUrls(urls);
+
+    let cancelled = false;
+    const createdUrls: string[] = [];
+
+    const hydrateUrls = async () => {
+      const nextUrls: Record<string, string> = {};
+      for (const item of mediaItems) {
+        if (cancelled) break;
+        const resolvedUrl = await loadPrivateMediaObjectUrl(item);
+        if (resolvedUrl) {
+          if (cancelled) {
+            URL.revokeObjectURL(resolvedUrl);
+          } else {
+            createdUrls.push(resolvedUrl);
+            nextUrls[item.id] = resolvedUrl;
+          }
+        }
+      }
+      if (!cancelled) {
+        setObjectUrls(nextUrls);
+      }
+    };
+
+    void hydrateUrls();
 
     return () => {
-      Object.values(urls).forEach((u) => URL.revokeObjectURL(u));
+      cancelled = true;
+      createdUrls.forEach((u) => URL.revokeObjectURL(u));
     };
-  }, [mediaItems]);
+  }, [mediaItems, unlocked]);
 
   const filteredItems = useMemo(() => {
     if (activeAlbumId === 'all') return mediaItems;
@@ -91,27 +121,35 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const pickedFiles = Array.from(files);
+    e.target.value = '';
+
     const targetAlbumId =
       activeAlbumId !== 'all'
         ? activeAlbumId
         : albums[0]?.id || 'album_sanctuary';
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const kind = file.type.startsWith('video/') ? 'video' : 'image';
-      const item: PrivateMediaItem = {
-        id: createId('media'),
-        albumId: targetAlbumId,
-        name: file.name,
-        mimeType: file.type || 'image/jpeg',
-        kind,
-        sizeBytes: file.size,
-        blob: file,
-        createdAt: new Date().toISOString(),
-      };
-      await onSaveMedia(item);
+    setImportingCount(pickedFiles.length);
+    setImportNotice('');
+
+    let imported = 0;
+    for (const file of pickedFiles) {
+      try {
+        const item = await importPrivateMediaFile(file, targetAlbumId);
+        await onSaveMedia(item);
+        imported += 1;
+      } catch {
+        // Continue importing remaining items if one fails
+      }
     }
-    e.target.value = '';
+
+    setImportingCount(0);
+    if (imported > 0) {
+      setImportNotice(
+        `Saved ${imported} ${imported === 1 ? 'item' : 'items'} into hidden app-only storage. Removing the original from your phone Gallery keeps this private copy safe.`
+      );
+      window.setTimeout(() => setImportNotice(''), 6000);
+    }
   };
 
   const handleCreateAlbum = async (e: React.FormEvent) => {
@@ -172,13 +210,13 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <header className="rounded-3xl bg-gradient-to-br from-[#EDF5FC] via-[#F4F9FE] to-[#F3F1FA] dark:from-[#16222E] dark:via-[#171F2A] dark:to-[#1C1B2B] border border-[#9BC4E2]/40 dark:border-[#9BC4E2]/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 shadow-xs">
         <div>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6]">
             Private Gallery
           </h1>
           <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1">
-            Stored privately inside your device · Auto-locks whenever you leave or minimize.
+            Copied to hidden app-only internal storage · Hidden from Albums &amp; stays safe even if you delete the original from your phone · Auto-locks when leaving.
           </p>
         </div>
 
@@ -227,6 +265,21 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           </label>
         </div>
       </header>
+
+      {importingCount > 0 && (
+        <p className="text-xs text-[#255F8A] dark:text-[#9BC4E2]" role="status">
+          Copying {importingCount} {importingCount === 1 ? 'file' : 'files'} into hidden app-only storage...
+        </p>
+      )}
+
+      {importNotice && (
+        <div
+          role="status"
+          className="rounded-2xl bg-[#E4F2E9] dark:bg-[#1B2C22] border border-[#9EC5AB]/45 px-4 py-3 text-xs text-[#245C3D] dark:text-[#A9DFBE]"
+        >
+          {importNotice}
+        </div>
+      )}
 
       {pinUpdateSuccess && (
         <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]" role="status">
@@ -392,7 +445,11 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
                     />
-                  ) : null}
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-[#EDF5FC] dark:bg-[#1D212A]">
+                      <ImageIcon className="w-6 h-6 text-[#9BC4E2] opacity-75 animate-pulse" />
+                    </div>
+                  )}
                 </button>
                 <button
                   type="button"

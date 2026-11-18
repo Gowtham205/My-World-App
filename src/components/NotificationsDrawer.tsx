@@ -216,7 +216,11 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                         {item.title}
                       </p>
                       {item.body && (
-                        <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-0.5 line-clamp-2 leading-relaxed">
+                        <p
+                          className={`text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 leading-relaxed ${
+                            item.kind === 'calm' ? 'whitespace-pre-line' : 'line-clamp-2'
+                          }`}
+                        >
                           {item.body}
                         </p>
                       )}

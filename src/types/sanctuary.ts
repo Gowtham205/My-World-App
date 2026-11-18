@@ -152,7 +152,8 @@ export interface PrivateMediaItem {
   mimeType: string;
   kind: 'image' | 'video';
   sizeBytes: number;
-  blob: Blob;
+  storagePath?: string; // App-private Directory.Data path (e.g. private_sanctuary_media/media_xxx.mwm)
+  blob?: Blob; // Web / fallback owned Blob copy
   createdAt: string;
 }
 

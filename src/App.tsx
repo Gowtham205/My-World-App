@@ -85,10 +85,12 @@ import {
   attachNotificationListeners,
   collectMissedAndTodayInboxItems,
   ensureNotificationSetup,
+  formatEventCalmPrompts,
   removeNotificationBySlotSeed,
   sendSystemNotification,
   syncScheduledNativeNotifications,
 } from './lib/notifications';
+import { deletePrivateMediaFile } from './lib/privateMediaStorage';
 import {
   ALARM_MAX_RING_MS,
   playNotificationSound,
@@ -824,6 +826,21 @@ export function App() {
     return () => window.clearInterval(id);
   }, [soundTimerRemainingSec]);
 
+  // Refresh minute clock so HomeView Event Calm status activates/expires right on schedule
+  const [minuteClockTick, setMinuteClockTick] = useState(() => {
+    const d = new Date();
+    return `${getTodayStr()}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  });
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const d = new Date();
+      const next = `${getTodayStr()}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      setMinuteClockTick((prev) => (prev === next ? prev : next));
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, []);
+
   // Active Event Calm session right now (matching date & time window)
   const activeEventSession = useMemo(() => {
     const now = new Date();
@@ -838,7 +855,7 @@ export function App() {
         return nowMin >= startM && nowMin <= endM;
       }) || null
     );
-  }, [eventSessions]);
+  }, [eventSessions, minuteClockTick]);
 
   // Real-time background scheduler for Alarms & Event Calm Mode interval check-ins
   useEffect(() => {
@@ -967,67 +984,75 @@ export function App() {
         break;
       }
 
-      // 2. Check Active Event Calm Mode Check-In Intervals
-      if (activeEventSession && activeEventSession.lastCheckInMinute !== minuteKey) {
-        const nowMin = now.getHours() * 60 + now.getMinutes();
-        const startMin = parseMinutes(activeEventSession.startTime);
-        const endMin = parseMinutes(activeEventSession.endTime);
+      // 2. Check All Active Event Calm Mode Check-In Intervals using live clock time
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      for (const session of eventSessions) {
+        if (!session.active || session.date !== today) continue;
+        if (session.lastCheckInMinute === minuteKey) continue;
+
+        const startMin = parseMinutes(session.startTime);
+        const endMin = parseMinutes(session.endTime);
+        if (nowMin < startMin || nowMin > endMin) continue;
+
         const elapsed = nowMin - startMin;
 
         let shouldTrigger = false;
-        if (activeEventSession.isMidpointOnly) {
+        if (session.isMidpointOnly) {
           const midpoint = Math.round((startMin + endMin) / 2);
           shouldTrigger = nowMin === midpoint;
-        } else if (activeEventSession.intervalMinutes > 0 && elapsed > 0) {
-          shouldTrigger = elapsed % activeEventSession.intervalMinutes === 0;
+        } else if (session.intervalMinutes > 0 && elapsed >= 0) {
+          shouldTrigger = elapsed % session.intervalMinutes === 0;
         }
 
-        if (shouldTrigger) {
-          const pool = [
-            ...activeEventSession.selectedPrompts,
-            ...activeEventSession.customPrompts,
-          ];
-          const prompt =
-            pool[Math.floor(Math.random() * pool.length)] ||
-            "It's okay. Take 3 slow breaths and return to the present moment.";
+        if (!shouldTrigger) continue;
 
-          const updatedSession: EventCalmSession = {
-            ...activeEventSession,
-            lastCheckInMinute: minuteKey,
-          };
-          setEventSessions((prev) =>
-            prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-          );
-          await putInStore('events', updatedSession);
+        const pool = [...session.selectedPrompts, ...session.customPrompts]
+          .map((p) => p.trim())
+          .filter(Boolean);
+        const leadPrompt =
+          pool[Math.floor(Math.random() * pool.length)] ||
+          "It's okay. Take 3 slow breaths and return to the present moment.";
+        const fullPromptChecklist = formatEventCalmPrompts(session);
 
-          setBreathingPromptState({
-            session: updatedSession,
-            prompt,
-            startedAtMs: Date.now(),
-          });
+        const updatedSession: EventCalmSession = {
+          ...session,
+          lastCheckInMinute: minuteKey,
+        };
+        setEventSessions((prev) =>
+          prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+        );
+        await putInStore('events', updatedSession);
 
-          const calmDedupeKey = `calm:${updatedSession.id}:${minuteKey}`;
-          pushInboxNotification({
-            dedupeKey: calmDedupeKey,
-            kind: 'calm',
-            status: 'delivered',
-            title: `${updatedSession.eventName} · Event Calm`,
-            body: prompt,
-            scheduledAt: now.toISOString(),
-            createdAt: now.toISOString(),
-            read: false,
-            route: 'event-calm',
-          });
+        setBreathingPromptState({
+          session: updatedSession,
+          prompt: leadPrompt,
+          startedAtMs: Date.now(),
+        });
 
-          void sendSystemNotification({
-            dedupeKey: calmDedupeKey,
-            slotSeed: `calm:${updatedSession.id}`,
-            title: `${updatedSession.eventName} · Event Calm`,
-            body: prompt,
-            channel: 'calm',
-            route: 'event-calm',
-          });
-        }
+        const calmDedupeKey = `calm:${updatedSession.id}:${minuteKey}`;
+        pushInboxNotification({
+          dedupeKey: calmDedupeKey,
+          kind: 'calm',
+          status: 'delivered',
+          title: `${updatedSession.eventName} · Event Calm`,
+          body: fullPromptChecklist,
+          scheduledAt: now.toISOString(),
+          createdAt: now.toISOString(),
+          read: false,
+          route: 'event-calm',
+        });
+
+        void sendSystemNotification({
+          dedupeKey: calmDedupeKey,
+          slotSeed: calmDedupeKey,
+          title: `${updatedSession.eventName} · Event Calm`,
+          body: fullPromptChecklist,
+          channel: 'calm',
+          route: 'event-calm',
+          entityId: updatedSession.id,
+          summaryText:
+            pool.length > 1 ? `${pool.length} grounding prompts` : undefined,
+        });
       }
     };
 
@@ -1037,7 +1062,7 @@ export function App() {
     ready,
     alarms,
     tasks,
-    activeEventSession,
+    eventSessions,
     customAudioTones,
     defaultNotificationSoundId,
     pushInboxNotification,
@@ -1128,10 +1153,15 @@ export function App() {
 
   const saveMedia = async (item: PrivateMediaItem) => {
     await putInStore('media', item);
-    setMediaItems((prev) => [item, ...prev]);
+    setMediaItems((prev) => {
+      const exists = prev.some((m) => m.id === item.id);
+      return exists ? prev.map((m) => (m.id === item.id ? item : m)) : [item, ...prev];
+    });
   };
 
   const deleteMedia = async (id: string) => {
+    const target = mediaItems.find((m) => m.id === id);
+    await deletePrivateMediaFile(target);
     await deleteFromStore('media', id);
     setMediaItems((prev) => prev.filter((m) => m.id !== id));
   };

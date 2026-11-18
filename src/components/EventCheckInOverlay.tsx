@@ -36,15 +36,19 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
   }, []);
 
   const currentPhase = phases[phaseIndex];
+  const allPrompts = [...session.selectedPrompts, ...session.customPrompts]
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const additionalPrompts = allPrompts.filter((p) => p !== promptMessage);
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-[#0F1115]/95 backdrop-blur-xl flex items-center justify-center p-5"
+      className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-[#0F1115]/95 backdrop-blur-xl flex items-center justify-center p-5 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Event Calm Grounding"
     >
-      <div className="max-w-lg w-full bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] rounded-3xl p-7 sm:p-9 relative text-center">
+      <div className="max-w-lg w-full bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] rounded-3xl p-7 sm:p-9 relative text-center my-auto">
         <button
           type="button"
           onClick={onClose}
@@ -60,7 +64,7 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
         </div>
 
         {/* Breathing Circle */}
-        <div className="relative flex items-center justify-center my-8 h-48">
+        <div className="relative flex items-center justify-center my-6 h-44">
           <div className="w-40 h-40 rounded-full bg-[#9EC5AB]/10 border border-[#9EC5AB]/30 flex items-center justify-center animate-breathe">
             <div className="w-28 h-28 rounded-full bg-[#9EC5AB]/15 border border-[#9EC5AB]/40 flex flex-col items-center justify-center px-3">
               <span className="text-sm font-medium text-[#111827] dark:text-[#F1F3F6]">{currentPhase.label}</span>
@@ -75,7 +79,23 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
           “{promptMessage}”
         </blockquote>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
+        {additionalPrompts.length > 0 && (
+          <div className="mt-5 rounded-2xl bg-[#F3F8F5] dark:bg-[#1D232A] border border-[#9EC5AB]/30 p-4 text-left space-y-2 max-h-40 overflow-y-auto">
+            <p className="text-[11px] font-medium text-[#2E6B48] dark:text-[#9EC5AB]">
+              Your Grounding Reminders ({allPrompts.length})
+            </p>
+            <ul className="space-y-1.5 text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
+              {additionalPrompts.map((p, idx) => (
+                <li key={`${idx}-${p.slice(0, 16)}`} className="flex items-start gap-2">
+                  <span className="text-[#2E6B48] dark:text-[#9EC5AB] shrink-0">•</span>
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-7">
           {session.venue.trim() && (
             <a
               href={buildGoogleMapsDirectionsUrl(session.venue)}

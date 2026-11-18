@@ -86,6 +86,50 @@ function getCurrentMinuteKey(d = new Date()): string {
   return `${y}-${mo}-${da}T${hh}:${mm}`;
 }
 
+export function formatEventCalmPrompts(session: EventCalmSession): string {
+  const allPrompts = [...session.selectedPrompts, ...session.customPrompts]
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (allPrompts.length === 0) {
+    return "It's okay. Take 3 slow breaths and return to the present moment.";
+  }
+  if (allPrompts.length === 1) {
+    return allPrompts[0];
+  }
+  return allPrompts.map((p, idx) => `${idx + 1}. ${p}`).join('\n');
+}
+
+export function getEventCalmCheckInTimes(session: EventCalmSession): Date[] {
+  const [y, m, d] = session.date.split('-').map(Number);
+  const [sh, sm] = session.startTime.split(':').map(Number);
+  const [eh, em] = session.endTime.split(':').map(Number);
+  if ([y, m, d, sh, sm, eh, em].some((n) => Number.isNaN(n))) return [];
+
+  const startDt = new Date(y, m - 1, d, sh, sm, 0, 0);
+  const endDt = new Date(y, m - 1, d, eh, em, 0, 0);
+  if (endDt.getTime() < startDt.getTime()) {
+    endDt.setDate(endDt.getDate() + 1);
+  }
+
+  if (session.isMidpointOnly) {
+    return [new Date((startDt.getTime() + endDt.getTime()) / 2)];
+  }
+
+  if (session.intervalMinutes <= 0) return [];
+
+  const stepMs = session.intervalMinutes * 60 * 1000;
+  const checkTimes: Date[] = [];
+  for (
+    let t = startDt.getTime();
+    t <= endDt.getTime() && checkTimes.length < 48;
+    t += stepMs
+  ) {
+    checkTimes.push(new Date(t));
+  }
+  return checkTimes;
+}
+
 export async function ensureNotificationSetup(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
@@ -578,50 +622,38 @@ export function syncScheduledNativeNotifications(params: {
         });
       }
 
-      // 3. Active Event Calm Mode upcoming check-in notifications (uses one shared slotSeed per session so it never piles up)
+      // 3. Active Event Calm Mode upcoming check-in notifications
       for (const session of params.eventSessions) {
         if (!session.active) continue;
-        const [y, m, d] = session.date.split('-').map(Number);
-        const [sh, sm] = session.startTime.split(':').map(Number);
-        const [eh, em] = session.endTime.split(':').map(Number);
-        if ([y, m, d, sh, sm, eh, em].some((n) => Number.isNaN(n))) continue;
+        const checkTimes = getEventCalmCheckInTimes(session);
+        if (checkTimes.length === 0) continue;
 
-        const startDt = new Date(y, m - 1, d, sh, sm, 0, 0);
-        const endDt = new Date(y, m - 1, d, eh, em, 0, 0);
-        if (endDt.getTime() <= Date.now()) continue;
+        const message = formatEventCalmPrompts(session);
+        const promptCount =
+          session.selectedPrompts.length + session.customPrompts.length;
 
-        const checkTimes: Date[] = [];
-        if (session.isMidpointOnly) {
-          checkTimes.push(new Date((startDt.getTime() + endDt.getTime()) / 2));
-        } else if (session.intervalMinutes > 0) {
-          const stepMs = session.intervalMinutes * 60 * 1000;
-          for (
-            let t = startDt.getTime() + stepMs;
-            t <= endDt.getTime() && checkTimes.length < 6;
-            t += stepMs
-          ) {
-            checkTimes.push(new Date(t));
-          }
-        }
-
-        const pool = [...session.selectedPrompts, ...session.customPrompts];
-        const message =
-          pool[0] || "It's okay. Take 3 slow breaths and return to the present moment.";
-        const slotSeed = `calm:${session.id}`;
-
-        checkTimes.forEach((at, idx) => {
+        checkTimes.forEach((at) => {
           if (at.getTime() <= Date.now() + 15000) return;
+          const slotMinuteKey = getCurrentMinuteKey(at);
+          const slotSeed = `calm:${session.id}:${slotMinuteKey}`;
           pushUnique({
-            id: hashToNotificationId(`${slotSeed}:${idx}`),
+            id: hashToNotificationId(slotSeed),
             title: `${session.eventName} · Event Calm`,
             body: message,
             largeBody: message,
+            ...(promptCount > 1 ? { summaryText: `${promptCount} grounding prompts` } : {}),
             channelId: CALM_CHANNEL_ID,
-            group: slotSeed,
+            actionTypeId: undefined,
             foreground: true,
             autoCancel: true,
             isExactNotification: useExact,
-            extra: { route: 'event-calm' satisfies AppRoute, kind: 'calm', entityId: session.id, slotSeed },
+            extra: {
+              route: 'event-calm' satisfies AppRoute,
+              kind: 'calm',
+              entityId: session.id,
+              slotSeed,
+              dedupeKey: slotSeed,
+            },
             schedule: { at, allowWhileIdle: true },
           });
         });
@@ -832,44 +864,32 @@ export function collectMissedAndTodayInboxItems(params: {
 
   // 3. Active Event Calm check-ins from earlier today that passed while app was closed
   for (const session of params.eventSessions) {
-    if (!session.active || session.date !== todayStr) continue;
-    const [sh, sm] = session.startTime.split(':').map(Number);
-    const [eh, em] = session.endTime.split(':').map(Number);
-    if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) continue;
+    if (!session.active) continue;
+    const checkTimes = getEventCalmCheckInTimes(session);
+    if (checkTimes.length === 0) continue;
 
-    const startDt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sh, sm, 0, 0);
-    const endDt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), eh, em, 0, 0);
+    const missedSlots = checkTimes
+      .filter((dt) => {
+        const ms = dt.getTime();
+        return ms < oneMinuteAgoMs && ms >= sevenDaysAgoMs;
+      })
+      .slice(-8);
 
-    let latestMissedSlot: Date | null = null;
-    if (session.isMidpointOnly) {
-      const midDt = new Date((startDt.getTime() + endDt.getTime()) / 2);
-      if (midDt.getTime() < oneMinuteAgoMs) {
-        latestMissedSlot = midDt;
-      }
-    } else if (session.intervalMinutes > 0) {
-      const stepMs = session.intervalMinutes * 60 * 1000;
-      for (let t = startDt.getTime() + stepMs; t <= Math.min(oneMinuteAgoMs, endDt.getTime()); t += stepMs) {
-        latestMissedSlot = new Date(t);
-      }
-    }
+    if (missedSlots.length === 0) continue;
 
-    if (latestMissedSlot) {
-      const slotHH = String(latestMissedSlot.getHours()).padStart(2, '0');
-      const slotMM = String(latestMissedSlot.getMinutes()).padStart(2, '0');
-      const minuteKey = `${todayStr}T${slotHH}:${slotMM}`;
+    const fullPromptList = formatEventCalmPrompts(session);
+
+    for (const slotDt of missedSlots) {
+      const minuteKey = getCurrentMinuteKey(slotDt);
       if (session.lastCheckInMinute === minuteKey) continue;
-
-      const pool = [...session.selectedPrompts, ...session.customPrompts];
-      const prompt =
-        pool[0] || "It's okay. Take 3 slow breaths and return to the present moment.";
 
       pushIfNew({
         dedupeKey: `calm:${session.id}:${minuteKey}`,
         kind: 'calm',
         status: 'missed',
         title: `${session.eventName} · Event Calm`,
-        body: prompt,
-        scheduledAt: latestMissedSlot.toISOString(),
+        body: fullPromptList,
+        scheduledAt: slotDt.toISOString(),
         createdAt: new Date().toISOString(),
         read: false,
         route: 'event-calm',
