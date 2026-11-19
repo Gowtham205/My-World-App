@@ -1,4 +1,10 @@
+import { Capacitor } from '@capacitor/core';
 import type { CustomAudioTone } from '../types/sanctuary';
+import {
+  playNativeChime,
+  stopNativeChime,
+  syncCustomToneFileToNative,
+} from './nativeAudio';
 
 // Web Audio API synthesis + local custom audio file playback for alarms, reminders & notifications
 
@@ -60,29 +66,29 @@ export function playSanctuaryChime(
   const now = ctx.currentTime;
   const frequencies =
     variant === 'alarm'
-      ? [523.25, 659.25, 783.99]
+      ? [523.25, 659.25, 783.99, 1046.5]
       : variant === 'sunrise'
         ? [392.0, 493.88, 587.33, 783.99]
-        : [432, 540];
+        : [432, 540, 648];
 
   frequencies.forEach((freq, idx) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = variant === 'sunrise' ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(freq, now + idx * 0.2);
+    osc.frequency.setValueAtTime(freq, now + idx * 0.18);
 
-    gain.gain.setValueAtTime(0.0001, now + idx * 0.2);
+    gain.gain.setValueAtTime(0.0001, now + idx * 0.18);
     gain.gain.exponentialRampToValueAtTime(
-      variant === 'alarm' ? 0.16 : variant === 'sunrise' ? 0.13 : 0.09,
-      now + idx * 0.2 + 0.06
+      variant === 'alarm' ? 0.68 : variant === 'sunrise' ? 0.62 : 0.52,
+      now + idx * 0.18 + 0.04
     );
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.2 + 1.45);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.18 + 1.55);
 
     osc.connect(gain);
     gain.connect(ctx.destination);
 
-    osc.start(now + idx * 0.2);
-    osc.stop(now + idx * 0.2 + 1.55);
+    osc.start(now + idx * 0.18);
+    osc.stop(now + idx * 0.18 + 1.65);
   });
 }
 
@@ -132,34 +138,35 @@ function buildBuiltinAlarmWavBlob(soundId?: string): Blob {
 
   const notes =
     key === 'builtin:calm-chime'
-      ? [432, 540]
+      ? [432, 540, 648]
       : key === 'builtin:sunrise-harp'
         ? [392.0, 493.88, 587.33, 783.99]
-        : [523.25, 659.25, 783.99];
+        : [523.25, 659.25, 783.99, 1046.5];
 
   const isTriangle = key === 'builtin:sunrise-harp';
-  const peakAmp = key === 'builtin:calm-chime' ? 0.28 : 0.34;
+  const peakAmp = key === 'builtin:calm-chime' ? 0.78 : 0.88;
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate;
     let sample = 0;
 
     for (let nIdx = 0; nIdx < notes.length; nIdx++) {
-      const startT = nIdx * 0.2;
+      const startT = nIdx * 0.19;
       const localT = t - startT;
-      if (localT >= 0 && localT <= 1.55) {
-        const attack = Math.min(1, localT / 0.05);
-        const decay = Math.exp(-localT * 2.6);
+      if (localT >= 0 && localT <= 1.65) {
+        const attack = Math.min(1, localT / 0.035);
+        const decay = Math.exp(-localT * 2.1);
         const freq = notes[nIdx];
         const phase = freq * localT;
-        const wave = isTriangle
+        const fundamental = isTriangle
           ? 2 * Math.abs(2 * (phase - Math.floor(phase + 0.5))) - 1
           : Math.sin(2 * Math.PI * phase);
-        sample += wave * attack * decay * peakAmp;
+        const overtone = 0.28 * Math.sin(2 * Math.PI * (freq * 2) * localT);
+        sample += (fundamental + overtone) * attack * decay * (peakAmp * 0.52);
       }
     }
 
-    const clamped = Math.max(-0.95, Math.min(0.95, sample));
+    const clamped = Math.max(-0.96, Math.min(0.96, sample));
     view.setInt16(44 + i * 2, Math.round(clamped * 32767), true);
   }
 
@@ -185,14 +192,14 @@ export function startAlarmRinging(
   }
 
   // Always prefer HTMLAudioElement (for both custom audio and synthesized built-in WAV)
-  // so Android WebView acquires exclusive audio focus and pauses any playing music.
+  // so exclusive audio focus is acquired and any playing music pauses.
   const audioBlob = customTone?.blob ?? buildBuiltinAlarmWavBlob(soundId);
 
   try {
     const url = URL.createObjectURL(audioBlob);
     const audio = new Audio(url);
     audio.loop = true;
-    audio.volume = 0.92;
+    audio.volume = 1.0;
     activeAlarmObjectUrl = url;
     activeAlarmAudio = audio;
     audio.play().catch(() => {
@@ -248,6 +255,9 @@ export function stopAlarmRinging() {
 }
 
 export function stopSoundPreview() {
+  if (Capacitor.isNativePlatform()) {
+    void stopNativeChime();
+  }
   if (activePreviewTimeout !== null) {
     window.clearTimeout(activePreviewTimeout);
     activePreviewTimeout = null;
@@ -275,11 +285,35 @@ export function previewSoundTone(
   stopSoundPreview();
   const custom = soundId ? customTones.find((t) => t.id === soundId) : undefined;
 
+  if (Capacitor.isNativePlatform()) {
+    void (async () => {
+      const soundPath = custom ? await syncCustomToneFileToNative(custom) : '';
+      const played = await playNativeChime({
+        soundId: soundId || BUILTIN_TONES[0].id,
+        soundPath: soundPath || '',
+        maxMs: 8000,
+      });
+      if (played) {
+        activePreviewTimeout = window.setTimeout(() => {
+          activePreviewTimeout = null;
+          onEnd?.();
+        }, custom ? 8000 : 2600);
+        return;
+      }
+      playBuiltinById(soundId);
+      activePreviewTimeout = window.setTimeout(() => {
+        activePreviewTimeout = null;
+        onEnd?.();
+      }, 2000);
+    })();
+    return;
+  }
+
   if (custom?.blob) {
     try {
       const url = URL.createObjectURL(custom.blob);
       const audio = new Audio(url);
-      audio.volume = 0.85;
+      audio.volume = 1.0;
       activePreviewObjectUrl = url;
       activePreviewAudio = audio;
       audio.onended = () => {
@@ -297,11 +331,34 @@ export function previewSoundTone(
     }
   }
 
-  playBuiltinById(soundId);
+  // Play using synthesized WAV via HTMLAudioElement first for clear volume on desktop/mobile web
+  try {
+    const wav = buildBuiltinAlarmWavBlob(soundId);
+    const url = URL.createObjectURL(wav);
+    const audio = new Audio(url);
+    audio.volume = 1.0;
+    activePreviewObjectUrl = url;
+    activePreviewAudio = audio;
+    audio.onended = () => {
+      stopSoundPreview();
+      onEnd?.();
+    };
+    audio.play().catch(() => {
+      stopSoundPreview();
+      playBuiltinById(soundId);
+      activePreviewTimeout = window.setTimeout(() => {
+        activePreviewTimeout = null;
+        onEnd?.();
+      }, 1800);
+    });
+    return;
+  } catch {
+    playBuiltinById(soundId);
+  }
   activePreviewTimeout = window.setTimeout(() => {
     activePreviewTimeout = null;
     onEnd?.();
-  }, 1600);
+  }, 1800);
 }
 
 export function playNotificationSound(
@@ -309,11 +366,27 @@ export function playNotificationSound(
   soundId?: string
 ) {
   const custom = soundId ? customTones.find((t) => t.id === soundId) : undefined;
+
+  if (Capacitor.isNativePlatform()) {
+    void (async () => {
+      const soundPath = custom ? await syncCustomToneFileToNative(custom) : '';
+      const played = await playNativeChime({
+        soundId: soundId || 'builtin:calm-chime',
+        soundPath: soundPath || '',
+        maxMs: 9500,
+      });
+      if (!played) {
+        playBuiltinById(soundId || 'builtin:calm-chime');
+      }
+    })();
+    return;
+  }
+
   if (custom?.blob) {
     try {
       const url = URL.createObjectURL(custom.blob);
       const audio = new Audio(url);
-      audio.volume = 0.8;
+      audio.volume = 1.0;
       const cleanup = () => {
         URL.revokeObjectURL(url);
       };
@@ -339,5 +412,18 @@ export function playNotificationSound(
     }
   }
 
-  playBuiltinById(soundId || 'builtin:calm-chime');
+  try {
+    const wav = buildBuiltinAlarmWavBlob(soundId || 'builtin:calm-chime');
+    const url = URL.createObjectURL(wav);
+    const audio = new Audio(url);
+    audio.volume = 1.0;
+    const cleanup = () => URL.revokeObjectURL(url);
+    audio.onended = cleanup;
+    audio.play().catch(() => {
+      cleanup();
+      playBuiltinById(soundId || 'builtin:calm-chime');
+    });
+  } catch {
+    playBuiltinById(soundId || 'builtin:calm-chime');
+  }
 }

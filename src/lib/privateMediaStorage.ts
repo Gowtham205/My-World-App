@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import type { PrivateMediaItem } from '../types/sanctuary';
+import { exportToDevicePublicStorage, type ExportToDeviceResult } from './nativeAudio';
 import { createId } from './storage';
 
 const MEDIA_DIR = 'private_sanctuary_media';
@@ -223,4 +224,83 @@ export async function deletePrivateMediaFile(item?: PrivateMediaItem): Promise<v
   } catch {
     // Ignore missing file errors on deletion
   }
+}
+
+function ensureExtensionForMedia(name: string, kind: 'image' | 'video', mimeType: string): string {
+  const clean = (name || (kind === 'video' ? 'private-video.mp4' : 'private-photo.jpg')).trim();
+  if (/\.[a-z0-9]{2,5}$/i.test(clean)) return clean;
+  if (kind === 'video') {
+    if (mimeType.includes('webm')) return `${clean}.webm`;
+    if (mimeType.includes('quicktime')) return `${clean}.mov`;
+    return `${clean}.mp4`;
+  }
+  if (mimeType.includes('png')) return `${clean}.png`;
+  if (mimeType.includes('webp')) return `${clean}.webp`;
+  return `${clean}.jpg`;
+}
+
+export async function downloadPrivateMediaToDevice(
+  item: PrivateMediaItem
+): Promise<ExportToDeviceResult> {
+  const folderType = item.kind === 'video' ? 'video' : 'image';
+  const mimeType =
+    item.mimeType || (item.kind === 'video' ? 'video/mp4' : 'image/jpeg');
+  const filename = ensureExtensionForMedia(item.name, item.kind, mimeType);
+
+  if (Capacitor.isNativePlatform() && item.storagePath) {
+    const directRes = await exportToDevicePublicStorage({
+      filename,
+      mimeType,
+      folderType,
+      sourcePath: item.storagePath,
+    });
+    if (directRes.ok) {
+      return directRes;
+    }
+
+    // Fallback via Filesystem.readFile if needed
+    try {
+      const result = await Filesystem.readFile({
+        directory: Directory.Data,
+        path: item.storagePath,
+      });
+      if (typeof result.data === 'string') {
+        const bytes = base64ToUint8Array(result.data);
+        const safeBytes = new Uint8Array(bytes.byteLength);
+        safeBytes.set(bytes);
+        const blob = new Blob([safeBytes.buffer], { type: mimeType });
+        return exportToDevicePublicStorage({
+          filename,
+          mimeType,
+          folderType,
+          blob,
+        });
+      }
+      if (result.data instanceof Blob) {
+        return exportToDevicePublicStorage({
+          filename,
+          mimeType,
+          folderType,
+          blob: result.data,
+        });
+      }
+    } catch {
+      // fall through to item.blob
+    }
+  }
+
+  if (item.blob) {
+    return exportToDevicePublicStorage({
+      filename,
+      mimeType,
+      folderType,
+      blob: item.blob,
+    });
+  }
+
+  return {
+    ok: false,
+    displayPath: '',
+    error: 'Could not find stored media data to export.',
+  };
 }

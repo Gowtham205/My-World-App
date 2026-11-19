@@ -18,12 +18,18 @@ import type {
 } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { formatTime12h } from '../lib/dateUtils';
+import { Capacitor } from '@capacitor/core';
 import {
   BUILTIN_TONES,
   previewSoundTone,
   resolveSoundName,
   stopSoundPreview,
 } from '../lib/sound';
+import {
+  getNativeAudioDiagnostics,
+  openNativeExactAlarmSettings,
+  type AudioDiagnostics,
+} from '../lib/nativeAudio';
 
 interface AlarmsViewProps {
   alarms: AlarmItem[];
@@ -78,8 +84,24 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
   const [previewingId, setPreviewingId] = useState<string | null>(null);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<AudioDiagnostics | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlineFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const refreshDiag = () => {
+      void getNativeAudioDiagnostics().then((d) => {
+        if (d) setDiagnostics(d);
+      });
+    };
+    refreshDiag();
+    window.addEventListener('focus', refreshDiag);
+    return () => {
+      window.removeEventListener('focus', refreshDiag);
+      stopSoundPreview();
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -251,6 +273,35 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
           New Alarm
         </button>
       </header>
+
+      {diagnostics && (!diagnostics.canExactAlarms || diagnostics.mediaVolume === 0) && (
+        <div
+          role="status"
+          className="rounded-2xl bg-[#FDF4EB] dark:bg-[#261D17] border border-[#F2B8A2]/45 px-4 py-3 text-xs text-[#913B22] dark:text-[#F5C1AD] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+        >
+          <div className="space-y-0.5">
+            {diagnostics.mediaVolume === 0 && (
+              <p className="font-medium">
+                Phone Media volume is currently muted. Use your phone’s side Volume Up button so alarms ring clearly.
+              </p>
+            )}
+            {!diagnostics.canExactAlarms && (
+              <p className="font-medium">
+                Exact Alarms permission is disabled in Android settings—enable it so alarms ring right on time when the screen is off.
+              </p>
+            )}
+          </div>
+          {!diagnostics.canExactAlarms && (
+            <button
+              type="button"
+              onClick={() => void openNativeExactAlarmSettings()}
+              className="min-h-[38px] px-3.5 rounded-xl bg-[#F2B8A2] text-[#0F1115] text-xs font-semibold whitespace-nowrap shrink-0 self-start sm:self-center"
+            >
+              Allow Exact Alarms
+            </button>
+          )}
+        </div>
+      )}
 
       {showAdd && (
         <form

@@ -375,7 +375,8 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
                     Check-ins:{' '}
                     {session.isMidpointOnly
                       ? 'Single midpoint check-in'
-                      : `Every ${session.intervalMinutes} minutes`}
+                      : `Every ${session.intervalMinutes} minutes`}{' '}
+                    · Plays calm chime &amp; shows full prompts
                   </p>
 
                   <div className="p-4 rounded-2xl bg-[#F3F8F5] dark:bg-[#1D212A] border border-[#9EC5AB]/25 dark:border-white/[0.06] space-y-2">
@@ -452,7 +453,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
                     className="min-h-[42px] px-4 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <Wind className="w-3.5 h-3.5" />
-                    Calm Breathing
+                    Calm &amp; Grounding
                   </button>
                 </div>
               </article>

@@ -6,10 +6,17 @@ import type {
   AppNotificationKind,
   AppRoute,
   BirthdayEntry,
+  CustomAudioTone,
   EventCalmSession,
   TaskReminderItem,
 } from '../types/sanctuary';
 import { createId, getDismissedNotificationKeys } from './storage';
+import {
+  stopNativeRingtone,
+  syncAllCustomTonesToNative,
+  syncNativeSchedules,
+  type NativeScheduleItem,
+} from './nativeAudio';
 
 const ALARM_CHANNEL_ID = 'my-world-alarms';
 const REMINDER_CHANNEL_ID = 'my-world-reminders';
@@ -178,25 +185,6 @@ export async function ensureNotificationSetup(): Promise<boolean> {
           await LocalNotifications.createChannel(ch).catch(() => {});
         }
 
-        await LocalNotifications.registerActionTypes({
-          types: [
-            {
-              id: ALARM_ACTION_TYPE_ID,
-              actions: [
-                { id: 'snooze', title: 'Snooze 5m', foreground: false },
-                { id: 'dismiss', title: 'Dismiss', foreground: false, destructive: true },
-              ],
-            },
-            {
-              id: REMINDER_ACTION_TYPE_ID,
-              actions: [
-                { id: 'snooze', title: 'Snooze 5m', foreground: false },
-                { id: 'dismiss', title: 'Dismiss', foreground: false, destructive: true },
-              ],
-            },
-          ],
-        }).catch(() => {});
-
         initialized = true;
       }
 
@@ -224,6 +212,7 @@ export async function removeNotificationBySlotSeed(slotSeed: string): Promise<vo
   if (!Capacitor.isNativePlatform()) return;
   const id = hashToNotificationId(slotSeed);
   try {
+    await stopNativeRingtone(id);
     await LocalNotifications.removeDeliveredNotificationsById({ ids: [id] }).catch(() => {});
     await LocalNotifications.cancel({ notifications: [{ id }] }).catch(() => {});
   } catch {
@@ -283,17 +272,7 @@ export async function sendSystemNotification(params: {
             ? CALM_CHANNEL_ID
             : REMINDER_CHANNEL_ID;
 
-      const actionTypeId =
-        channel === 'alarm'
-          ? ALARM_ACTION_TYPE_ID
-          : channel === 'reminder'
-            ? REMINDER_ACTION_TYPE_ID
-            : undefined;
-
       const isOngoing = Boolean(ongoing ?? (isPlaying && channel === 'alarm'));
-
-      // Use the SAME deterministic notification ID as syncScheduledNativeNotifications so
-      // Android updates any matching slot in place rather than stacking duplicate cards.
       const id = hashToNotificationId(slotSeed);
       await LocalNotifications.schedule({
         notifications: [
@@ -305,7 +284,6 @@ export async function sendSystemNotification(params: {
             ...(summaryText ? { summaryText } : {}),
             channelId,
             group: slotSeed,
-            actionTypeId,
             ongoing: isOngoing,
             foreground: true,
             autoCancel: !isOngoing,
@@ -344,7 +322,7 @@ export async function sendSystemNotification(params: {
   }
 }
 
-function getNextDateForTime(hhmm: string): Date | null {
+function getNextDateForTime(hhmm: string, minLeadMs = 2000): Date | null {
   const [hStr, mStr] = hhmm.split(':');
   const hour = Number(hStr);
   const minute = Number(mStr);
@@ -352,25 +330,52 @@ function getNextDateForTime(hhmm: string): Date | null {
 
   const target = new Date();
   target.setHours(hour, minute, 0, 0);
-  if (target.getTime() <= Date.now() + 65000) {
+  if (target.getTime() <= Date.now() + minLeadMs) {
     target.setDate(target.getDate() + 1);
   }
   return target;
 }
 
-function getDateForDueTask(dueDate: string, dueTime: string): Date | null {
+function getNextDateForRepeatingAlarm(
+  hhmm: string,
+  repeatDays: number[],
+  minLeadMs = 2000
+): Date | null {
+  const [hStr, mStr] = hhmm.split(':');
+  const hour = Number(hStr);
+  const minute = Number(mStr);
+  if (Number.isNaN(hour) || Number.isNaN(minute) || repeatDays.length === 0) return null;
+
+  const candidate = new Date();
+  candidate.setHours(hour, minute, 0, 0);
+  if (candidate.getTime() <= Date.now() + minLeadMs) {
+    candidate.setDate(candidate.getDate() + 1);
+  }
+
+  for (let offset = 0; offset < 8; offset++) {
+    if (repeatDays.includes(candidate.getDay())) {
+      return candidate;
+    }
+    candidate.setDate(candidate.getDate() + 1);
+  }
+  return null;
+}
+
+function getDateForDueTask(dueDate: string, dueTime: string, minLeadMs = 2000): Date | null {
   if (!dueDate || !dueTime) return null;
   const [y, m, d] = dueDate.split('-').map(Number);
   const [hh, mm] = dueTime.split(':').map(Number);
   if ([y, m, d, hh, mm].some((n) => Number.isNaN(n))) return null;
   const dt = new Date(y, m - 1, d, hh, mm, 0, 0);
-  return dt.getTime() > Date.now() + 15000 ? dt : null;
+  return dt.getTime() > Date.now() + minLeadMs ? dt : null;
 }
 
 function buildScheduleFingerprint(params: {
   alarms: AlarmItem[];
   tasks: TaskReminderItem[];
   eventSessions: EventCalmSession[];
+  customAudioTones?: CustomAudioTone[];
+  defaultNotificationSoundId?: string;
 }): string {
   const compactAlarms = params.alarms.map((a) => ({
     id: a.id,
@@ -381,6 +386,7 @@ function buildScheduleFingerprint(params: {
     enabled: a.enabled,
     repeatDays: a.repeatDays,
     snoozeMinutes: a.snoozeMinutes || 5,
+    soundId: a.soundId || '',
     soundName: a.soundName || '',
     snoozedUntilDate: a.snoozedUntilDate || '',
     snoozedUntilTime: a.snoozedUntilTime || '',
@@ -394,6 +400,8 @@ function buildScheduleFingerprint(params: {
       dueDate: t.dueDate,
       dueTime: t.dueTime,
       category: t.category,
+      soundId: t.soundId || '',
+      soundName: t.soundName || '',
     }));
   const compactEvents = params.eventSessions
     .filter((s) => s.active)
@@ -408,13 +416,26 @@ function buildScheduleFingerprint(params: {
       selectedPrompts: s.selectedPrompts,
       customPrompts: s.customPrompts,
     }));
-  return JSON.stringify({ compactAlarms, compactTasks, compactEvents });
+  const compactToneIds = (params.customAudioTones || []).map((t) => `${t.id}:${t.sizeBytes}`);
+  return JSON.stringify({
+    compactAlarms,
+    compactTasks,
+    compactEvents,
+    compactToneIds,
+    defaultNotificationSoundId: params.defaultNotificationSoundId || '',
+  });
+}
+
+export function resetScheduleSyncFingerprint(): void {
+  lastScheduleFingerprint = '';
 }
 
 export function syncScheduledNativeNotifications(params: {
   alarms: AlarmItem[];
   tasks: TaskReminderItem[];
   eventSessions: EventCalmSession[];
+  customAudioTones?: CustomAudioTone[];
+  defaultNotificationSoundId?: string;
 }): Promise<void> {
   if (!Capacitor.isNativePlatform()) return Promise.resolve();
 
@@ -426,14 +447,10 @@ export function syncScheduledNativeNotifications(params: {
 
   syncChain = syncChain.then(async () => {
     try {
-      const granted = await ensureNotificationSetup();
-      if (!granted) return;
+      await ensureNotificationSetup();
 
-      const exactCheck = await LocalNotifications.checkExactNotificationSetting().catch(() => ({
-        exact_alarm: 'denied' as const,
-      }));
-      const useExact = exactCheck.exact_alarm === 'granted';
-
+      // Clear legacy @capacitor/local-notifications schedules so our native AlarmManager +
+      // SanctuaryRingtoneService BroadcastReceiver handles all triggers without duplicates
       const pending = await LocalNotifications.getPending().catch(() => ({ notifications: [] }));
       const toCancel = pending.notifications
         .filter((n) => n.id >= 10000)
@@ -442,60 +459,42 @@ export function syncScheduledNativeNotifications(params: {
         await LocalNotifications.cancel({ notifications: toCancel }).catch(() => {});
       }
 
-      const notifications: Parameters<typeof LocalNotifications.schedule>[0]['notifications'] = [];
-      const seenIds = new Set<number>();
+      const tones = params.customAudioTones || [];
+      const tonePathMap = await syncAllCustomTonesToNative(tones);
+      const defaultSoundId = params.defaultNotificationSoundId || 'builtin:calm-chime';
+      const defaultSoundPath = tonePathMap.get(defaultSoundId) || '';
 
-      const pushUnique = (
-        item: Parameters<typeof LocalNotifications.schedule>[0]['notifications'][number]
-      ) => {
-        if (seenIds.has(item.id)) return;
-        seenIds.add(item.id);
-        notifications.push(item);
-      };
+      const schedules: NativeScheduleItem[] = [];
 
-      const now = new Date();
-      const nowHH = now.getHours();
-      const nowMM = now.getMinutes();
-
-      // 1. Enabled Alarms
+      // 1. Enabled Alarms (both dedicated & linked task alarms)
       for (const alarm of params.alarms) {
         if (!alarm.enabled || !alarm.time) continue;
-        const [hStr, mStr] = alarm.time.split(':');
-        const hour = Number(hStr);
-        const minute = Number(mStr);
-        if (Number.isNaN(hour) || Number.isNaN(minute)) continue;
-
         const baseTitle = alarm.linkedReminderTitle || alarm.label || 'My World Alarm';
-        const title = `▶ ${baseTitle}`;
         const snoozeMins = alarm.snoozeMinutes || 5;
-        const soundLabel = alarm.soundName || 'Sanctuary Chime';
+        const soundId = alarm.soundId || 'builtin:sanctuary-chime';
+        const soundPath = tonePathMap.get(soundId) || '';
+        const soundName = alarm.soundName || 'Sanctuary Chime';
         const body = (alarm.linkedReminderNotes || '').trim();
         const slotSeed = `alarm:${alarm.id}`;
 
-        // Schedule active snooze wake-up if present
+        // Active snooze trigger if user tapped Snooze
         if (alarm.snoozedUntilDate && alarm.snoozedUntilTime) {
-          const snoozeAt = getDateForDueTask(alarm.snoozedUntilDate, alarm.snoozedUntilTime);
+          const snoozeAt = getDateForDueTask(alarm.snoozedUntilDate, alarm.snoozedUntilTime, 1000);
           if (snoozeAt) {
-            pushUnique({
-              id: hashToNotificationId(slotSeed),
-              title,
+            schedules.push({
+              id: `${slotSeed}:snooze`,
+              notifId: hashToNotificationId(slotSeed),
+              kind: 'alarm',
+              entityId: alarm.id,
+              title: baseTitle,
               body,
-              ...(body ? { largeBody: body } : {}),
-              channelId: ALARM_CHANNEL_ID,
-              group: slotSeed,
-              actionTypeId: ALARM_ACTION_TYPE_ID,
-              foreground: true,
-              autoCancel: false,
-              isExactNotification: useExact,
-              extra: {
-                route: 'alarms' satisfies AppRoute,
-                kind: 'alarm',
-                entityId: alarm.id,
-                snoozeMinutes: snoozeMins,
-                soundName: soundLabel,
-                slotSeed,
-              },
-              schedule: { at: snoozeAt, allowWhileIdle: true },
+              soundId,
+              soundPath,
+              soundName,
+              route: 'alarms',
+              snoozeMinutes: snoozeMins,
+              repeating: false,
+              triggerAtMs: snoozeAt.getTime(),
             });
           }
         }
@@ -504,88 +503,44 @@ export function syncScheduledNativeNotifications(params: {
           const at = alarm.snoozedUntilDate
             ? null
             : alarm.date
-              ? getDateForDueTask(alarm.date, alarm.time)
-              : getNextDateForTime(alarm.time);
+              ? getDateForDueTask(alarm.date, alarm.time, 2000)
+              : getNextDateForTime(alarm.time, 2000);
           if (at) {
-            pushUnique({
-              id: hashToNotificationId(slotSeed),
-              title,
-              body,
-              ...(body ? { largeBody: body } : {}),
-              channelId: ALARM_CHANNEL_ID,
-              group: slotSeed,
-              actionTypeId: ALARM_ACTION_TYPE_ID,
-              foreground: true,
-              autoCancel: false,
-              isExactNotification: useExact,
-              extra: {
-                route: 'alarms' satisfies AppRoute,
-                kind: 'alarm',
-                entityId: alarm.id,
-                snoozeMinutes: snoozeMins,
-                soundName: soundLabel,
-                slotSeed,
-              },
-              schedule: { at, allowWhileIdle: true },
-            });
-          }
-        } else if (alarm.repeatDays.length === 7) {
-          // If repeating right at this exact current minute, avoid immediate duplicate re-triggering
-          if (nowHH === hour && nowMM === minute) continue;
-          pushUnique({
-            id: hashToNotificationId(slotSeed),
-            title,
-            body,
-            ...(body ? { largeBody: body } : {}),
-            channelId: ALARM_CHANNEL_ID,
-            group: slotSeed,
-            actionTypeId: ALARM_ACTION_TYPE_ID,
-            foreground: true,
-            autoCancel: false,
-            isExactNotification: useExact,
-            extra: {
-              route: 'alarms' satisfies AppRoute,
+            schedules.push({
+              id: slotSeed,
+              notifId: hashToNotificationId(slotSeed),
               kind: 'alarm',
               entityId: alarm.id,
-              snoozeMinutes: snoozeMins,
-              soundName: soundLabel,
-              slotSeed,
-            },
-            schedule: {
-              on: { hour, minute },
-              repeats: true,
-              allowWhileIdle: true,
-            },
-          });
-        } else {
-          for (const dayIdx of alarm.repeatDays) {
-            if (now.getDay() === dayIdx && nowHH === hour && nowMM === minute) continue;
-            const weekday = (dayIdx + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
-            const daySlotSeed = `alarm:${alarm.id}:w:${dayIdx}`;
-            pushUnique({
-              id: hashToNotificationId(daySlotSeed),
-              title,
+              title: baseTitle,
               body,
-              ...(body ? { largeBody: body } : {}),
-              channelId: ALARM_CHANNEL_ID,
-              group: slotSeed,
-              actionTypeId: ALARM_ACTION_TYPE_ID,
-              foreground: true,
-              autoCancel: false,
-              isExactNotification: useExact,
-              extra: {
-                route: 'alarms' satisfies AppRoute,
-                kind: 'alarm',
-                entityId: alarm.id,
-                snoozeMinutes: snoozeMins,
-                soundName: soundLabel,
-                slotSeed: daySlotSeed,
-              },
-              schedule: {
-                on: { weekday, hour, minute },
-                repeats: true,
-                allowWhileIdle: true,
-              },
+              soundId,
+              soundPath,
+              soundName,
+              route: 'alarms',
+              snoozeMinutes: snoozeMins,
+              repeating: false,
+              triggerAtMs: at.getTime(),
+            });
+          }
+        } else {
+          const nextRepeat = getNextDateForRepeatingAlarm(alarm.time, alarm.repeatDays, 2000);
+          if (nextRepeat) {
+            schedules.push({
+              id: slotSeed,
+              notifId: hashToNotificationId(slotSeed),
+              kind: 'alarm',
+              entityId: alarm.id,
+              title: baseTitle,
+              body,
+              soundId,
+              soundPath,
+              soundName,
+              route: 'alarms',
+              snoozeMinutes: snoozeMins,
+              repeating: true,
+              repeatDays: alarm.repeatDays,
+              hhmm: alarm.time,
+              triggerAtMs: nextRepeat.getTime(),
             });
           }
         }
@@ -594,31 +549,26 @@ export function syncScheduledNativeNotifications(params: {
       // 2. Unlinked Task Reminders with future due time
       for (const task of params.tasks) {
         if (task.completed || task.linkedAlarmId || !task.dueTime) continue;
-        const at = getDateForDueTask(task.dueDate, task.dueTime);
+        const at = getDateForDueTask(task.dueDate, task.dueTime, 2000);
         if (!at) continue;
 
         const slotSeed = `task:${task.id}`;
-        const taskBody = (task.notes || '').trim();
-        pushUnique({
-          id: hashToNotificationId(slotSeed),
-          title: `▶ ${task.title}`,
-          body: taskBody,
-          ...(taskBody ? { largeBody: taskBody } : {}),
-          channelId: REMINDER_CHANNEL_ID,
-          group: slotSeed,
-          actionTypeId: REMINDER_ACTION_TYPE_ID,
-          foreground: true,
-          autoCancel: true,
-          isExactNotification: useExact,
-          extra: {
-            route: 'tasks' satisfies AppRoute,
-            kind: 'reminder',
-            entityId: task.id,
-            snoozeMinutes: 5,
-            soundName: task.soundName,
-            slotSeed,
-          },
-          schedule: { at, allowWhileIdle: true },
+        const soundId = task.soundId || defaultSoundId;
+        const soundPath = tonePathMap.get(soundId) || defaultSoundPath;
+        schedules.push({
+          id: slotSeed,
+          notifId: hashToNotificationId(slotSeed),
+          kind: 'reminder',
+          entityId: task.id,
+          title: task.title,
+          body: (task.notes || '').trim(),
+          soundId,
+          soundPath,
+          soundName: task.soundName || 'Reminder Chime',
+          route: 'tasks',
+          snoozeMinutes: 5,
+          repeating: false,
+          triggerAtMs: at.getTime(),
         });
       }
 
@@ -629,39 +579,29 @@ export function syncScheduledNativeNotifications(params: {
         if (checkTimes.length === 0) continue;
 
         const message = formatEventCalmPrompts(session);
-        const promptCount =
-          session.selectedPrompts.length + session.customPrompts.length;
-
-        checkTimes.forEach((at) => {
-          if (at.getTime() <= Date.now() + 15000) return;
+        for (const at of checkTimes) {
+          if (at.getTime() <= Date.now() + 2000) continue;
           const slotMinuteKey = getCurrentMinuteKey(at);
           const slotSeed = `calm:${session.id}:${slotMinuteKey}`;
-          pushUnique({
-            id: hashToNotificationId(slotSeed),
+          schedules.push({
+            id: slotSeed,
+            notifId: hashToNotificationId(slotSeed),
+            kind: 'calm',
+            entityId: session.id,
             title: `${session.eventName} · Event Calm`,
             body: message,
-            largeBody: message,
-            ...(promptCount > 1 ? { summaryText: `${promptCount} grounding prompts` } : {}),
-            channelId: CALM_CHANNEL_ID,
-            actionTypeId: undefined,
-            foreground: true,
-            autoCancel: true,
-            isExactNotification: useExact,
-            extra: {
-              route: 'event-calm' satisfies AppRoute,
-              kind: 'calm',
-              entityId: session.id,
-              slotSeed,
-              dedupeKey: slotSeed,
-            },
-            schedule: { at, allowWhileIdle: true },
+            soundId: defaultSoundId,
+            soundPath: defaultSoundPath,
+            soundName: 'Calm Bell',
+            route: 'event-calm',
+            snoozeMinutes: 5,
+            repeating: false,
+            triggerAtMs: at.getTime(),
           });
-        });
+        }
       }
 
-      if (notifications.length > 0) {
-        await LocalNotifications.schedule({ notifications }).catch(() => {});
-      }
+      await syncNativeSchedules(schedules);
     } catch {
       // ignore background schedule failures
     }

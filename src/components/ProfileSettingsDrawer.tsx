@@ -9,11 +9,15 @@ import {
   Lock,
   LogOut,
   Moon,
+  Share2,
   ShieldCheck,
   Sun,
   Volume2,
   X,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import type { User } from 'firebase/auth';
 import type {
   AppRoute,
@@ -28,6 +32,7 @@ import {
   type BiometricAvailability,
 } from '../lib/biometrics';
 import { generateSalt, hashPin } from '../lib/crypto';
+import { exportToDevicePublicStorage } from '../lib/nativeAudio';
 import { BUILTIN_TONES } from '../lib/sound';
 import { exportLocalBackupJson, getSetting, putInStore } from '../lib/storage';
 
@@ -71,6 +76,13 @@ export const ProfileSettingsDrawer: React.FC<ProfileSettingsDrawerProps> = ({
   const [nameFeedback, setNameFeedback] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [backupNotice, setBackupNotice] = useState<{
+    ok: boolean;
+    message: string;
+    path?: string;
+    filename?: string;
+    jsonCache?: string;
+  } | null>(null);
 
   // Fingerprint & Master Lock setup state
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings | null>(null);
@@ -95,6 +107,7 @@ export const ProfileSettingsDrawer: React.FC<ProfileSettingsDrawerProps> = ({
     setFpConfirmPinInput('');
     setFpError(null);
     setFpSuccess(null);
+    setBackupNotice(null);
 
     let mounted = true;
     Promise.all([
@@ -203,19 +216,71 @@ export const ProfileSettingsDrawer: React.FC<ProfileSettingsDrawerProps> = ({
 
   const handleExportBackup = async () => {
     setExporting(true);
+    setBackupNotice(null);
     try {
       const json = await exportLocalBackupJson();
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `my-world-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const filename = `my-world-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const result = await exportToDevicePublicStorage({
+        filename,
+        mimeType: 'application/json',
+        folderType: 'backup',
+        textContent: json,
+      });
+
+      if (result.ok) {
+        setBackupNotice({
+          ok: true,
+          message: 'Backup saved successfully!',
+          path: result.displayPath,
+          filename,
+          jsonCache: json,
+        });
+      } else {
+        setBackupNotice({
+          ok: false,
+          message: result.error || 'Could not save backup file.',
+        });
+      }
+    } catch {
+      setBackupNotice({
+        ok: false,
+        message: 'Could not generate local backup.',
+      });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleShareBackup = async () => {
+    if (!backupNotice?.jsonCache || !backupNotice.filename) return;
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const cachePath = `backup_share/${backupNotice.filename}`;
+        await Filesystem.writeFile({
+          directory: Directory.Cache,
+          path: cachePath,
+          data: backupNotice.jsonCache,
+          encoding: Encoding.UTF8,
+          recursive: true,
+        });
+        const { uri } = await Filesystem.getUri({
+          directory: Directory.Cache,
+          path: cachePath,
+        });
+        await Share.share({
+          title: 'My World Backup',
+          text: 'My World Sanctuary local backup JSON',
+          url: uri,
+          dialogTitle: 'Share or save backup file',
+        });
+      } else if (navigator.share) {
+        await navigator.share({
+          title: 'My World Backup',
+          text: backupNotice.jsonCache,
+        });
+      }
+    } catch {
+      // ignore cancelled share sheet
     }
   };
 
@@ -601,10 +666,38 @@ export const ProfileSettingsDrawer: React.FC<ProfileSettingsDrawerProps> = ({
             >
               <span className="flex items-center gap-2.5">
                 <Download className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />
-                {exporting ? 'Preparing Backup...' : 'Export Local Backup (.json)'}
+                {exporting ? 'Saving Backup...' : 'Export Local Backup (.json)'}
               </span>
-              <span className="text-[#5B6472] dark:text-[#98A2B3]">Device only</span>
+              <span className="text-[#5B6472] dark:text-[#98A2B3]">Download</span>
             </button>
+
+            {backupNotice && (
+              <div
+                role="status"
+                className={`rounded-2xl p-3.5 text-xs space-y-2 border ${
+                  backupNotice.ok
+                    ? 'bg-[#E4F2E9] dark:bg-[#192B22] border-[#9EC5AB]/45 text-[#1F5638] dark:text-[#A9DFBE]'
+                    : 'bg-[#FCEEE9] dark:bg-[#2B1B18] border-[#F2B8A2]/45 text-[#A6482D] dark:text-[#F2B8A2]'
+                }`}
+              >
+                <p className="font-semibold">{backupNotice.message}</p>
+                {backupNotice.path && (
+                  <p className="font-mono-tabular text-[11px] break-all opacity-90">
+                    Saved to: {backupNotice.path}
+                  </p>
+                )}
+                {backupNotice.ok && backupNotice.jsonCache && (
+                  <button
+                    type="button"
+                    onClick={() => void handleShareBackup()}
+                    className="min-h-[36px] px-3 rounded-xl bg-white/85 dark:bg-[#131722] border border-slate-900/[0.08] dark:border-white/[0.08] text-[11px] font-semibold text-[#255F8A] dark:text-[#9BC4E2] inline-flex items-center gap-1.5"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    Share / Save Copy
+                  </button>
+                )}
+              </div>
+            )}
           </section>
 
           {/* 5. About App */}

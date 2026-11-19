@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import {
   AlarmClock,
   ArrowLeft,
@@ -86,10 +87,21 @@ import {
   collectMissedAndTodayInboxItems,
   ensureNotificationSetup,
   formatEventCalmPrompts,
+  hashToNotificationId,
   removeNotificationBySlotSeed,
+  resetScheduleSyncFingerprint,
   sendSystemNotification,
   syncScheduledNativeNotifications,
 } from './lib/notifications';
+import {
+  attachNativeAudioListeners,
+  drainNativePendingEvents,
+  startNativeRingtone,
+  stopNativeRingtone,
+  syncCustomToneFileToNative,
+  tryClaimNativeSlot,
+  type NativeAlertEvent,
+} from './lib/nativeAudio';
 import { deletePrivateMediaFile } from './lib/privateMediaStorage';
 import {
   ALARM_MAX_RING_MS,
@@ -281,9 +293,13 @@ export function App() {
     session: EventCalmSession;
     prompt: string;
     startedAtMs: number;
+    muteInitialChime?: boolean;
   } | null>(null);
   const [calmMinutesByDate, setCalmMinutesByDate] = useState<Record<string, number>>(() =>
     getCalmMinutesByDate()
+  );
+  const [nativeEventsReady, setNativeEventsReady] = useState<boolean>(
+    () => !Capacitor.isNativePlatform()
   );
 
   const ringingAlarmRef = useRef(ringingAlarm);
@@ -292,6 +308,12 @@ export function App() {
   alarmsRef.current = alarms;
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
+  const eventSessionsRef = useRef(eventSessions);
+  eventSessionsRef.current = eventSessions;
+  const customAudioTonesRef = useRef(customAudioTones);
+  customAudioTonesRef.current = customAudioTones;
+  const defaultNotificationSoundIdRef = useRef(defaultNotificationSoundId);
+  defaultNotificationSoundIdRef.current = defaultNotificationSoundId;
   const activeReminderNoticeRef = useRef(activeReminderNotice);
   activeReminderNoticeRef.current = activeReminderNotice;
   const breathingPromptStateRef = useRef(breathingPromptState);
@@ -512,13 +534,239 @@ export function App() {
     reconcileMissedNotifications();
   }, [reconcileMissedNotifications]);
 
-  // Immediate AppState / visibilitychange auto-lock + foreground missed-alert reconciliation
+  const handleNativeAlertEvent = useCallback(
+    async (ev: NativeAlertEvent) => {
+      const now = Date.now();
+
+      if (ev.type === 'fired') {
+        const minuteKey = ev.minuteKey || '';
+        if (ev.kind === 'alarm') {
+          const matched = alarmsRef.current.find((a) => a.id === ev.entityId);
+          if (matched) {
+            const updated: AlarmItem = {
+              ...matched,
+              lastTriggeredMinute: minuteKey || matched.lastTriggeredMinute,
+              snoozedUntilDate: undefined,
+              snoozedUntilTime: undefined,
+              enabled: matched.repeatDays.length === 0 ? false : matched.enabled,
+            };
+            await putInStore('alarms', updated);
+            setAlarms((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+
+            if (now - (ev.timestampMs || now) < 55_000) {
+              setRingingAlarm(updated);
+              setRingingStartedAtMs(ev.timestampMs || now);
+            }
+          }
+          if (minuteKey) {
+            pushInboxNotification({
+              dedupeKey: `alarm:${ev.entityId}:${minuteKey}`,
+              kind: 'alarm',
+              status: 'delivered',
+              title: ev.title || 'Sanctuary Alarm',
+              body: ev.body || 'Alarm triggered.',
+              scheduledAt: new Date(ev.timestampMs || now).toISOString(),
+              createdAt: new Date().toISOString(),
+              read: true,
+              route: 'alarms',
+            });
+          }
+          return;
+        }
+
+        if (ev.kind === 'reminder') {
+          const matchedTask = tasksRef.current.find((t) => t.id === ev.entityId);
+          if (matchedTask) {
+            const updated: TaskReminderItem = {
+              ...matchedTask,
+              lastNotifiedMinute: minuteKey || matchedTask.lastNotifiedMinute,
+            };
+            await putInStore('tasks', updated);
+            setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+            if (now - (ev.timestampMs || now) < 120_000) {
+              setActiveReminderNotice(updated);
+            }
+          }
+          if (minuteKey) {
+            pushInboxNotification({
+              dedupeKey: `task:${ev.entityId}:${minuteKey}`,
+              kind: 'reminder',
+              status: 'delivered',
+              title: ev.title || 'Smart Reminder',
+              body: ev.body || 'Scheduled task reminder.',
+              scheduledAt: new Date(ev.timestampMs || now).toISOString(),
+              createdAt: new Date().toISOString(),
+              read: false,
+              route: 'tasks',
+            });
+          }
+          return;
+        }
+
+        if (ev.kind === 'calm') {
+          const matchedSession = eventSessionsRef.current.find((s) => s.id === ev.entityId);
+          if (matchedSession) {
+            const updated: EventCalmSession = {
+              ...matchedSession,
+              lastCheckInMinute: minuteKey || matchedSession.lastCheckInMinute,
+            };
+            await putInStore('events', updated);
+            setEventSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+            if (now - (ev.timestampMs || now) < 180_000) {
+              const pool = [...updated.selectedPrompts, ...updated.customPrompts]
+                .map((p) => p.trim())
+                .filter(Boolean);
+              const leadPrompt =
+                pool[0] || "It's okay. Take 3 slow breaths and return to the present moment.";
+              setBreathingPromptState({
+                session: updated,
+                prompt: leadPrompt,
+                startedAtMs: ev.timestampMs || now,
+                muteInitialChime: true,
+              });
+            }
+          }
+          if (minuteKey) {
+            pushInboxNotification({
+              dedupeKey: `calm:${ev.entityId}:${minuteKey}`,
+              kind: 'calm',
+              status: 'delivered',
+              title: ev.title || 'Event Calm',
+              body: ev.body || 'Gentle grounding check-in.',
+              scheduledAt: new Date(ev.timestampMs || now).toISOString(),
+              createdAt: new Date().toISOString(),
+              read: false,
+              route: 'event-calm',
+            });
+          }
+        }
+        return;
+      }
+
+      if (ev.type === 'snooze' || ev.type === 'auto_snoozed') {
+        const effectiveMinutes = ev.snoozeMinutes && ev.snoozeMinutes > 0 ? ev.snoozeMinutes : 5;
+        const snoozeTarget = new Date(
+          ev.snoozeTargetMs || Date.now() + effectiveMinutes * 60_000
+        );
+        const snoozeDate = `${snoozeTarget.getFullYear()}-${String(
+          snoozeTarget.getMonth() + 1
+        ).padStart(2, '0')}-${String(snoozeTarget.getDate()).padStart(2, '0')}`;
+        const snoozeTime = `${String(snoozeTarget.getHours()).padStart(2, '0')}:${String(
+          snoozeTarget.getMinutes()
+        ).padStart(2, '0')}`;
+
+        if (ev.kind === 'reminder') {
+          const matchedTask = tasksRef.current.find((t) => t.id === ev.entityId);
+          if (matchedTask) {
+            const updated: TaskReminderItem = {
+              ...matchedTask,
+              dueDate: snoozeDate,
+              dueTime: snoozeTime,
+              lastNotifiedMinute: undefined,
+            };
+            await putInStore('tasks', updated);
+            setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+            setActiveReminderNotice((curr) => (curr?.id === updated.id ? null : curr));
+          }
+          return;
+        }
+
+        const matchedAlarm =
+          alarmsRef.current.find((a) => a.id === ev.entityId) || ringingAlarmRef.current;
+        if (matchedAlarm) {
+          const updated: AlarmItem = {
+            ...matchedAlarm,
+            enabled: true,
+            snoozedUntilDate: snoozeDate,
+            snoozedUntilTime: snoozeTime,
+            lastTriggeredMinute: undefined,
+          };
+          await putInStore('alarms', updated);
+          setAlarms((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+          setRingingAlarm((curr) => (curr?.id === updated.id ? null : curr));
+
+          if (ev.type === 'auto_snoozed') {
+            const formattedTime = formatTime12h(snoozeTime);
+            const alarmTitle = updated.linkedReminderTitle || updated.label || 'Sanctuary Alarm';
+            pushInboxNotification({
+              dedupeKey: `alarm:${updated.id}:autosnooze:${snoozeDate}T${snoozeTime}`,
+              kind: 'alarm',
+              status: 'missed',
+              title: `Auto-snoozed ${effectiveMinutes}m · ${alarmTitle}`,
+              body: updated.linkedReminderNotes || `Next alarm at ${formattedTime}.`,
+              scheduledAt: snoozeTarget.toISOString(),
+              createdAt: new Date().toISOString(),
+              read: false,
+              route: 'alarms',
+            });
+          }
+        } else {
+          setRingingAlarm(null);
+        }
+        return;
+      }
+
+      if (ev.type === 'dismiss') {
+        if (ev.kind === 'reminder') {
+          setActiveReminderNotice((curr) =>
+            !ev.entityId || curr?.id === ev.entityId ? null : curr
+          );
+          return;
+        }
+        const matchedAlarm =
+          alarmsRef.current.find((a) => a.id === ev.entityId) || ringingAlarmRef.current;
+        if (matchedAlarm && (matchedAlarm.snoozedUntilDate || matchedAlarm.snoozedUntilTime)) {
+          const cleaned: AlarmItem = {
+            ...matchedAlarm,
+            snoozedUntilDate: undefined,
+            snoozedUntilTime: undefined,
+          };
+          await putInStore('alarms', cleaned);
+          setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
+        }
+        setRingingAlarm((curr) =>
+          !ev.entityId || curr?.id === ev.entityId ? null : curr
+        );
+      }
+    },
+    [pushInboxNotification]
+  );
+
+  const drainAndApplyNativeEvents = useCallback(async () => {
+    if (!Capacitor.isNativePlatform()) {
+      setNativeEventsReady(true);
+      return;
+    }
+    try {
+      const { events, pendingRoute } = await drainNativePendingEvents();
+      for (const ev of events) {
+        await handleNativeAlertEvent(ev);
+      }
+      if (events.length > 0) {
+        resetScheduleSyncFingerprint();
+      }
+      if (pendingRoute) {
+        navigateTo(pendingRoute);
+      }
+    } finally {
+      setNativeEventsReady(true);
+    }
+  }, [handleNativeAlertEvent, navigateTo]);
+
+  useEffect(() => {
+    if (!ready) return;
+    void drainAndApplyNativeEvents();
+  }, [ready, drainAndApplyNativeEvents]);
+
+  // Immediate AppState / visibilitychange auto-lock + foreground missed-alert reconciliation + native event drain
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
         setVaultKey(null);
       } else if (document.visibilityState === 'visible') {
-        reconcileMissedNotifications();
+        void drainAndApplyNativeEvents().then(() => {
+          reconcileMissedNotifications();
+        });
       }
     };
     const handlePageHide = () => setVaultKey(null);
@@ -530,7 +778,9 @@ export function App() {
       if (!isActive) {
         setVaultKey(null);
       } else {
-        reconcileMissedNotifications();
+        void drainAndApplyNativeEvents().then(() => {
+          reconcileMissedNotifications();
+        });
       }
     }).catch(() => null);
 
@@ -539,7 +789,7 @@ export function App() {
       window.removeEventListener('pagehide', handlePageHide);
       void appStateHandle.then((h) => h?.remove());
     };
-  }, [reconcileMissedNotifications]);
+  }, [drainAndApplyNativeEvents, reconcileMissedNotifications]);
 
   const getAlarmSlotSeed = useCallback((alarm: AlarmItem, weekday = new Date().getDay()) => {
     return alarm.repeatDays.length > 0 && alarm.repeatDays.length < 7
@@ -623,7 +873,11 @@ export function App() {
           soundLabel: updated.soundName,
         });
       } else {
-        void removeNotificationBySlotSeed(slotSeed);
+        const primarySeed = `alarm:${updated.id}`;
+        void removeNotificationBySlotSeed(primarySeed);
+        if (slotSeed !== primarySeed) {
+          void removeNotificationBySlotSeed(slotSeed);
+        }
       }
     },
     [getAlarmSlotSeed, pushInboxNotification]
@@ -687,7 +941,34 @@ export function App() {
         });
       }
 
-      // 1. Post the notification tray card FIRST before starting alarm audio
+      handleStopAllSoundscapes();
+      stopSoundPreview();
+
+      const matchedTone = alarm.soundId
+        ? customAudioTones.find((t) => t.id === alarm.soundId)
+        : undefined;
+
+      if (Capacitor.isNativePlatform()) {
+        const soundPath = matchedTone ? await syncCustomToneFileToNative(matchedTone) : '';
+        await startNativeRingtone({
+          scheduleId: `alarm:${alarm.id}`,
+          notifId: hashToNotificationId(`alarm:${alarm.id}`),
+          kind: 'alarm',
+          entityId: alarm.id,
+          title: alarm.linkedReminderTitle || alarm.label,
+          body: (alarm.linkedReminderNotes || '').trim(),
+          soundId: alarm.soundId || 'builtin:sanctuary-chime',
+          soundPath: soundPath || '',
+          soundName: soundLabel,
+          route: 'alarms',
+          snoozeMinutes: alarmWithSound.snoozeMinutes,
+          isTest: Boolean(options?.isTest),
+          slotKey: options?.isTest ? '' : alarmDedupeKey,
+        });
+        return;
+      }
+
+      // Web fallback: post browser Notification + play HTMLAudioElement / WebAudio
       await sendSystemNotification({
         dedupeKey: alarmDedupeKey,
         slotSeed,
@@ -703,16 +984,7 @@ export function App() {
         snoozeMinutes: alarmWithSound.snoozeMinutes,
       });
 
-      // Brief yield so the OS posts the notification before sound begins
       await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
-
-      // 2. Stop any playing soundscapes or audio previews, then ring alarm (which also claims OS audio focus)
-      handleStopAllSoundscapes();
-      stopSoundPreview();
-
-      const matchedTone = alarm.soundId
-        ? customAudioTones.find((t) => t.id === alarm.soundId)
-        : undefined;
 
       startAlarmRinging(matchedTone, alarm.soundId, {
         maxDurationMs: ALARM_MAX_RING_MS,
@@ -734,11 +1006,21 @@ export function App() {
     ]
   );
 
-  // Setup Android notification channels, tap routing, & action buttons (Snooze / Dismiss)
+  // Setup Android notification channels, native Broadcast listeners, & tap routing
   useEffect(() => {
     if (!ready || !authUser) return;
     void ensureNotificationSetup();
-    const detach = attachNotificationListeners({
+
+    const detachNative = attachNativeAudioListeners({
+      onAlertEvent: (ev) => {
+        void handleNativeAlertEvent(ev);
+      },
+      onRouteIntent: (targetRoute) => {
+        navigateTo(targetRoute);
+      },
+    });
+
+    const detachLocal = attachNotificationListeners({
       onNavigate: (targetRoute) => navigateTo(targetRoute),
       onNativeReceived: (item) => pushInboxNotification(item),
       onActionPerformed: (payload) => {
@@ -788,11 +1070,13 @@ export function App() {
       },
     });
     return () => {
-      detach();
+      detachNative();
+      detachLocal();
     };
   }, [
     ready,
     authUser,
+    handleNativeAlertEvent,
     navigateTo,
     pushInboxNotification,
     snoozeAlarmByEntity,
@@ -800,9 +1084,25 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!ready || !authUser) return;
-    void syncScheduledNativeNotifications({ alarms, tasks, eventSessions });
-  }, [ready, authUser, alarms, tasks, eventSessions]);
+    if (!ready || !authUser || !nativeEventsReady) return;
+    resetScheduleSyncFingerprint();
+    void syncScheduledNativeNotifications({
+      alarms,
+      tasks,
+      eventSessions,
+      customAudioTones,
+      defaultNotificationSoundId,
+    });
+  }, [
+    ready,
+    authUser,
+    nativeEventsReady,
+    alarms,
+    tasks,
+    eventSessions,
+    customAudioTones,
+    defaultNotificationSoundId,
+  ]);
 
   // Soundscapes sleep/focus timer countdown
   useEffect(() => {
@@ -886,6 +1186,24 @@ export function App() {
 
         if (!isSnoozeDue && !isRegularDue) continue;
 
+        const alarmSlotKey = `alarm:${alarm.id}:${minuteKey}`;
+        if (Capacitor.isNativePlatform()) {
+          const claimed = await tryClaimNativeSlot(alarmSlotKey);
+          if (!claimed) {
+            // Native SanctuaryAlarmReceiver already triggered this alarm
+            const syncedAlarm: AlarmItem = {
+              ...alarm,
+              lastTriggeredMinute: minuteKey,
+              snoozedUntilDate: undefined,
+              snoozedUntilTime: undefined,
+              enabled: alarm.repeatDays.length === 0 ? false : alarm.enabled,
+            };
+            setAlarms((prev) => prev.map((a) => (a.id === alarm.id ? syncedAlarm : a)));
+            await putInStore('alarms', syncedAlarm);
+            continue;
+          }
+        }
+
         const updatedAlarm: AlarmItem = {
           ...alarm,
           lastTriggeredMinute: minuteKey,
@@ -939,6 +1257,17 @@ export function App() {
           break;
         }
 
+        const taskSlotKey = `reminder:${task.id}:${minuteKey}`;
+        if (Capacitor.isNativePlatform()) {
+          const claimed = await tryClaimNativeSlot(taskSlotKey);
+          if (!claimed) {
+            const syncedTask: TaskReminderItem = { ...task, lastNotifiedMinute: minuteKey };
+            setTasks((prev) => prev.map((t) => (t.id === task.id ? syncedTask : t)));
+            await putInStore('tasks', syncedTask);
+            continue;
+          }
+        }
+
         const soundId = task.soundId || defaultNotificationSoundId;
         const soundLabel = task.soundName || resolveSoundName(customAudioTones, soundId);
         const updatedTask: TaskReminderItem = {
@@ -963,24 +1292,44 @@ export function App() {
           route: 'tasks',
         });
 
-        await sendSystemNotification({
-          dedupeKey: taskDedupeKey,
-          slotSeed: `task:${task.id}`,
-          title: task.title,
-          body: (task.notes || '').trim(),
-          channel: 'reminder',
-          route: 'tasks',
-          entityId: task.id,
-          isPlaying: true,
-          ongoing: false,
-          replaceInPlace: true,
-          soundLabel,
-          snoozeMinutes: 5,
-        });
-
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
         setActiveReminderNotice(updatedTask);
-        playNotificationSound(customAudioTones, soundId);
+
+        if (Capacitor.isNativePlatform()) {
+          const matchedTone = customAudioTones.find((t) => t.id === soundId);
+          const soundPath = matchedTone ? await syncCustomToneFileToNative(matchedTone) : '';
+          await startNativeRingtone({
+            scheduleId: `task:${task.id}`,
+            notifId: hashToNotificationId(`task:${task.id}`),
+            kind: 'reminder',
+            entityId: task.id,
+            title: task.title,
+            body: (task.notes || '').trim(),
+            soundId,
+            soundPath: soundPath || '',
+            soundName: soundLabel,
+            route: 'tasks',
+            snoozeMinutes: 5,
+            slotKey: taskSlotKey,
+          });
+        } else {
+          await sendSystemNotification({
+            dedupeKey: taskDedupeKey,
+            slotSeed: `task:${task.id}`,
+            title: task.title,
+            body: (task.notes || '').trim(),
+            channel: 'reminder',
+            route: 'tasks',
+            entityId: task.id,
+            isPlaying: true,
+            ongoing: false,
+            replaceInPlace: true,
+            soundLabel,
+            snoozeMinutes: 5,
+          });
+
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
+          playNotificationSound(customAudioTones, soundId);
+        }
         break;
       }
 
@@ -1006,6 +1355,19 @@ export function App() {
 
         if (!shouldTrigger) continue;
 
+        const calmSlotKey = `calm:${session.id}:${minuteKey}`;
+        if (Capacitor.isNativePlatform()) {
+          const claimed = await tryClaimNativeSlot(calmSlotKey);
+          if (!claimed) {
+            const syncedSession: EventCalmSession = { ...session, lastCheckInMinute: minuteKey };
+            setEventSessions((prev) =>
+              prev.map((s) => (s.id === syncedSession.id ? syncedSession : s))
+            );
+            await putInStore('events', syncedSession);
+            continue;
+          }
+        }
+
         const pool = [...session.selectedPrompts, ...session.customPrompts]
           .map((p) => p.trim())
           .filter(Boolean);
@@ -1023,12 +1385,6 @@ export function App() {
         );
         await putInStore('events', updatedSession);
 
-        setBreathingPromptState({
-          session: updatedSession,
-          prompt: leadPrompt,
-          startedAtMs: Date.now(),
-        });
-
         const calmDedupeKey = `calm:${updatedSession.id}:${minuteKey}`;
         pushInboxNotification({
           dedupeKey: calmDedupeKey,
@@ -1042,17 +1398,47 @@ export function App() {
           route: 'event-calm',
         });
 
-        void sendSystemNotification({
-          dedupeKey: calmDedupeKey,
-          slotSeed: calmDedupeKey,
-          title: `${updatedSession.eventName} · Event Calm`,
-          body: fullPromptChecklist,
-          channel: 'calm',
-          route: 'event-calm',
-          entityId: updatedSession.id,
-          summaryText:
-            pool.length > 1 ? `${pool.length} grounding prompts` : undefined,
-        });
+        if (Capacitor.isNativePlatform()) {
+          const matchedTone = customAudioTones.find((t) => t.id === defaultNotificationSoundId);
+          const soundPath = matchedTone ? await syncCustomToneFileToNative(matchedTone) : '';
+          await startNativeRingtone({
+            scheduleId: calmDedupeKey,
+            notifId: hashToNotificationId(calmDedupeKey),
+            kind: 'calm',
+            entityId: updatedSession.id,
+            title: `${updatedSession.eventName} · Event Calm`,
+            body: fullPromptChecklist,
+            soundId: defaultNotificationSoundId,
+            soundPath: soundPath || '',
+            soundName: 'Calm Bell',
+            route: 'event-calm',
+            snoozeMinutes: 5,
+            slotKey: calmSlotKey,
+          });
+          setBreathingPromptState({
+            session: updatedSession,
+            prompt: leadPrompt,
+            startedAtMs: Date.now(),
+            muteInitialChime: true,
+          });
+        } else {
+          setBreathingPromptState({
+            session: updatedSession,
+            prompt: leadPrompt,
+            startedAtMs: Date.now(),
+          });
+          void sendSystemNotification({
+            dedupeKey: calmDedupeKey,
+            slotSeed: calmDedupeKey,
+            title: `${updatedSession.eventName} · Event Calm`,
+            body: fullPromptChecklist,
+            channel: 'calm',
+            route: 'event-calm',
+            entityId: updatedSession.id,
+            summaryText:
+              pool.length > 1 ? `${pool.length} grounding prompts` : undefined,
+          });
+        }
       }
     };
 
@@ -1121,11 +1507,13 @@ export function App() {
     const target = tasks.find((t) => t.id === id);
     await deleteFromStore('tasks', id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    setActiveReminderNotice((curr) => (curr?.id === id ? null : curr));
     void removeNotificationBySlotSeed(`task:${id}`);
 
     if (target?.linkedAlarmId) {
       await deleteFromStore('alarms', target.linkedAlarmId);
       setAlarms((prev) => prev.filter((a) => a.id !== target.linkedAlarmId));
+      setRingingAlarm((curr) => (curr?.id === target.linkedAlarmId ? null : curr));
       void removeNotificationBySlotSeed(`alarm:${target.linkedAlarmId}`);
     }
   };
@@ -1190,6 +1578,8 @@ export function App() {
   const deleteAlarm = async (id: string) => {
     await deleteFromStore('alarms', id);
     setAlarms((prev) => prev.filter((a) => a.id !== id));
+    setRingingAlarm((curr) => (curr?.id === id ? null : curr));
+    void removeNotificationBySlotSeed(`alarm:${id}`);
   };
 
   const saveIdea = async (idea: CreativeIdeaCard) => {
@@ -1311,7 +1701,12 @@ export function App() {
     const active = ringingAlarmRef.current;
     stopAlarmRinging();
     if (active) {
-      void removeNotificationBySlotSeed(getAlarmSlotSeed(active));
+      const primarySeed = `alarm:${active.id}`;
+      const slotSeed = getAlarmSlotSeed(active);
+      void removeNotificationBySlotSeed(primarySeed);
+      if (slotSeed !== primarySeed) {
+        void removeNotificationBySlotSeed(slotSeed);
+      }
       if (active.snoozedUntilDate || active.snoozedUntilTime) {
         const cleaned: AlarmItem = {
           ...active,
@@ -1321,6 +1716,8 @@ export function App() {
         void putInStore('alarms', cleaned);
         setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
       }
+    } else {
+      void stopNativeRingtone();
     }
     setRingingAlarm(null);
   }, [getAlarmSlotSeed]);
@@ -2301,6 +2698,7 @@ export function App() {
           promptMessage={breathingPromptState.prompt}
           customAudioTones={customAudioTones}
           notificationSoundId={defaultNotificationSoundId}
+          muteInitialChime={breathingPromptState.muteInitialChime}
           onClose={handleCloseBreathingOverlay}
         />
       )}

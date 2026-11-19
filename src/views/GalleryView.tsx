@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Download,
   FolderPlus,
   Image as ImageIcon,
   KeyRound,
@@ -12,6 +13,7 @@ import {
 import type { MediaAlbum, PrivateMediaItem } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import {
+  downloadPrivateMediaToDevice,
   importPrivateMediaFile,
   loadPrivateMediaObjectUrl,
 } from '../lib/privateMediaStorage';
@@ -51,6 +53,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
   const [importingCount, setImportingCount] = useState(0);
   const [importNotice, setImportNotice] = useState('');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadNotice, setDownloadNotice] = useState<{
+    ok: boolean;
+    message: string;
+    path?: string;
+  } | null>(null);
 
   // Update PIN state
   const [showPinUpdate, setShowPinUpdate] = useState(false);
@@ -198,6 +206,25 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     setTimeout(() => setPinUpdateSuccess(''), 3500);
   };
 
+  const handleDownloadMedia = async (item: PrivateMediaItem) => {
+    setDownloadingId(item.id);
+    setDownloadNotice(null);
+    const res = await downloadPrivateMediaToDevice(item);
+    setDownloadingId(null);
+    if (res.ok) {
+      setDownloadNotice({
+        ok: true,
+        message: `Saved "${item.name}" to your device.`,
+        path: res.displayPath,
+      });
+    } else {
+      setDownloadNotice({
+        ok: false,
+        message: res.error || `Could not save "${item.name}".`,
+      });
+    }
+  };
+
   const confirmDeleteMedia = async () => {
     if (!pendingDeleteItem) return;
     const idToDelete = pendingDeleteItem.id;
@@ -278,6 +305,34 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           className="rounded-2xl bg-[#E4F2E9] dark:bg-[#1B2C22] border border-[#9EC5AB]/45 px-4 py-3 text-xs text-[#245C3D] dark:text-[#A9DFBE]"
         >
           {importNotice}
+        </div>
+      )}
+
+      {downloadNotice && (
+        <div
+          role="status"
+          className={`rounded-2xl px-4 py-3 text-xs flex items-start justify-between gap-3 border ${
+            downloadNotice.ok
+              ? 'bg-[#E4F2E9] dark:bg-[#1B2C22] border-[#9EC5AB]/45 text-[#1F5638] dark:text-[#A9DFBE]'
+              : 'bg-[#FCEEE9] dark:bg-[#2B1B18] border-[#F2B8A2]/45 text-[#A6482D] dark:text-[#F2B8A2]'
+          }`}
+        >
+          <div className="space-y-1 min-w-0">
+            <p className="font-semibold">{downloadNotice.message}</p>
+            {downloadNotice.path && (
+              <p className="font-mono-tabular text-[11px] break-all opacity-90">
+                Location: {downloadNotice.path}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setDownloadNotice(null)}
+            aria-label="Dismiss save notice"
+            className="min-w-[32px] min-h-[32px] rounded-xl flex items-center justify-center shrink-0 hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
@@ -451,14 +506,26 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     </div>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingDeleteItem(item)}
-                  aria-label={`Delete ${item.name}`}
-                  className="absolute top-2.5 right-2.5 w-10 h-10 rounded-full bg-[#0F1115]/80 text-[#F1F3F6] hover:text-[#F2B8A2] flex items-center justify-center opacity-95 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 opacity-95 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    disabled={downloadingId === item.id}
+                    onClick={() => void handleDownloadMedia(item)}
+                    aria-label={`Save ${item.name} to phone`}
+                    title="Save to phone storage"
+                    className="w-10 h-10 rounded-full bg-[#0F1115]/80 text-[#F1F3F6] hover:text-[#9EC5AB] disabled:opacity-50 flex items-center justify-center"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDeleteItem(item)}
+                    aria-label={`Delete ${item.name}`}
+                    className="w-10 h-10 rounded-full bg-[#0F1115]/80 text-[#F1F3F6] hover:text-[#F2B8A2] flex items-center justify-center"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -472,26 +539,55 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-4xl flex items-center justify-between mb-4 gap-3">
-            <p className="text-sm text-[#F1F3F6] truncate">{viewerItem.name}</p>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setPendingDeleteItem(viewerItem)}
-                aria-label={`Delete ${viewerItem.name}`}
-                className="w-11 h-11 rounded-full bg-white/[0.08] hover:bg-[#F2B8A2]/20 flex items-center justify-center text-[#F2B8A2]"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewerItem(null)}
-                aria-label="Close viewer"
-                className="w-11 h-11 rounded-full bg-white/[0.08] hover:bg-white/[0.16] flex items-center justify-center text-[#F1F3F6]"
-              >
-                <X className="w-5 h-5" />
-              </button>
+          <div className="w-full max-w-4xl flex flex-col gap-2 mb-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-[#F1F3F6] truncate">{viewerItem.name}</p>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={downloadingId === viewerItem.id}
+                  onClick={() => void handleDownloadMedia(viewerItem)}
+                  aria-label={`Download ${viewerItem.name} to device`}
+                  className="min-h-[44px] px-3.5 rounded-full bg-[#9EC5AB] hover:bg-[#8EB89D] disabled:opacity-50 flex items-center gap-1.5 text-xs font-semibold text-[#0F1115]"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{downloadingId === viewerItem.id ? 'Saving...' : 'Save to Phone'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingDeleteItem(viewerItem)}
+                  aria-label={`Delete ${viewerItem.name}`}
+                  className="w-11 h-11 rounded-full bg-white/[0.08] hover:bg-[#F2B8A2]/20 flex items-center justify-center text-[#F2B8A2]"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewerItem(null)}
+                  aria-label="Close viewer"
+                  className="w-11 h-11 rounded-full bg-white/[0.08] hover:bg-white/[0.16] flex items-center justify-center text-[#F1F3F6]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
+            {downloadNotice && (
+              <div
+                role="status"
+                className={`rounded-xl px-3.5 py-2 text-xs ${
+                  downloadNotice.ok
+                    ? 'bg-[#192B22] border border-[#9EC5AB]/40 text-[#A9DFBE]'
+                    : 'bg-[#2B1B18] border border-[#F2B8A2]/40 text-[#F2B8A2]'
+                }`}
+              >
+                <span className="font-semibold">{downloadNotice.message}</span>
+                {downloadNotice.path ? (
+                  <span className="block font-mono-tabular text-[11px] break-all mt-0.5 opacity-90">
+                    Location: {downloadNotice.path}
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
           <div className="max-h-[78vh] w-full max-w-4xl flex items-center justify-center">
             {viewerItem.kind === 'video' ? (

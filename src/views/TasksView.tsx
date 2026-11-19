@@ -556,7 +556,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               </div>
             </div>
 
-            <label className="flex items-start gap-3 cursor-pointer p-3 rounded-2xl bg-[#ECEFF3]/70 dark:bg-[#1D212A]/80 border border-slate-900/[0.07] dark:border-white/[0.06]">
+            <label className="flex items-start gap-3 cursor-pointer p-3.5 rounded-2xl bg-[#ECEFF3]/70 dark:bg-[#1D212A]/80 border border-slate-900/[0.07] dark:border-white/[0.06]">
               <input
                 type="checkbox"
                 checked={draft.linkAlarm}
@@ -566,11 +566,14 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 className="w-4 h-4 mt-0.5 accent-[#9EC5AB] shrink-0"
               />
               <span className="text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
-                <strong className="font-semibold text-[#111827] dark:text-[#F1F3F6]">
-                  Link Alarm at {formatTime12h(draft.dueTime)}
-                </strong>{' '}
-                — rings continuously with Snooze &amp; Dismiss and stops active music when
-                triggered.
+                <strong className="font-semibold text-[#111827] dark:text-[#F1F3F6] block">
+                  {draft.linkAlarm
+                    ? `Full Ringing Alarm at ${formatTime12h(draft.dueTime)}`
+                    : `Smart Reminder Sound Alert at ${formatTime12h(draft.dueTime)}`}
+                </strong>
+                {draft.linkAlarm
+                  ? 'Loops loudly for 1 minute on Media volume, pauses active music, and includes Snooze & Dismiss in your notification drawer.'
+                  : 'Plays your selected reminder sound for up to 10 seconds with Snooze 5m & Dismiss directly in your notification drawer.'}
               </span>
             </label>
           </div>
@@ -777,15 +780,23 @@ export const TasksView: React.FC<TasksViewProps> = ({
                           </span>
                         </>
                       )}
-                      {task.linkedAlarmId && (
+                      {task.linkedAlarmId ? (
                         <>
                           <span aria-hidden="true">·</span>
                           <span className="text-[#A6482D] dark:text-[#F2B8A2] inline-flex items-center gap-1">
                             <Bell className="w-3 h-3" />
-                            Alarm linked
+                            Full Alarm
                           </span>
                         </>
-                      )}
+                      ) : task.dueTime ? (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span className="text-[#2E6B48] dark:text-[#9EC5AB] inline-flex items-center gap-1">
+                            <Bell className="w-3 h-3" />
+                            Sound Reminder
+                          </span>
+                        </>
+                      ) : null}
                       {task.soundName && (
                         <>
                           <span aria-hidden="true">·</span>
