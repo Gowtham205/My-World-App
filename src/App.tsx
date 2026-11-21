@@ -81,13 +81,16 @@ import {
   generateSalt,
   hashPin,
 } from './lib/crypto';
-import { formatTime12h, getTodayStr } from './lib/dateUtils';
+import { formatTime12h, getDaysUntilBirthday, getTodayStr } from './lib/dateUtils';
+import { doesTaskMatchDate, getNextMatchingDateFromToday } from './lib/taskRecurrence';
 import {
   attachNotificationListeners,
   collectMissedAndTodayInboxItems,
   ensureNotificationSetup,
   formatEventCalmPrompts,
+  hasBirthdayDrawerSent,
   hashToNotificationId,
+  markBirthdayDrawerSent,
   removeNotificationBySlotSeed,
   resetScheduleSyncFingerprint,
   sendSystemNotification,
@@ -238,6 +241,36 @@ const SECONDARY_LINKS: {
 function parseMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
+}
+
+function getNextAlarmStateAfterFire(
+  alarm: AlarmItem,
+  allTasks: TaskReminderItem[]
+): { enabled: boolean; date?: string } {
+  if (alarm.repeatDays.length > 0) {
+    return { enabled: alarm.enabled, date: alarm.date };
+  }
+  if (alarm.linkedReminderId) {
+    const linked = allTasks.find((t) => t.id === alarm.linkedReminderId);
+    if (
+      linked &&
+      !linked.completed &&
+      (linked.recurrence === 'Monthly' ||
+        (linked.recurrence === 'Custom' && linked.customRecurrenceUnit === 'monthly'))
+    ) {
+      const nextDate = getNextMatchingDateFromToday({
+        startDate: linked.dueDate || getTodayStr(),
+        recurrence: linked.recurrence,
+        customRecurrenceUnit: linked.customRecurrenceUnit,
+        customRecurrenceMonthDays: linked.customRecurrenceMonthDays,
+        afterDateStr: getTodayStr(),
+      });
+      if (nextDate) {
+        return { enabled: true, date: nextDate };
+      }
+    }
+  }
+  return { enabled: false, date: alarm.date };
 }
 
 export function App() {
@@ -543,12 +576,14 @@ export function App() {
         if (ev.kind === 'alarm') {
           const matched = alarmsRef.current.find((a) => a.id === ev.entityId);
           if (matched) {
+            const nextState = getNextAlarmStateAfterFire(matched, tasksRef.current);
             const updated: AlarmItem = {
               ...matched,
               lastTriggeredMinute: minuteKey || matched.lastTriggeredMinute,
               snoozedUntilDate: undefined,
               snoozedUntilTime: undefined,
-              enabled: matched.repeatDays.length === 0 ? false : matched.enabled,
+              enabled: nextState.enabled,
+              date: nextState.date,
             };
             await putInStore('alarms', updated);
             setAlarms((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
@@ -1090,6 +1125,7 @@ export function App() {
       alarms,
       tasks,
       eventSessions,
+      birthdays,
       customAudioTones,
       defaultNotificationSoundId,
     });
@@ -1100,6 +1136,7 @@ export function App() {
     alarms,
     tasks,
     eventSessions,
+    birthdays,
     customAudioTones,
     defaultNotificationSoundId,
   ]);
@@ -1191,12 +1228,14 @@ export function App() {
           const claimed = await tryClaimNativeSlot(alarmSlotKey);
           if (!claimed) {
             // Native SanctuaryAlarmReceiver already triggered this alarm
+            const nextState = getNextAlarmStateAfterFire(alarm, tasks);
             const syncedAlarm: AlarmItem = {
               ...alarm,
               lastTriggeredMinute: minuteKey,
               snoozedUntilDate: undefined,
               snoozedUntilTime: undefined,
-              enabled: alarm.repeatDays.length === 0 ? false : alarm.enabled,
+              enabled: nextState.enabled,
+              date: nextState.date,
             };
             setAlarms((prev) => prev.map((a) => (a.id === alarm.id ? syncedAlarm : a)));
             await putInStore('alarms', syncedAlarm);
@@ -1204,12 +1243,14 @@ export function App() {
           }
         }
 
+        const nextState = getNextAlarmStateAfterFire(alarm, tasks);
         const updatedAlarm: AlarmItem = {
           ...alarm,
           lastTriggeredMinute: minuteKey,
           snoozedUntilDate: undefined,
           snoozedUntilTime: undefined,
-          enabled: alarm.repeatDays.length === 0 ? false : alarm.enabled,
+          enabled: nextState.enabled,
+          date: nextState.date,
         };
         setAlarms((prev) => prev.map((a) => (a.id === alarm.id ? updatedAlarm : a)));
         await putInStore('alarms', updatedAlarm);
@@ -1221,7 +1262,9 @@ export function App() {
       // 1b. Check Smart Task Reminders (linked fallback if alarm missing, plus unlinked reminders)
       for (const task of tasks) {
         if (task.completed) continue;
-        if (!task.dueTime || task.dueDate !== today || task.dueTime !== currentHHMM) continue;
+        if (!task.dueTime || task.dueTime !== currentHHMM || !doesTaskMatchDate(task, today)) {
+          continue;
+        }
         if (task.lastNotifiedMinute === minuteKey) continue;
 
         if (task.linkedAlarmId) {
@@ -1440,6 +1483,105 @@ export function App() {
           });
         }
       }
+
+      // 3. Birthdays: deliver gentle OS drawer notifications (on-the-day & active offsets)
+      for (const b of birthdays) {
+        const info = getDaysUntilBirthday(b.birthDate);
+        if (!info.nextOccurrenceDate) continue;
+        const [ny, nm, nd] = info.nextOccurrenceDate.split('-').map(Number);
+        if ([ny, nm, nd].some((n) => Number.isNaN(n))) continue;
+        const dayTargetMs = new Date(ny, nm - 1, nd, 9, 0, 0, 0).getTime();
+
+        const dispatchBirthdayOsNotice = async (params: {
+          key: string;
+          title: string;
+          body: string;
+          scheduledIso: string;
+        }) => {
+          if (hasBirthdayDrawerSent(params.key)) return;
+          markBirthdayDrawerSent(params.key);
+
+          pushInboxNotification({
+            dedupeKey: params.key,
+            kind: 'birthday',
+            status: 'delivered',
+            title: params.title,
+            body: params.body,
+            scheduledAt: params.scheduledIso,
+            createdAt: now.toISOString(),
+            read: false,
+            route: 'birthdays',
+          });
+
+          if (Capacitor.isNativePlatform()) {
+            const claimed = await tryClaimNativeSlot(params.key);
+            if (!claimed) return;
+            const matchedTone = customAudioTones.find(
+              (t) => t.id === defaultNotificationSoundId
+            );
+            const soundPath = matchedTone ? await syncCustomToneFileToNative(matchedTone) : '';
+            await startNativeRingtone({
+              scheduleId: params.key,
+              notifId: hashToNotificationId(params.key),
+              kind: 'calm',
+              entityId: b.id,
+              title: params.title,
+              body: params.body,
+              soundId: defaultNotificationSoundId,
+              soundPath: soundPath || '',
+              soundName: 'Birthday Reminder',
+              route: 'birthdays',
+              snoozeMinutes: 5,
+              slotKey: params.key,
+            });
+          } else {
+            void sendSystemNotification({
+              dedupeKey: params.key,
+              slotSeed: params.key,
+              title: params.title,
+              body: params.body,
+              channel: 'birthday',
+              route: 'birthdays',
+              entityId: b.id,
+            });
+          }
+        };
+
+        // On-the-day birthday notification (9:00 AM onwards)
+        if (info.daysUntil === 0 && currentHHMM >= '09:00') {
+          await dispatchBirthdayOsNotice({
+            key: `bday:${b.id}:day:${today}`,
+            title: `🎂 ${b.name}’s Birthday Today`,
+            body:
+              b.wishTemplate ||
+              `Remember to send a warm birthday wish to ${b.name} (${b.relationship}).`,
+            scheduledIso: `${today}T09:00:00`,
+          });
+        }
+
+        // Advance offset reminders
+        for (const off of b.offsets || []) {
+          if (!off || off.value <= 0) continue;
+          const unitMs =
+            off.unit === 'minutes'
+              ? 60_000
+              : off.unit === 'hours'
+                ? 3_600_000
+                : 86_400_000;
+          const offsetTriggerMs = dayTargetMs - off.value * unitMs;
+          const deltaMs = now.getTime() - offsetTriggerMs;
+          if (deltaMs >= 0 && deltaMs < 120_000) {
+            await dispatchBirthdayOsNotice({
+              key: `bday:${b.id}:off:${off.id}:${info.nextOccurrenceDate}`,
+              title: `🎂 Upcoming Birthday: ${b.name}`,
+              body: `${off.value} ${off.unit} until ${b.name}’s birthday (${b.relationship}). ${
+                b.wishTemplate ? 'Pre-written wish is ready in Birthdays.' : ''
+              }`.trim(),
+              scheduledIso: new Date(offsetTriggerMs).toISOString(),
+            });
+          }
+        }
+      }
     };
 
     const interval = window.setInterval(tick, 4000);
@@ -1449,6 +1591,7 @@ export function App() {
     alarms,
     tasks,
     eventSessions,
+    birthdays,
     customAudioTones,
     defaultNotificationSoundId,
     pushInboxNotification,
@@ -2472,8 +2615,20 @@ export function App() {
               events={calendarEvents}
               tasks={tasks}
               birthdays={birthdays}
+              eventSessions={eventSessions}
+              alarms={alarms}
+              customAudioTones={customAudioTones}
+              defaultNotificationSoundId={defaultNotificationSoundId}
               onSaveEvent={saveCalendarEvent}
               onDeleteEvent={deleteCalendarEvent}
+              onSaveTask={saveTask}
+              onDeleteTask={deleteTask}
+              onCreateLinkedAlarm={saveAlarm}
+              onDeleteLinkedAlarm={deleteAlarm}
+              onSaveCustomTone={saveCustomTone}
+              onSaveEventSession={saveEventSession}
+              onDeleteEventSession={deleteEventSession}
+              onOpenBreathing={handleOpenBreathing}
             />
           )}
 

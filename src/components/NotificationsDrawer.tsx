@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AlarmClock, Bell, Cake, CheckCheck, Clock, Trash2, Wind, X } from 'lucide-react';
 import type { AppNotificationItem, AppNotificationKind, AppRoute } from '../types/sanctuary';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface NotificationsDrawerProps {
   open: boolean;
@@ -47,6 +48,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
   onNavigate,
 }) => {
   const [filter, setFilter] = useState<'all' | 'missed' | 'unread'>('all');
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const sorted = [...notifications].sort((a, b) => {
@@ -149,7 +151,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
             {notifications.length > 0 && (
               <button
                 type="button"
-                onClick={onClearAll}
+                onClick={() => setConfirmClearOpen(true)}
                 title="Clear all notifications"
                 aria-label="Clear all notifications"
                 className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
@@ -240,7 +242,26 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
             ))
           )}
         </div>
+
+        <div className="px-5 py-3 border-t border-slate-900/[0.06] dark:border-white/[0.06] bg-white/45 dark:bg-white/[0.02] shrink-0">
+          <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
+            Missed alarms &amp; reminders stay in this Bell inbox without cluttering your phone
+            drawer. Birthdays send gentle reminders directly to your phone drawer.
+          </p>
+        </div>
       </aside>
+
+      <ConfirmDialog
+        open={confirmClearOpen}
+        title="Clear All Notifications?"
+        message="Are you sure you want to clear all notifications from your Bell inbox?"
+        confirmLabel="Clear All"
+        onConfirm={() => {
+          setConfirmClearOpen(false);
+          onClearAll();
+        }}
+        onCancel={() => setConfirmClearOpen(false)}
+      />
     </div>
   );
 };

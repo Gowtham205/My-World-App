@@ -11,6 +11,8 @@ import type {
   TaskReminderItem,
 } from '../types/sanctuary';
 import { createId, getDismissedNotificationKeys } from './storage';
+import { getDaysUntilBirthday } from './dateUtils';
+import { getNextTaskOccurrenceDateTime } from './taskRecurrence';
 import {
   stopNativeRingtone,
   syncAllCustomTonesToNative,
@@ -82,6 +84,39 @@ export function markOccurrenceDispatched(dedupeKey: string): void {
 export function wasOccurrenceDispatched(dedupeKey: string): boolean {
   loadDispatchedFromSession();
   return dispatchedOccurrences.has(dedupeKey);
+}
+
+const BDAY_OS_SENT_STORAGE = 'my_world_bday_os_sent_v1';
+
+export function hasBirthdayDrawerSent(key: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(BDAY_OS_SENT_STORAGE);
+    if (!raw) return false;
+    const map = JSON.parse(raw) as Record<string, number>;
+    return Boolean(map && map[key]);
+  } catch {
+    return false;
+  }
+}
+
+export function markBirthdayDrawerSent(key: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(BDAY_OS_SENT_STORAGE);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    const pruned: Record<string, number> = {};
+    for (const [k, ts] of Object.entries(parsed)) {
+      if (typeof ts === 'number' && ts > cutoff) {
+        pruned[k] = ts;
+      }
+    }
+    pruned[key] = Date.now();
+    localStorage.setItem(BDAY_OS_SENT_STORAGE, JSON.stringify(pruned));
+  } catch {
+    // ignore storage errors
+  }
 }
 
 function getCurrentMinuteKey(d = new Date()): string {
@@ -370,10 +405,19 @@ function getDateForDueTask(dueDate: string, dueTime: string, minLeadMs = 2000): 
   return dt.getTime() > Date.now() + minLeadMs ? dt : null;
 }
 
+function parseLocalDateTime(dateStr: string, timeStr: string): Date | null {
+  if (!dateStr || !timeStr) return null;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const [hh, mm] = timeStr.split(':').map(Number);
+  if ([y, m, d, hh, mm].some((n) => Number.isNaN(n))) return null;
+  return new Date(y, m - 1, d, hh, mm, 0, 0);
+}
+
 function buildScheduleFingerprint(params: {
   alarms: AlarmItem[];
   tasks: TaskReminderItem[];
   eventSessions: EventCalmSession[];
+  birthdays?: BirthdayEntry[];
   customAudioTones?: CustomAudioTone[];
   defaultNotificationSoundId?: string;
 }): string {
@@ -399,6 +443,10 @@ function buildScheduleFingerprint(params: {
       notes: t.notes,
       dueDate: t.dueDate,
       dueTime: t.dueTime,
+      recurrence: t.recurrence,
+      customRecurrenceUnit: t.customRecurrenceUnit || '',
+      customRecurrenceDays: t.customRecurrenceDays || [],
+      customRecurrenceMonthDays: t.customRecurrenceMonthDays || [],
       category: t.category,
       soundId: t.soundId || '',
       soundName: t.soundName || '',
@@ -416,11 +464,19 @@ function buildScheduleFingerprint(params: {
       selectedPrompts: s.selectedPrompts,
       customPrompts: s.customPrompts,
     }));
+  const compactBirthdays = (params.birthdays || []).map((b) => ({
+    id: b.id,
+    name: b.name,
+    birthDate: b.birthDate,
+    wishTemplate: b.wishTemplate,
+    offsets: b.offsets,
+  }));
   const compactToneIds = (params.customAudioTones || []).map((t) => `${t.id}:${t.sizeBytes}`);
   return JSON.stringify({
     compactAlarms,
     compactTasks,
     compactEvents,
+    compactBirthdays,
     compactToneIds,
     defaultNotificationSoundId: params.defaultNotificationSoundId || '',
   });
@@ -434,6 +490,7 @@ export function syncScheduledNativeNotifications(params: {
   alarms: AlarmItem[];
   tasks: TaskReminderItem[];
   eventSessions: EventCalmSession[];
+  birthdays?: BirthdayEntry[];
   customAudioTones?: CustomAudioTone[];
   defaultNotificationSoundId?: string;
 }): Promise<void> {
@@ -546,11 +603,32 @@ export function syncScheduledNativeNotifications(params: {
         }
       }
 
-      // 2. Unlinked Task Reminders with future due time
+      // 2. Unlinked Task Reminders (supports Once, Daily, Weekly, Monthly, and Custom repeat schedules)
       for (const task of params.tasks) {
         if (task.completed || task.linkedAlarmId || !task.dueTime) continue;
-        const at = getDateForDueTask(task.dueDate, task.dueTime, 2000);
+        const at = getNextTaskOccurrenceDateTime(task, 2000);
         if (!at) continue;
+
+        let repeating = false;
+        let repeatDays: number[] = [];
+        if (task.recurrence === 'Daily') {
+          repeating = true;
+          repeatDays = [0, 1, 2, 3, 4, 5, 6];
+        } else if (task.recurrence === 'Weekly' && task.dueDate) {
+          const parsed = new Date(`${task.dueDate}T12:00:00`);
+          if (!Number.isNaN(parsed.getTime())) {
+            repeating = true;
+            repeatDays = [parsed.getDay()];
+          }
+        } else if (
+          task.recurrence === 'Custom' &&
+          task.customRecurrenceUnit !== 'monthly' &&
+          task.customRecurrenceDays &&
+          task.customRecurrenceDays.length > 0
+        ) {
+          repeating = true;
+          repeatDays = [...task.customRecurrenceDays].sort((a, b) => a - b);
+        }
 
         const slotSeed = `task:${task.id}`;
         const soundId = task.soundId || defaultSoundId;
@@ -567,7 +645,8 @@ export function syncScheduledNativeNotifications(params: {
           soundName: task.soundName || 'Reminder Chime',
           route: 'tasks',
           snoozeMinutes: 5,
-          repeating: false,
+          repeating,
+          ...(repeating ? { repeatDays, hhmm: task.dueTime } : {}),
           triggerAtMs: at.getTime(),
         });
       }
@@ -597,6 +676,67 @@ export function syncScheduledNativeNotifications(params: {
             snoozeMinutes: 5,
             repeating: false,
             triggerAtMs: at.getTime(),
+          });
+        }
+      }
+
+      // 4. Birthdays (on-the-day morning alert at 09:00 + advance offset reminders in OS drawer)
+      for (const b of params.birthdays || []) {
+        const info = getDaysUntilBirthday(b.birthDate);
+        if (!info.nextOccurrenceDate) continue;
+        const dayTarget = parseLocalDateTime(info.nextOccurrenceDate, '09:00');
+        if (!dayTarget) continue;
+
+        const dayTargetMs = dayTarget.getTime();
+        if (dayTargetMs > Date.now() + 2000) {
+          const daySeed = `bday:${b.id}:day:${info.nextOccurrenceDate}`;
+          schedules.push({
+            id: daySeed,
+            notifId: hashToNotificationId(daySeed),
+            kind: 'calm',
+            entityId: b.id,
+            title: `🎂 ${b.name}’s Birthday Today`,
+            body:
+              b.wishTemplate ||
+              `Remember to send a warm birthday wish to ${b.name} (${b.relationship}).`,
+            soundId: defaultSoundId,
+            soundPath: defaultSoundPath,
+            soundName: 'Birthday Reminder',
+            route: 'birthdays',
+            snoozeMinutes: 5,
+            repeating: false,
+            triggerAtMs: dayTargetMs,
+          });
+        }
+
+        for (const off of b.offsets || []) {
+          if (!off || off.value <= 0) continue;
+          const unitMs =
+            off.unit === 'minutes'
+              ? 60_000
+              : off.unit === 'hours'
+                ? 3_600_000
+                : 86_400_000;
+          const offsetTriggerMs = dayTargetMs - off.value * unitMs;
+          if (offsetTriggerMs <= Date.now() + 2000) continue;
+
+          const offSeed = `bday:${b.id}:off:${off.id}:${info.nextOccurrenceDate}`;
+          schedules.push({
+            id: offSeed,
+            notifId: hashToNotificationId(offSeed),
+            kind: 'calm',
+            entityId: b.id,
+            title: `🎂 Upcoming Birthday: ${b.name}`,
+            body: `${off.value} ${off.unit} until ${b.name}’s birthday (${b.relationship}). ${
+              b.wishTemplate ? 'Pre-written wish is ready in Birthdays.' : ''
+            }`.trim(),
+            soundId: defaultSoundId,
+            soundPath: defaultSoundPath,
+            soundName: 'Birthday Reminder',
+            route: 'birthdays',
+            snoozeMinutes: 5,
+            repeating: false,
+            triggerAtMs: offsetTriggerMs,
           });
         }
       }

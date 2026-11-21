@@ -6,6 +6,47 @@ export function getTodayStr(): string {
   return `${y}-${m}-${day}`;
 }
 
+export function getTomorrowStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function getNowTimeStr(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+export function validateFutureDateTime(params: {
+  date: string;
+  time?: string;
+  requireTime?: boolean;
+  dateLabel?: string;
+  timeLabel?: string;
+}): string | null {
+  const { date, time, requireTime, dateLabel = 'Date', timeLabel = 'Time' } = params;
+  if (!date) {
+    return `${dateLabel} is required.`;
+  }
+  const today = getTodayStr();
+  if (date < today) {
+    return `${dateLabel} cannot be in the past. Please choose today or a future date.`;
+  }
+  if (requireTime && !time) {
+    return `${timeLabel} is required.`;
+  }
+  if (date === today && time) {
+    const nowTime = getNowTimeStr();
+    if (time < nowTime) {
+      return `${timeLabel} cannot be in the past for today. Please choose an upcoming time or a future date.`;
+    }
+  }
+  return null;
+}
+
 export function getGreetingByHour(hour = new Date().getHours()): {
   greeting: string;
   subMessage: string;

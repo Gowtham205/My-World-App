@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Copy,
   CreditCard,
+  Download,
   Eye,
   EyeOff,
   FileKey2,
@@ -21,8 +22,11 @@ import type {
   VaultSecretPayload,
 } from '../types/sanctuary';
 import { decryptPayload, encryptPayload } from '../lib/crypto';
+import { getTodayStr } from '../lib/dateUtils';
+import { exportToDevicePublicStorage } from '../lib/nativeAudio';
 import { createId } from '../lib/storage';
 import { copyText } from '../lib/share';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { SecurityGate } from '../components/SecurityGate';
 
 interface VaultViewProps {
@@ -65,6 +69,12 @@ export const VaultView: React.FC<VaultViewProps> = ({
   const [editingItem, setEditingItem] = useState<DecryptedVaultItem | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<DecryptedVaultItem | null>(null);
+  const [exportNotice, setExportNotice] = useState<{
+    ok: boolean;
+    message: string;
+    path?: string;
+  } | null>(null);
 
   // Update PIN modal/form state
   const [showPinUpdate, setShowPinUpdate] = useState(false);
@@ -87,6 +97,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
   const [pinCode, setPinCode] = useState('');
   const [notes, setNotes] = useState('');
   const [customFields, setCustomFields] = useState<VaultCustomField[]>([]);
+  const inlineEditFormRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -161,6 +172,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
   };
 
   const openEditForm = (item: DecryptedVaultItem) => {
+    setShowAdd(false);
     setEditingItem(item);
     setEntryType(item.type);
     setTitle(item.title);
@@ -173,8 +185,10 @@ export const VaultView: React.FC<VaultViewProps> = ({
     setPinCode(item.pinCode || '');
     setNotes(item.notes || '');
     setCustomFields(item.customFields ? item.customFields.map((f) => ({ ...f })) : []);
-    setShowAdd(true);
     setShowPinUpdate(false);
+    window.setTimeout(() => {
+      inlineEditFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   };
 
   const handleSaveEntry = async (e: React.FormEvent) => {
@@ -258,6 +272,71 @@ export const VaultView: React.FC<VaultViewProps> = ({
     ]);
   };
 
+  const handleDownloadTxt = async () => {
+    setExportNotice(null);
+    if (items.length === 0) {
+      setExportNotice({
+        ok: false,
+        message: 'No secrets saved yet to export.',
+      });
+      return;
+    }
+
+    const lines: string[] = [
+      'My World - Secrets & Passwords Export',
+      `Exported At : ${new Date().toLocaleString()}`,
+      `Total Items : ${items.length}`,
+      '==================================================',
+      '',
+    ];
+
+    items.forEach((item, index) => {
+      const typeLabel = ENTRY_TYPES.find((t) => t.value === item.type)?.label || item.type;
+      lines.push(`[${index + 1}] ${item.title}`);
+      lines.push(`Type        : ${typeLabel}`);
+      if (item.username) lines.push(`Username    : ${item.username}`);
+      if (item.password) lines.push(`Password    : ${item.password}`);
+      if (item.url) lines.push(`Website URL : ${item.url}`);
+      if (item.cardNumber) lines.push(`Card Number : ${item.cardNumber}`);
+      if (item.expiry) lines.push(`Expiry      : ${item.expiry}`);
+      if (item.cvv) lines.push(`CVV         : ${item.cvv}`);
+      if (item.pinCode) lines.push(`PIN         : ${item.pinCode}`);
+      if (item.customFields.length > 0) {
+        for (const cf of item.customFields) {
+          if (cf.key || cf.value) {
+            lines.push(`${cf.key || 'Field'} : ${cf.value}`);
+          }
+        }
+      }
+      if (item.notes) {
+        lines.push(`Notes       : ${item.notes.replace(/\r?\n/g, '\n              ')}`);
+      }
+      lines.push('--------------------------------------------------');
+      lines.push('');
+    });
+
+    const filename = `my-world-secrets-${getTodayStr()}.txt`;
+    const res = await exportToDevicePublicStorage({
+      filename,
+      mimeType: 'text/plain;charset=utf-8',
+      folderType: 'backup',
+      textContent: lines.join('\n'),
+    });
+
+    if (res.ok) {
+      setExportNotice({
+        ok: true,
+        message: `Exported ${items.length} ${items.length === 1 ? 'entry' : 'entries'} as .txt.`,
+        path: res.displayPath,
+      });
+    } else {
+      setExportNotice({
+        ok: false,
+        message: res.error || 'Could not download secrets text file.',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
@@ -271,6 +350,14 @@ export const VaultView: React.FC<VaultViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleDownloadTxt()}
+            className="min-h-[44px] px-4 py-2 rounded-2xl bg-white dark:bg-[#171A21] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] flex items-center gap-2 whitespace-nowrap"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download .txt
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -301,6 +388,22 @@ export const VaultView: React.FC<VaultViewProps> = ({
           </button>
         </div>
       </header>
+
+      {exportNotice && (
+        <div
+          role="status"
+          className={`rounded-2xl border px-4 py-3 text-xs space-y-1 ${
+            exportNotice.ok
+              ? 'bg-[#EAF5EE] dark:bg-[#17251F] border-[#9EC5AB]/45 text-[#1F5636] dark:text-[#A9DFBE]'
+              : 'bg-[#FDF1EB] dark:bg-[#2A1D1B] border-[#F2B8A2]/45 text-[#A6482D] dark:text-[#F2B8A2]'
+          }`}
+        >
+          <p className="font-semibold">{exportNotice.message}</p>
+          {exportNotice.path && (
+            <p className="text-[11px] opacity-90">Saved to: {exportNotice.path}</p>
+          )}
+        </div>
+      )}
 
       {pinUpdateSuccess && (
         <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB]" role="status">
@@ -384,198 +487,209 @@ export const VaultView: React.FC<VaultViewProps> = ({
         </form>
       )}
 
-      {showAdd && (
-        <form
-          onSubmit={handleSaveEntry}
-          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-7 space-y-4"
-        >
-          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
-            {editingItem ? 'Edit Secret Entry' : 'Add Secret Entry'}
-          </h2>
+      {(() => {
+        const renderEntryForm = (isInlineEdit: boolean) => (
+          <form
+            ref={isInlineEdit ? inlineEditFormRef : undefined}
+            onSubmit={handleSaveEntry}
+            className={`rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/35 p-5 sm:p-7 space-y-4 ${
+              isInlineEdit ? 'md:col-span-2' : ''
+            }`}
+          >
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
+              {editingItem ? 'Edit Secret Entry' : 'Add Secret Entry'}
+            </h2>
 
-          <div className="flex flex-wrap gap-1.5">
-            {ENTRY_TYPES.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => setEntryType(t.value)}
-                className={`min-h-[40px] px-3 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
-                  entryType === t.value
-                    ? 'bg-[#BEB4DC]/20 text-[#5B4D8A] dark:text-[#BEB4DC] border border-[#BEB4DC]/30'
-                    : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3]'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          <input
-            type="text"
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Entry title (e.g. Primary Bank, Home Wi-Fi, Private Journal)"
-            className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          />
-
-          {entryType === 'login' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username or email"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              />
-              <input
-                type="text"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="Website URL (optional)"
-                className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              />
+            <div className="flex flex-wrap gap-1.5">
+              {ENTRY_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setEntryType(t.value)}
+                  className={`min-h-[40px] px-3 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
+                    entryType === t.value
+                      ? 'bg-[#BEB4DC]/20 text-[#5B4D8A] dark:text-[#BEB4DC] border border-[#BEB4DC]/30'
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3]'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
-          )}
 
-          {entryType === 'bank_card' && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                type="text"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
-                placeholder="Card / Account number"
-                className="sm:col-span-3 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
-              />
-              <input
-                type="text"
-                value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
-                placeholder="Expiry (MM/YY)"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
-              />
-              <input
-                type="password"
-                value={cvv}
-                onChange={(e) => setCvv(e.target.value)}
-                placeholder="CVV / Security Code"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
-              />
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Entry title (e.g. Primary Bank, Home Wi-Fi, Private Journal)"
+              className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+            />
+
+            {entryType === 'login' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Username or email"
+                  className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+                />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+                />
+                <input
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="Website URL (optional)"
+                  className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+                />
+              </div>
+            )}
+
+            {entryType === 'bank_card' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  value={cardNumber}
+                  onChange={(e) => setCardNumber(e.target.value)}
+                  placeholder="Card / Account number"
+                  className="sm:col-span-3 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+                />
+                <input
+                  type="text"
+                  value={expiry}
+                  onChange={(e) => setExpiry(e.target.value)}
+                  placeholder="Expiry (MM/YY)"
+                  className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+                />
+                <input
+                  type="password"
+                  value={cvv}
+                  onChange={(e) => setCvv(e.target.value)}
+                  placeholder="CVV / Security Code"
+                  className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+                />
+                <input
+                  type="password"
+                  value={pinCode}
+                  onChange={(e) => setPinCode(e.target.value)}
+                  placeholder="ATM PIN"
+                  className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+                />
+              </div>
+            )}
+
+            {entryType === 'pin' && (
               <input
                 type="password"
                 value={pinCode}
                 onChange={(e) => setPinCode(e.target.value)}
-                placeholder="ATM PIN"
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+                placeholder="Secret PIN or passcode"
+                className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
               />
-            </div>
-          )}
+            )}
 
-          {entryType === 'pin' && (
-            <input
-              type="password"
-              value={pinCode}
-              onChange={(e) => setPinCode(e.target.value)}
-              placeholder="Secret PIN or passcode"
-              className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Secret notes, recovery codes, personal relationship notes, or nicknames..."
+              className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
             />
-          )}
 
-          <textarea
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Secret notes, recovery codes, personal relationship notes, or nicknames..."
-            className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          />
+            {/* Custom Key-Value Fields */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Custom Key-Value Fields</span>
+                <button
+                  type="button"
+                  onClick={addCustomField}
+                  className="min-h-[36px] px-3 rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-xs text-[#5B4D8A] dark:text-[#BEB4DC] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09]"
+                >
+                  + Add Field
+                </button>
+              </div>
+              {customFields.map((field) => (
+                <div key={field.id} className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={field.key}
+                    onChange={(e) =>
+                      setCustomFields((prev) =>
+                        prev.map((f) => (f.id === field.id ? { ...f, key: e.target.value } : f))
+                      )
+                    }
+                    placeholder="Field label"
+                    className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
+                  />
+                  <input
+                    type="text"
+                    value={field.value}
+                    onChange={(e) =>
+                      setCustomFields((prev) =>
+                        prev.map((f) => (f.id === field.id ? { ...f, value: e.target.value } : f))
+                      )
+                    }
+                    placeholder="Value"
+                    className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
+                  />
+                </div>
+              ))}
+            </div>
 
-          {/* Custom Key-Value Fields */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Custom Key-Value Fields</span>
+            <div className="flex justify-end gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={addCustomField}
-                className="min-h-[36px] px-3 rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-xs text-[#5B4D8A] dark:text-[#BEB4DC] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09]"
+                onClick={() => {
+                  resetForm();
+                  setShowAdd(false);
+                }}
+                className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
               >
-                + Add Field
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold"
+              >
+                {editingItem ? 'Update Secret' : 'Encrypt & Save'}
               </button>
             </div>
-            {customFields.map((field) => (
-              <div key={field.id} className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={field.key}
-                  onChange={(e) =>
-                    setCustomFields((prev) =>
-                      prev.map((f) => (f.id === field.id ? { ...f, key: e.target.value } : f))
-                    )
-                  }
-                  placeholder="Field label"
-                  className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
-                />
-                <input
-                  type="text"
-                  value={field.value}
-                  onChange={(e) =>
-                    setCustomFields((prev) =>
-                      prev.map((f) => (f.id === field.id ? { ...f, value: e.target.value } : f))
-                    )
-                  }
-                  placeholder="Value"
-                  className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
-                />
+          </form>
+        );
+
+        return (
+          <>
+            {showAdd && !editingItem && renderEntryForm(false)}
+
+            {items.length === 0 ? (
+              <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
+                <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
+                  Your encrypted Vault is empty. Store logins, bank cards, PINs, or private notes safely
+                  offline.
+                </p>
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {items.map((item) => {
+                  if (editingItem && editingItem.id === item.id) {
+                    return <React.Fragment key={item.id}>{renderEntryForm(true)}</React.Fragment>;
+                  }
+                  const revealed = Boolean(revealedIds[item.id]);
+                  const typeMeta = ENTRY_TYPES.find((t) => t.value === item.type) || ENTRY_TYPES[0];
+                  const Icon = typeMeta.icon;
 
-          <div className="flex justify-end gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                setShowAdd(false);
-              }}
-              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold"
-            >
-              {editingItem ? 'Update Secret' : 'Encrypt & Save'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {items.length === 0 ? (
-        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
-          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
-            Your encrypted Vault is empty. Store logins, bank cards, PINs, or private notes safely
-            offline.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {items.map((item) => {
-            const revealed = Boolean(revealedIds[item.id]);
-            const typeMeta = ENTRY_TYPES.find((t) => t.value === item.type) || ENTRY_TYPES[0];
-            const Icon = typeMeta.icon;
-
-            return (
-              <article
-                key={item.id}
-                className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 space-y-3"
-              >
+                  return (
+                    <article
+                      key={item.id}
+                      className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 space-y-3"
+                    >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] flex items-center gap-1.5">
@@ -608,7 +722,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDeleteEncrypted(item.id)}
+                      onClick={() => setPendingDeleteItem(item)}
                       aria-label="Delete encrypted entry"
                       className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                     >
@@ -713,11 +827,31 @@ export const VaultView: React.FC<VaultViewProps> = ({
                     </p>
                   )}
                 </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                </article>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        );
+      })()}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteItem)}
+        title="Delete Secret Entry?"
+        message={
+          pendingDeleteItem
+            ? `“${pendingDeleteItem.title}” will be permanently removed from your encrypted Vault.`
+            : ''
+        }
+        onConfirm={async () => {
+          if (!pendingDeleteItem) return;
+          const id = pendingDeleteItem.id;
+          setPendingDeleteItem(null);
+          await onDeleteEncrypted(id);
+        }}
+        onCancel={() => setPendingDeleteItem(null)}
+      />
     </div>
   );
 };

@@ -8,9 +8,11 @@ import {
   Trash2,
   SlidersHorizontal,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { getApiUrl } from '../lib/api';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface ChatMessage {
   id: string;
@@ -75,6 +77,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   const threadEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -99,6 +102,13 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
     historyForRequest: { role: 'user' | 'model'; text: string }[],
     assistantId: string
   ) => {
+    const configuredBackend = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+    if (Capacitor.isNativePlatform() && !configuredBackend) {
+      throw new Error(
+        'Gemini Companion needs a connected My World server to respond from the standalone mobile app. It works automatically when opened from the hosted web app.'
+      );
+    }
+
     const payload = JSON.stringify({
       messages: historyForRequest,
       model,
@@ -136,6 +146,11 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
         } catch {
           parsedError = '';
         }
+      }
+      if (res.status === 404) {
+        throw new Error(
+          'Gemini Companion service endpoint is unavailable in this build. Please use the hosted web app for AI chat.'
+        );
       }
       if (res.status === 503 || res.status === 502 || res.status === 504) {
         throw new Error(
@@ -299,10 +314,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
           {messages.length > 0 && (
             <button
               type="button"
-              onClick={() => {
-                setMessages([]);
-                setErrorMsg(null);
-              }}
+              onClick={() => setConfirmClearOpen(true)}
               className="min-h-[44px] px-4 rounded-2xl bg-white/85 dark:bg-[#1A1F2B] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2] inline-flex items-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
@@ -510,6 +522,19 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
           </button>
         </form>
       </div>
+
+      <ConfirmDialog
+        open={confirmClearOpen}
+        title="Clear Conversation?"
+        message="Are you sure you want to clear all messages in this chat? Any unsaved replies will be removed."
+        confirmLabel="Clear Chat"
+        onConfirm={() => {
+          setConfirmClearOpen(false);
+          setMessages([]);
+          setErrorMsg(null);
+        }}
+        onCancel={() => setConfirmClearOpen(false)}
+      />
     </div>
   );
 };

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import type { CalendarEventItem, EventCalmSession } from '../types/sanctuary';
 import { createId } from '../lib/storage';
-import { getTodayStr } from '../lib/dateUtils';
+import { getNowTimeStr, getTodayStr, getTomorrowStr } from '../lib/dateUtils';
 
 interface MapsViewProps {
   initialDestinationQuery?: string;
@@ -473,11 +473,12 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
 
   const handleSendToEventCalm = async () => {
     if (!destinationPlace) return;
+    const targetDate = getNowTimeStr() > '18:00' ? getTomorrowStr() : getTodayStr();
     await onSaveEventSession({
       id: createId('evcalm'),
       eventName: destinationPlace.name,
       venue: destinationPlace.address || destinationPlace.name,
-      date: getTodayStr(),
+      date: targetDate,
       startTime: '18:00',
       endTime: '20:30',
       intervalMinutes: 20,
@@ -495,10 +496,11 @@ const MapWorkspace: React.FC<MapWorkspaceProps> = ({
 
   const handleAddToCalendar = async () => {
     if (!destinationPlace) return;
+    const targetDate = getNowTimeStr() > '15:00' ? getTomorrowStr() : getTodayStr();
     await onSaveCalendarEvent({
       id: createId('cal'),
       title: `Visit ${destinationPlace.name}`,
-      date: getTodayStr(),
+      date: targetDate,
       startTime: '15:00',
       endTime: '16:30',
       location: destinationPlace.address || destinationPlace.name,

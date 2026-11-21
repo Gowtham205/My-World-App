@@ -93,9 +93,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
         <div className="relative p-6 sm:p-8 lg:p-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
           <div className="max-w-2xl">
-            <p className="text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB] tracking-wide mb-2">
-              {formattedDate} · Personal Sanctuary
-            </p>
+            <div className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-white/75 dark:bg-[#1E2A26]/90 border border-[#9EC5AB]/45 dark:border-[#9EC5AB]/30 mb-3 shadow-2xs">
+              <span className="text-sm font-semibold text-[#1D5636] dark:text-[#A9DFBE]">
+                {formattedDate}
+              </span>
+              <span aria-hidden="true" className="text-[#5B6472] dark:text-[#98A2B3]">·</span>
+              <span className="text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB]">
+                Personal Sanctuary
+              </span>
+            </div>
             <h1 className="font-display text-3xl sm:text-4xl lg:text-[2.75rem] font-medium text-[#111827] dark:text-[#F1F3F6] leading-tight text-balance">
               {userName?.trim()
                 ? `${greeting}, ${userName.trim().split(/\s+/)[0]}`
@@ -173,22 +179,28 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="lg:col-span-7 space-y-6">
           {/* Featured Daily Quote — Lavender Pastel Surface */}
           <section className="rounded-3xl bg-gradient-to-br from-[#F3EFFC] via-[#F9F7FD] to-[#FFFFFF] dark:from-[#211B30] dark:via-[#191926] dark:to-[#171B24] border border-[#BEB4DC]/45 dark:border-[#BEB4DC]/25 p-6 sm:p-7 shadow-xs">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-[#BEB4DC]/30 dark:bg-[#BEB4DC]/20 flex items-center justify-center shrink-0">
                   <Quote className="w-4 h-4 text-[#5B4D8A] dark:text-[#C7B8EA]" />
                 </div>
-                <div className="text-xs font-medium text-[#5B4D8A] dark:text-[#C7B8EA]">
-                  Daily Grounding Quote
-                  {featuredQuote ? ` · ${featuredQuote.mood}` : ''}
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6] leading-snug">
+                    Daily Grounding Quote
+                  </h2>
+                  {featuredQuote && (
+                    <p className="text-xs text-[#5B4D8A] dark:text-[#C7B8EA] mt-0.5">
+                      {featuredQuote.mood}
+                    </p>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={onShuffleQuote}
                   aria-label="Shuffle quote"
-                  className="min-h-[44px] min-w-[44px] px-3 rounded-xl bg-white/80 dark:bg-white/[0.06] hover:bg-white dark:hover:bg-white/[0.1] border border-[#BEB4DC]/35 text-xs font-medium text-[#473B73] dark:text-[#D5CBEF] flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+                  className="min-h-[42px] px-3 rounded-xl bg-white/80 dark:bg-white/[0.06] hover:bg-white dark:hover:bg-white/[0.1] border border-[#BEB4DC]/35 text-xs font-medium text-[#473B73] dark:text-[#D5CBEF] flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-[#5B4D8A] dark:text-[#C7B8EA]" />
                   Shuffle
@@ -196,7 +208,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onNavigate('quotes')}
-                  className="min-h-[44px] px-3 rounded-xl hover:bg-[#BEB4DC]/20 text-xs font-medium text-[#5B4D8A] dark:text-[#C7B8EA] transition-colors whitespace-nowrap"
+                  className="min-h-[42px] px-3 rounded-xl hover:bg-[#BEB4DC]/20 text-xs font-medium text-[#5B4D8A] dark:text-[#C7B8EA] transition-colors whitespace-nowrap"
                 >
                   Collection
                 </button>

@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Copy, Pencil, Pin, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { MotivationalQuote, QuoteMood } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { copyText } from '../lib/share';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 // Future-ready QuoteProvider interface so an optional mood-based generator can plug in cleanly later
 export interface QuoteProvider {
@@ -31,6 +32,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   const [author, setAuthor] = useState('');
   const [mood, setMood] = useState<QuoteMood>('Calm');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [pendingDeleteQuote, setPendingDeleteQuote] = useState<MotivationalQuote | null>(null);
+  const inlineEditFormRef = useRef<HTMLFormElement | null>(null);
 
   const filteredQuotes = useMemo(() => {
     return quotes.filter((q) => moodFilter === 'All' || q.mood === moodFilter);
@@ -57,11 +60,14 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   };
 
   const openEditForm = (q: MotivationalQuote) => {
+    setShowAdd(false);
     setEditingQuote(q);
     setText(q.text);
     setAuthor(q.author);
     setMood(q.mood);
-    setShowAdd(true);
+    window.setTimeout(() => {
+      inlineEditFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   };
 
   const handleShuffleByMood = () => {
@@ -172,124 +178,157 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
         </section>
       )}
 
-      {/* Add / Edit Quote Form */}
-      {showAdd && (
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-6 space-y-4"
-        >
-          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
-            {editingQuote ? 'Edit Quote' : 'Save a Quote or Grounding Block'}
-          </h2>
-          <textarea
-            rows={3}
-            required
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Paste a quote, poem excerpt, or personal reminder..."
-            className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] leading-relaxed focus:outline-none focus:border-[#BEB4DC]/50"
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
-              type="text"
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              placeholder="Author or source (optional)"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            />
-            <select
-              value={mood}
-              onChange={(e) => setMood(e.target.value as QuoteMood)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            >
-              {MOODS.map((m) => (
-                <option key={m} value={m}>
-                  Mood: {m}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                setShowAdd(false);
-              }}
-              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD] whitespace-nowrap"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold whitespace-nowrap"
-            >
-              {editingQuote ? 'Update Quote' : 'Save to Collection'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Quote Library */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredQuotes.map((q) => (
-          <article
-            key={q.id}
-            className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4"
+      {(() => {
+        const renderForm = (isInlineEdit: boolean) => (
+          <form
+            ref={isInlineEdit ? inlineEditFormRef : undefined}
+            onSubmit={handleSubmit}
+            className={`rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/35 p-5 sm:p-6 space-y-4 ${
+              isInlineEdit ? 'md:col-span-2' : ''
+            }`}
           >
-            <div>
-              <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mb-2">
-                {q.mood}
-                {q.pinnedToHome ? ' · Pinned to Home' : ''}
-              </p>
-              <p className="font-display text-lg text-[#111827] dark:text-[#F1F3F6] leading-relaxed">“{q.text}”</p>
-              <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-3">— {q.author}</p>
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
+              {editingQuote ? 'Edit Quote' : 'Save a Quote or Grounding Block'}
+            </h2>
+            <textarea
+              rows={3}
+              required
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Paste a quote, poem excerpt, or personal reminder..."
+              className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] leading-relaxed focus:outline-none focus:border-[#BEB4DC]/50"
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                placeholder="Author or source (optional)"
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+              />
+              <select
+                value={mood}
+                onChange={(e) => setMood(e.target.value as QuoteMood)}
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+              >
+                {MOODS.map((m) => (
+                  <option key={m} value={m}>
+                    Mood: {m}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-center justify-between gap-2">
+            <div className="flex justify-end gap-2.5">
               <button
                 type="button"
-                onClick={() => handlePinToHome(q)}
-                className={`min-h-[40px] px-3 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap ${
-                  q.pinnedToHome
-                    ? 'bg-[#BEB4DC]/15 text-[#5B4D8A] dark:text-[#BEB4DC]'
-                    : 'hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] text-[#5B6472] dark:text-[#98A2B3]'
-                }`}
+                onClick={() => {
+                  resetForm();
+                  setShowAdd(false);
+                }}
+                className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD] whitespace-nowrap"
               >
-                <Pin className="w-3.5 h-3.5" />
-                {q.pinnedToHome ? 'Pinned Home' : 'Pin Home'}
+                Cancel
               </button>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => void handleCopy(q)}
-                  className="min-h-[40px] px-3 rounded-xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] text-xs text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  {copiedId === q.id ? 'Copied' : 'Copy'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openEditForm(q)}
-                  aria-label="Edit quote"
-                  className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#255F8A] dark:hover:text-[#9BC4E2] flex items-center justify-center"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDeleteQuote(q.id)}
-                  aria-label="Delete quote"
-                  className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold whitespace-nowrap"
+              >
+                {editingQuote ? 'Update Quote' : 'Save to Collection'}
+              </button>
             </div>
-          </article>
-        ))}
-      </div>
+          </form>
+        );
+
+        return (
+          <>
+            {showAdd && !editingQuote && renderForm(false)}
+
+            {/* Quote Library */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredQuotes.map((q) => {
+                if (editingQuote && editingQuote.id === q.id) {
+                  return <React.Fragment key={q.id}>{renderForm(true)}</React.Fragment>;
+                }
+                return (
+                  <article
+                    key={q.id}
+                    className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4"
+                  >
+                    <div>
+                      <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mb-2">
+                        {q.mood}
+                        {q.pinnedToHome ? ' · Pinned to Home' : ''}
+                      </p>
+                      <p className="font-display text-lg text-[#111827] dark:text-[#F1F3F6] leading-relaxed">“{q.text}”</p>
+                      <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-3">— {q.author}</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePinToHome(q)}
+                        className={`min-h-[40px] px-3 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+                          q.pinnedToHome
+                            ? 'bg-[#BEB4DC]/15 text-[#5B4D8A] dark:text-[#BEB4DC]'
+                            : 'hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] text-[#5B6472] dark:text-[#98A2B3]'
+                        }`}
+                      >
+                        <Pin className="w-3.5 h-3.5" />
+                        {q.pinnedToHome ? 'Pinned Home' : 'Pin Home'}
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleCopy(q)}
+                          className="min-h-[40px] px-3 rounded-xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] text-xs text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] flex items-center gap-1.5 whitespace-nowrap"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          {copiedId === q.id ? 'Copied' : 'Copy'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditForm(q)}
+                          aria-label="Edit quote"
+                          className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#255F8A] dark:hover:text-[#9BC4E2] flex items-center justify-center"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteQuote(q)}
+                          aria-label="Delete quote"
+                          className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.05] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </>
+        );
+      })()}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteQuote)}
+        title="Delete Quote?"
+        message={
+          pendingDeleteQuote
+            ? `Are you sure you want to delete this quote by ${pendingDeleteQuote.author}?`
+            : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!pendingDeleteQuote) return;
+          const id = pendingDeleteQuote.id;
+          setPendingDeleteQuote(null);
+          await onDeleteQuote(id);
+        }}
+        onCancel={() => setPendingDeleteQuote(null)}
+      />
     </div>
   );
 };

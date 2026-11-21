@@ -30,6 +30,7 @@ import {
   openNativeExactAlarmSettings,
   type AudioDiagnostics,
 } from '../lib/nativeAudio';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface AlarmsViewProps {
   alarms: AlarmItem[];
@@ -85,8 +86,17 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<AudioDiagnostics | null>(null);
+  const [pendingDeleteAlarm, setPendingDeleteAlarm] = useState<AlarmItem | null>(null);
+  const [pendingDeleteTone, setPendingDeleteTone] = useState<CustomAudioTone | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlineFileInputRef = useRef<HTMLInputElement | null>(null);
+  const inlineEditFormRef = useRef<HTMLFormElement | null>(null);
+
+  useEffect(() => {
+    if (editingAlarm?.id) {
+      inlineEditFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [editingAlarm?.id]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -187,14 +197,13 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
   };
 
   const openEditForm = (alarm: AlarmItem) => {
+    setShowAdd(false);
     setEditingAlarm(alarm);
     setLabel(alarm.label);
     setTime(alarm.time);
     setRepeatDays([...alarm.repeatDays]);
     setSnoozeMinutes(alarm.snoozeMinutes || 5);
     setSelectedSoundId(alarm.soundId || BUILTIN_TONES[0].id);
-    setShowAdd(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -251,6 +260,158 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
 
   const sortedAlarms = [...alarms].sort((a, b) => a.time.localeCompare(b.time));
 
+  const renderAlarmForm = (isInlineEdit: boolean) => (
+    <form
+      ref={isInlineEdit ? inlineEditFormRef : undefined}
+      onSubmit={handleSaveForm}
+      className={`rounded-3xl bg-white/95 dark:bg-[#191D28]/95 border border-[#F2B8A2]/50 dark:border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4 shadow-sm ${
+        isInlineEdit ? 'md:col-span-2' : ''
+      }`}
+    >
+      <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
+        {editingAlarm ? 'Edit Alarm' : 'Configure Alarm'}
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <input
+          type="text"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="Label (e.g. Take medicine, Morning routine)"
+          className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+        />
+        <input
+          type="time"
+          required
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Repeat Days (leave all off for one-time)</p>
+        <div className="flex flex-wrap gap-2">
+          {WEEKDAYS.map((day, idx) => {
+            const active = repeatDays.includes(idx);
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => toggleDay(idx)}
+                className={`min-w-[44px] min-h-[44px] rounded-2xl text-xs font-medium transition-colors ${
+                  active
+                    ? 'bg-[#F2B8A2] text-[#0F1115] font-semibold'
+                    : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
+                }`}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
+            Auto-Stop (1m) &amp; Snooze Default
+          </label>
+          <select
+            value={snoozeMinutes}
+            onChange={(e) => setSnoozeMinutes(Number(e.target.value))}
+            className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+          >
+            <option value={5}>5 minutes (Default)</option>
+            <option value={10}>10 minutes</option>
+            <option value={15}>15 minutes</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Alarm Ringtone</label>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedSoundId}
+              onChange={(e) => setSelectedSoundId(e.target.value)}
+              className="flex-1 min-w-0 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+            >
+              <optgroup label="Built-In Sanctuary Tones">
+                {BUILTIN_TONES.map((tone) => (
+                  <option key={tone.id} value={tone.id}>
+                    {tone.label}
+                  </option>
+                ))}
+              </optgroup>
+              {customAudioTones.length > 0 && (
+                <optgroup label="Your Uploaded Audio Files">
+                  {customAudioTones.map((tone) => (
+                    <option key={tone.id} value={tone.id}>
+                      {tone.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => handleTogglePreview(selectedSoundId)}
+              title={previewingId === selectedSoundId ? 'Stop preview' : 'Preview sound'}
+              aria-label="Preview alarm sound"
+              className="min-w-[44px] min-h-[44px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-[#2E6B48] dark:text-[#9EC5AB] flex items-center justify-center shrink-0"
+            >
+              {previewingId === selectedSoundId ? (
+                <Square className="w-4 h-4" />
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => inlineFileInputRef.current?.click()}
+              title="Upload custom audio file"
+              aria-label="Upload custom audio file"
+              className="min-w-[44px] min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] flex items-center gap-1.5 shrink-0"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="hidden md:inline">Upload</span>
+            </button>
+            <input
+              ref={inlineFileInputRef}
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac"
+              onChange={(e) => {
+                void handleAudioFilesUpload(e.target.files, 'alarm', true);
+                e.target.value = '';
+              }}
+              className="hidden"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2.5 pt-2">
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdd(false);
+            setEditingAlarm(null);
+          }}
+          className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="min-h-[44px] px-5 rounded-2xl bg-[#F2B8A2] text-[#0F1115] text-sm font-semibold"
+        >
+          {editingAlarm ? 'Update Alarm' : 'Save Alarm'}
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <div className="space-y-6">
       <header className="rounded-3xl bg-gradient-to-br from-[#FDF1EB] via-[#FFF7F3] to-[#FDF6EB] dark:from-[#2C1E1B] dark:via-[#241A1A] dark:to-[#241E17] border border-[#F2B8A2]/45 dark:border-[#F2B8A2]/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 shadow-xs">
@@ -303,154 +464,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
         </div>
       )}
 
-      {showAdd && (
-        <form
-          onSubmit={handleSaveForm}
-          className="rounded-3xl bg-white/90 dark:bg-[#191D28]/95 border border-[#F2B8A2]/40 dark:border-[#F2B8A2]/25 p-5 sm:p-7 space-y-4 shadow-xs"
-        >
-          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
-            {editingAlarm ? 'Edit Alarm' : 'Configure Alarm'}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="Label (e.g. Take medicine, Morning routine)"
-              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            />
-            <input
-              type="time"
-              required
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Repeat Days (leave all off for one-time)</p>
-            <div className="flex flex-wrap gap-2">
-              {WEEKDAYS.map((day, idx) => {
-                const active = repeatDays.includes(idx);
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => toggleDay(idx)}
-                    className={`min-w-[44px] min-h-[44px] rounded-2xl text-xs font-medium transition-colors ${
-                      active
-                        ? 'bg-[#F2B8A2] text-[#0F1115] font-semibold'
-                        : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06]'
-                    }`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
-                Auto-Stop (1m) &amp; Snooze Default
-              </label>
-              <select
-                value={snoozeMinutes}
-                onChange={(e) => setSnoozeMinutes(Number(e.target.value))}
-                className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              >
-                <option value={5}>5 minutes (Default)</option>
-                <option value={10}>10 minutes</option>
-                <option value={15}>15 minutes</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Alarm Ringtone</label>
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedSoundId}
-                  onChange={(e) => setSelectedSoundId(e.target.value)}
-                  className="flex-1 min-w-0 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-                >
-                  <optgroup label="Built-In Sanctuary Tones">
-                    {BUILTIN_TONES.map((tone) => (
-                      <option key={tone.id} value={tone.id}>
-                        {tone.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                  {customAudioTones.length > 0 && (
-                    <optgroup label="Your Uploaded Audio Files">
-                      {customAudioTones.map((tone) => (
-                        <option key={tone.id} value={tone.id}>
-                          {tone.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-
-                <button
-                  type="button"
-                  onClick={() => handleTogglePreview(selectedSoundId)}
-                  title={previewingId === selectedSoundId ? 'Stop preview' : 'Preview sound'}
-                  aria-label="Preview alarm sound"
-                  className="min-w-[44px] min-h-[44px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-[#2E6B48] dark:text-[#9EC5AB] flex items-center justify-center shrink-0"
-                >
-                  {previewingId === selectedSoundId ? (
-                    <Square className="w-4 h-4" />
-                  ) : (
-                    <Play className="w-4 h-4" />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => inlineFileInputRef.current?.click()}
-                  title="Upload custom audio file"
-                  aria-label="Upload custom audio file"
-                  className="min-w-[44px] min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] flex items-center gap-1.5 shrink-0"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span className="hidden md:inline">Upload</span>
-                </button>
-                <input
-                  ref={inlineFileInputRef}
-                  type="file"
-                  accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac"
-                  onChange={(e) => {
-                    void handleAudioFilesUpload(e.target.files, 'alarm', true);
-                    e.target.value = '';
-                  }}
-                  className="hidden"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                setShowAdd(false);
-                setEditingAlarm(null);
-              }}
-              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="min-h-[44px] px-5 rounded-2xl bg-[#F2B8A2] text-[#0F1115] text-sm font-semibold"
-            >
-              {editingAlarm ? 'Update Alarm' : 'Save Alarm'}
-            </button>
-          </div>
-        </form>
-      )}
+      {showAdd && !editingAlarm && renderAlarmForm(false)}
 
       {sortedAlarms.length === 0 ? (
         <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
@@ -461,6 +475,9 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {sortedAlarms.map((alarm) => {
+            if (editingAlarm?.id === alarm.id) {
+              return <React.Fragment key={alarm.id}>{renderAlarmForm(true)}</React.Fragment>;
+            }
             const currentSoundId = alarm.soundId || BUILTIN_TONES[0].id;
             return (
               <article
@@ -578,7 +595,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDeleteAlarm(alarm.id)}
+                      onClick={() => setPendingDeleteAlarm(alarm)}
                       aria-label="Delete alarm"
                       className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                     >
@@ -748,7 +765,7 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => void handleDeleteTone(tone.id)}
+                    onClick={() => setPendingDeleteTone(tone)}
                     aria-label={`Delete ${tone.name}`}
                     className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center shrink-0"
                   >
@@ -760,6 +777,42 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteAlarm)}
+        title="Delete Alarm?"
+        message={
+          pendingDeleteAlarm
+            ? `Are you sure you want to delete the alarm "${pendingDeleteAlarm.label}" (${formatTime12h(pendingDeleteAlarm.time)})?`
+            : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!pendingDeleteAlarm) return;
+          const id = pendingDeleteAlarm.id;
+          setPendingDeleteAlarm(null);
+          await onDeleteAlarm(id);
+        }}
+        onCancel={() => setPendingDeleteAlarm(null)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteTone)}
+        title="Delete Custom Audio?"
+        message={
+          pendingDeleteTone
+            ? `Are you sure you want to remove "${pendingDeleteTone.name}" from your custom sound library?`
+            : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!pendingDeleteTone) return;
+          const id = pendingDeleteTone.id;
+          setPendingDeleteTone(null);
+          await handleDeleteTone(id);
+        }}
+        onCancel={() => setPendingDeleteTone(null)}
+      />
     </div>
   );
 };

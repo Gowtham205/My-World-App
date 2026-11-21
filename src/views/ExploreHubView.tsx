@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { AppRoute } from '../types/sanctuary';
 import { exportLocalBackupJson } from '../lib/storage';
+import { exportToDevicePublicStorage } from '../lib/nativeAudio';
 
 interface ExploreHubViewProps {
   counts: {
@@ -257,16 +258,20 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
   const handleExportBackup = async () => {
     try {
       const json = await exportLocalBackupJson();
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `my-world-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setExportStatus('Local backup exported (Vault remains AES-256 encrypted).');
+      const filename = `my-world-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const res = await exportToDevicePublicStorage({
+        filename,
+        mimeType: 'application/json',
+        folderType: 'backup',
+        textContent: json,
+      });
+      if (res.ok) {
+        setExportStatus(
+          `Local backup saved to ${res.displayPath} (Vault remains AES-256 encrypted).`
+        );
+      } else {
+        setExportStatus(res.error || 'Could not export backup.');
+      }
     } catch {
       setExportStatus('Could not export backup.');
     }
@@ -334,15 +339,15 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
         })}
       </div>
 
-      <section className="rounded-3xl bg-gradient-to-br from-[#ECF7F0] via-[#F7FCF9] to-[#FFFFFF] dark:from-[#16251F] dark:to-[#171B24] border border-[#9EC5AB]/45 dark:border-[#9EC5AB]/25 p-5 sm:p-6 flex items-start gap-4">
-        <div className="w-10 h-10 rounded-2xl bg-[#9EC5AB]/30 dark:bg-[#9EC5AB]/20 border border-[#9EC5AB]/40 flex items-center justify-center shrink-0">
-          <Shield className="w-5 h-5 text-[#2E6B48] dark:text-[#9EC5AB]" />
+      <section className="rounded-3xl bg-gradient-to-br from-[#EAF7EF] via-[#F6FCF8] to-[#FFFFFF] dark:bg-none dark:bg-[#1E2B26] border border-[#7EB691]/50 dark:border-[#9EC5AB]/45 p-5 sm:p-6 flex items-start gap-4 shadow-[0_6px_24px_-6px_rgba(46,107,72,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_24px_-8px_rgba(158,197,171,0.18)]">
+        <div className="w-10 h-10 rounded-2xl bg-[#9EC5AB]/35 dark:bg-[#2A3D35] border border-[#7EB691]/50 dark:border-[#9EC5AB]/45 flex items-center justify-center shrink-0">
+          <Shield className="w-5 h-5 text-[#225839] dark:text-[#B5DEC4]" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6]">
+          <h3 className="text-sm font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
             100% Local-First Privacy
           </h3>
-          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1 leading-relaxed">
+          <p className="text-xs text-[#334155] dark:text-[#CBD5E1] mt-1 leading-relaxed">
             Notes, Tasks, Birthdays, Calendar, Private Media, and AES-256 encrypted Vault entries
             live exclusively inside your device storage.
           </p>

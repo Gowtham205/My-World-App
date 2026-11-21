@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Link2, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { CreativeIdeaCard, IdeaBoardType, IdeaCardColor } from '../types/sanctuary';
 import { createId } from '../lib/storage';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface IdeasViewProps {
   ideas: CreativeIdeaCard[];
@@ -28,6 +29,8 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
   const [board, setBoard] = useState<IdeaBoardType>('Learn');
   const [color, setColor] = useState<IdeaCardColor>('lavender');
   const [connectTargetId, setConnectTargetId] = useState('');
+  const [pendingDeleteIdea, setPendingDeleteIdea] = useState<CreativeIdeaCard | null>(null);
+  const inlineEditFormRef = useRef<HTMLFormElement | null>(null);
 
   const filteredIdeas = useMemo(() => {
     if (boardFilter === 'All') return ideas;
@@ -45,14 +48,16 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
   };
 
   const openEditForm = (card: CreativeIdeaCard) => {
+    setShowAdd(false);
     setEditingIdea(card);
     setTitle(card.title);
     setBody(card.body);
     setBoard(card.board);
     setColor(card.color);
     setConnectTargetId(card.connectedIds[0] || '');
-    setShowAdd(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.setTimeout(() => {
+      inlineEditFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -136,111 +141,122 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
         ))}
       </div>
 
-      {showAdd && (
-        <form
-          onSubmit={handleSaveForm}
-          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/30 p-5 sm:p-7 space-y-4"
-        >
-          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
-            {editingIdea ? 'Edit Idea Card' : 'Pin an Idea Card'}
-          </h2>
+      {(() => {
+        const renderForm = (isInlineEdit: boolean) => (
+          <form
+            ref={isInlineEdit ? inlineEditFormRef : undefined}
+            onSubmit={handleSaveForm}
+            className={`rounded-3xl bg-white dark:bg-[#171A21] border border-[#BEB4DC]/35 p-5 sm:p-7 space-y-4 ${
+              isInlineEdit ? 'sm:col-span-2 lg:col-span-3' : ''
+            }`}
+          >
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
+              {editingIdea ? 'Edit Idea Card' : 'Pin an Idea Card'}
+            </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. I want to learn watercolor sketching"
-              className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            />
-            <select
-              value={board}
-              onChange={(e) => setBoard(e.target.value as IdeaBoardType)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            >
-              {BOARDS.map((b) => (
-                <option key={b} value={b}>
-                  Board: {b}
-                </option>
-              ))}
-            </select>
-            <select
-              value={connectTargetId}
-              onChange={(e) => setConnectTargetId(e.target.value)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            >
-              <option value="">Connect to another idea (optional)</option>
-              {ideas
-                .filter((i) => !editingIdea || i.id !== editingIdea.id)
-                .map((i) => (
-                  <option key={i.id} value={i.id}>
-                    Link with: {i.title}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. I want to learn watercolor sketching"
+                className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+              />
+              <select
+                value={board}
+                onChange={(e) => setBoard(e.target.value as IdeaBoardType)}
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+              >
+                {BOARDS.map((b) => (
+                  <option key={b} value={b}>
+                    Board: {b}
                   </option>
                 ))}
-            </select>
-          </div>
-
-          <textarea
-            rows={3}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Sketch out the concept, steps to practice, or inspiration..."
-            className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-[#5B6472] dark:text-[#98A2B3] mr-1">Card Tone:</span>
-            {CARD_COLORS.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setColor(c.id)}
-                className={`min-h-[38px] px-3 rounded-xl text-xs font-medium border ${
-                  color === c.id
-                    ? `${c.bg} ${c.accent} border-slate-900/30 dark:border-white/30`
-                    : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border-slate-900/[0.08] dark:border-white/[0.06]'
-                }`}
+              </select>
+              <select
+                value={connectTargetId}
+                onChange={(e) => setConnectTargetId(e.target.value)}
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               >
-                {c.label}
+                <option value="">Connect to another idea (optional)</option>
+                {ideas
+                  .filter((i) => !editingIdea || i.id !== editingIdea.id)
+                  .map((i) => (
+                    <option key={i.id} value={i.id}>
+                      Link with: {i.title}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <textarea
+              rows={3}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Sketch out the concept, steps to practice, or inspiration..."
+              className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+            />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[#5B6472] dark:text-[#98A2B3] mr-1">Card Tone:</span>
+              {CARD_COLORS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setColor(c.id)}
+                  className={`min-h-[38px] px-3 rounded-xl text-xs font-medium border ${
+                    color === c.id
+                      ? `${c.bg} ${c.accent} border-slate-900/30 dark:border-white/30`
+                      : 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#5B6472] dark:text-[#98A2B3] border-slate-900/[0.08] dark:border-white/[0.06]'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdd(false);
+                  setEditingIdea(null);
+                }}
+                className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
+              >
+                Cancel
               </button>
-            ))}
-          </div>
+              <button
+                type="submit"
+                className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold"
+              >
+                {editingIdea ? 'Update Idea' : 'Save Idea'}
+              </button>
+            </div>
+          </form>
+        );
 
-          <div className="flex justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                setShowAdd(false);
-                setEditingIdea(null);
-              }}
-              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="min-h-[44px] px-5 rounded-2xl bg-[#BEB4DC] text-[#0F1115] text-sm font-semibold"
-            >
-              {editingIdea ? 'Update Idea' : 'Save Idea'}
-            </button>
-          </div>
-        </form>
-      )}
+        return (
+          <>
+            {showAdd && !editingIdea && renderForm(false)}
 
-      {/* Visual Moodboard & Sticky Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredIdeas.map((card) => {
-          const style = getColorStyle(card.color);
-          const connectedTitles = card.connectedIds
-            .map((cid) => ideas.find((i) => i.id === cid)?.title)
-            .filter(Boolean) as string[];
+            {/* Visual Moodboard & Sticky Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredIdeas.map((card) => {
+                if (editingIdea && editingIdea.id === card.id) {
+                  return <React.Fragment key={card.id}>{renderForm(true)}</React.Fragment>;
+                }
+                const style = getColorStyle(card.color);
+                const connectedTitles = card.connectedIds
+                  .map((cid) => ideas.find((i) => i.id === cid)?.title)
+                  .filter(Boolean) as string[];
 
-          return (
-            <article
-              key={card.id}
-              className={`rounded-3xl ${style.bg} border border-slate-900/[0.10] dark:border-white/[0.08] overflow-hidden flex flex-col justify-between`}
-            >
+                return (
+                  <article
+                    key={card.id}
+                    className={`rounded-3xl ${style.bg} border border-slate-900/[0.10] dark:border-white/[0.08] overflow-hidden flex flex-col justify-between`}
+                  >
               {card.imageUrl && (
                 <div className="aspect-[4/3] w-full overflow-hidden bg-white dark:bg-[#13161C]">
                   <img
@@ -267,7 +283,7 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                       </button>
                       <button
                         type="button"
-                        onClick={() => onDeleteIdea(card.id)}
+                        onClick={() => setPendingDeleteIdea(card)}
                         aria-label="Delete idea card"
                         className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                       >
@@ -307,10 +323,31 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                   </div>
                 )}
               </div>
-            </article>
-          );
-        })}
-      </div>
+                </article>
+                );
+              })}
+            </div>
+          </>
+        );
+      })()}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteIdea)}
+        title="Delete Idea Card?"
+        message={
+          pendingDeleteIdea
+            ? `Are you sure you want to delete "${pendingDeleteIdea.title}"?`
+            : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!pendingDeleteIdea) return;
+          const id = pendingDeleteIdea.id;
+          setPendingDeleteIdea(null);
+          await onDeleteIdea(id);
+        }}
+        onCancel={() => setPendingDeleteIdea(null)}
+      />
     </div>
   );
 };

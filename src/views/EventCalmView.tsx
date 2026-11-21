@@ -1,13 +1,21 @@
-import React, { useState } from 'react';
-import { MapPin, Navigation, Pencil, Play, Plus, Square, Trash2, Wind, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { MapPin, Navigation, Pencil, Play, Plus, Square, Trash2, Wind } from 'lucide-react';
 import type { EventCalmSession } from '../types/sanctuary';
-import { createId } from '../lib/storage';
 import {
   buildGoogleMapsDirectionsUrl,
   formatShortDate,
   formatTime12h,
-  getTodayStr,
 } from '../lib/dateUtils';
+import {
+  BUILT_IN_CALM_PROMPTS,
+  EventCalmFormFields,
+  eventSessionToDraft,
+  makeEmptyEventCalmDraft,
+  persistEventCalmDraft,
+  validateEventCalmDraft,
+  type EventCalmFormDraft,
+} from '../components/EventCalmFormFields';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface EventCalmViewProps {
   sessions: EventCalmSession[];
@@ -16,13 +24,6 @@ interface EventCalmViewProps {
   onOpenBreathing: (session: EventCalmSession) => void;
   onOpenOnMap?: (venue: string) => void;
 }
-
-const BUILT_IN_PROMPTS = [
-  "It's okay. You don't have to perform or impress anyone. You are just here to attend, and afterward you can leave.",
-  'Step outside for 2 minutes of fresh air and take 3 slow breaths.',
-  'Release overthinking—focus only on the present moment.',
-  'You are allowed to take quiet pauses whenever the room feels loud.',
-];
 
 export const EventCalmView: React.FC<EventCalmViewProps> = ({
   sessions,
@@ -33,108 +34,101 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
 }) => {
   const [showAdd, setShowAdd] = useState(false);
   const [editingSession, setEditingSession] = useState<EventCalmSession | null>(null);
-  const [eventName, setEventName] = useState('');
-  const [venue, setVenue] = useState('');
-  const [date, setDate] = useState(getTodayStr());
-  const [startTime, setStartTime] = useState('18:00');
-  const [endTime, setEndTime] = useState('21:30');
-  const [intervalOption, setIntervalOption] = useState<'15' | '20' | '30' | 'midpoint'>('20');
-  const [selectedPrompts, setSelectedPrompts] = useState<string[]>([
-    BUILT_IN_PROMPTS[0],
-    BUILT_IN_PROMPTS[1],
-  ]);
-  const [customPromptInput, setCustomPromptInput] = useState('');
-  const [customPrompts, setCustomPrompts] = useState<string[]>([]);
+  const [draft, setDraft] = useState<EventCalmFormDraft>(() => makeEmptyEventCalmDraft());
+  const [formError, setFormError] = useState<string | null>(null);
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<EventCalmSession | null>(null);
+  const inlineEditFormRef = useRef<HTMLFormElement | null>(null);
 
-  const toggleBuiltInPrompt = (prompt: string) => {
-    setSelectedPrompts((prev) =>
-      prev.includes(prompt) ? prev.filter((p) => p !== prompt) : [...prev, prompt]
-    );
-  };
-
-  const addCustomPrompt = () => {
-    if (!customPromptInput.trim()) return;
-    setCustomPrompts((prev) => [...prev, customPromptInput.trim()]);
-    setCustomPromptInput('');
-  };
+  useEffect(() => {
+    if (editingSession?.id) {
+      inlineEditFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [editingSession?.id]);
 
   const openAddForm = () => {
     setEditingSession(null);
-    setEventName('');
-    setVenue('');
-    setDate(getTodayStr());
-    setStartTime('18:00');
-    setEndTime('21:30');
-    setIntervalOption('20');
-    setSelectedPrompts([BUILT_IN_PROMPTS[0], BUILT_IN_PROMPTS[1]]);
-    setCustomPrompts([]);
-    setCustomPromptInput('');
+    setFormError(null);
+    setDraft(makeEmptyEventCalmDraft());
     setShowAdd((v) => !v);
   };
 
   const openEditForm = (session: EventCalmSession) => {
+    setShowAdd(false);
     setEditingSession(session);
-    setEventName(session.eventName);
-    setVenue(session.venue);
-    setDate(session.date);
-    setStartTime(session.startTime);
-    setEndTime(session.endTime);
-    setIntervalOption(
-      session.isMidpointOnly
-        ? 'midpoint'
-        : session.intervalMinutes === 15
-          ? '15'
-          : session.intervalMinutes === 30
-            ? '30'
-            : '20'
-    );
-    setSelectedPrompts([...session.selectedPrompts]);
-    setCustomPrompts([...session.customPrompts]);
-    setCustomPromptInput('');
-    setShowAdd(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setFormError(null);
+    setDraft(eventSessionToDraft(session));
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventName.trim()) return;
+    const err = validateEventCalmDraft(draft);
+    if (err) {
+      setFormError(err);
+      return;
+    }
+    setFormError(null);
 
-    const scheduleChanged =
-      !editingSession ||
-      editingSession.date !== date ||
-      editingSession.startTime !== startTime ||
-      editingSession.endTime !== endTime;
-
-    await onSaveSession({
-      ...(editingSession || {}),
-      id: editingSession ? editingSession.id : createId('evcalm'),
-      eventName: eventName.trim(),
-      venue: venue.trim(),
-      date: date || getTodayStr(),
-      startTime,
-      endTime,
-      intervalMinutes: intervalOption === 'midpoint' ? 0 : Number(intervalOption),
-      isMidpointOnly: intervalOption === 'midpoint',
-      selectedPrompts:
-        selectedPrompts.length > 0 ? selectedPrompts : [BUILT_IN_PROMPTS[0]],
-      customPrompts,
-      active: editingSession ? editingSession.active : true,
-      lastCheckInMinute: scheduleChanged ? undefined : editingSession?.lastCheckInMinute,
-      createdAt: editingSession ? editingSession.createdAt : new Date().toISOString(),
+    await persistEventCalmDraft({
+      draft,
+      existingSession: editingSession,
+      onSaveSession,
     });
 
     setEditingSession(null);
-    setEventName('');
-    setVenue('');
-    setCustomPrompts([]);
+    setDraft(makeEmptyEventCalmDraft());
     setShowAdd(false);
   };
+
+  const renderSessionForm = (isInlineEdit: boolean) => (
+    <form
+      ref={isInlineEdit ? inlineEditFormRef : undefined}
+      onSubmit={(e) => void handleSaveForm(e)}
+      className={`rounded-3xl bg-white/95 dark:bg-[#181C26]/95 border border-[#9EC5AB]/50 dark:border-[#9EC5AB]/30 p-5 sm:p-7 space-y-5 shadow-sm ${
+        isInlineEdit ? 'lg:col-span-2' : ''
+      }`}
+    >
+      <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
+        {editingSession ? 'Edit Event Calm Session' : 'Configure Event Calm Session'}
+      </h2>
+
+      <EventCalmFormFields
+        draft={draft}
+        onChange={(updater) => {
+          setFormError(null);
+          setDraft(updater);
+        }}
+        validationError={formError}
+      />
+
+      <div className="flex justify-end gap-2.5 pt-2">
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdd(false);
+            setEditingSession(null);
+            setFormError(null);
+          }}
+          className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="min-h-[44px] px-5 rounded-2xl bg-[#9EC5AB] text-[#0F1115] text-sm font-semibold"
+        >
+          {editingSession ? 'Update Session' : 'Save & Activate'}
+        </button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="space-y-6">
       <header className="rounded-3xl bg-gradient-to-br from-[#ECF6F0] via-[#F5FAF7] to-[#EEF5FB] dark:from-[#172420] dark:via-[#161F22] dark:to-[#17212B] border border-[#9EC5AB]/40 dark:border-[#9EC5AB]/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 shadow-xs">
         <div>
-          <p className="text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB]">Event Calm & Social Anxiety Companion</p>
+          <p className="text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB]">
+            Event Calm & Social Anxiety Companion
+          </p>
           <h1 className="font-display text-2xl sm:text-3xl font-medium text-[#111827] dark:text-[#F1F3F6] mt-1">
             Event Mode
           </h1>
@@ -154,163 +148,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
         </button>
       </header>
 
-      {showAdd && (
-        <form
-          onSubmit={handleSaveForm}
-          className="rounded-3xl bg-white/90 dark:bg-[#181C26]/95 border border-[#9EC5AB]/40 dark:border-[#9EC5AB]/25 p-5 sm:p-7 space-y-5 shadow-xs"
-        >
-          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
-            {editingSession ? 'Edit Event Calm Session' : 'Configure Event Calm Session'}
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
-              type="text"
-              required
-              value={eventName}
-              onChange={(e) => setEventName(e.target.value)}
-              placeholder="Event name (e.g. Cousin's Wedding Reception)"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            />
-            <input
-              type="text"
-              value={venue}
-              onChange={(e) => setVenue(e.target.value)}
-              placeholder="Venue address or Google Maps link (optional)"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Start Time</label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">End Time</label>
-              <input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Check-In Cadence</label>
-              <select
-                value={intervalOption}
-                onChange={(e) =>
-                  setIntervalOption(e.target.value as '15' | '20' | '30' | 'midpoint')
-                }
-                className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              >
-                <option value="15">Every 15 minutes</option>
-                <option value="20">Every 20 minutes</option>
-                <option value="30">Every 30 minutes</option>
-                <option value="midpoint">Single midpoint check-in</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-2.5">
-            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Select Gentle Grounding Prompts</p>
-            <div className="space-y-2">
-              {BUILT_IN_PROMPTS.map((p) => {
-                const chosen = selectedPrompts.includes(p);
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => toggleBuiltInPrompt(p)}
-                    className={`w-full text-left p-3.5 rounded-2xl border text-xs leading-relaxed transition-colors ${
-                      chosen
-                        ? 'bg-[#9EC5AB]/10 border-[#9EC5AB]/40 text-[#111827] dark:text-[#F1F3F6]'
-                        : 'bg-[#ECEFF3] dark:bg-[#1D212A] border-slate-900/[0.08] dark:border-white/[0.06] text-[#5B6472] dark:text-[#98A2B3]'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Add Your Own Personal Reassurance</p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={customPromptInput}
-                onChange={(e) => setCustomPromptInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addCustomPrompt();
-                  }
-                }}
-                placeholder="Write a personal calming note for yourself..."
-                className="flex-1 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
-              />
-              <button
-                type="button"
-                onClick={addCustomPrompt}
-                className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.06] dark:bg-white/[0.06] text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB] whitespace-nowrap"
-              >
-                Add
-              </button>
-            </div>
-            {customPrompts.map((cp, idx) => (
-              <div
-                key={`${cp}-${idx}`}
-                className="flex items-center justify-between gap-2 pl-2 pr-1 py-1 rounded-xl bg-[#E5E9F0] dark:bg-[#1D212A]/70 text-xs text-[#334155] dark:text-[#D0D5DD]"
-              >
-                <span>• {cp}</span>
-                <button
-                  type="button"
-                  onClick={() => setCustomPrompts((prev) => prev.filter((_, i) => i !== idx))}
-                  aria-label="Remove custom reassurance"
-                  className="min-w-[32px] min-h-[32px] rounded-lg hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center shrink-0"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex justify-end gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                setShowAdd(false);
-                setEditingSession(null);
-              }}
-              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="min-h-[44px] px-5 rounded-2xl bg-[#9EC5AB] text-[#0F1115] text-sm font-semibold"
-            >
-              {editingSession ? 'Update Session' : 'Save & Activate'}
-            </button>
-          </div>
-        </form>
-      )}
+      {showAdd && !editingSession && renderSessionForm(false)}
 
       {sessions.length === 0 ? (
         <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
@@ -322,6 +160,9 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {sessions.map((session) => {
+            if (editingSession?.id === session.id) {
+              return <React.Fragment key={session.id}>{renderSessionForm(true)}</React.Fragment>;
+            }
             const allPrompts = [...session.selectedPrompts, ...session.customPrompts];
             return (
               <article
@@ -355,7 +196,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => onDeleteSession(session.id)}
+                        onClick={() => setPendingDeleteSession(session)}
                         aria-label="Delete event session"
                         className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                       >
@@ -384,7 +225,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
                       Selected Grounding Prompts ({allPrompts.length})
                     </p>
                     <ul className="space-y-1.5 text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
-                      {(allPrompts.length > 0 ? allPrompts : [BUILT_IN_PROMPTS[0]]).map(
+                      {(allPrompts.length > 0 ? allPrompts : [BUILT_IN_CALM_PROMPTS[0]]).map(
                         (promptItem, pIdx) => (
                           <li key={`${session.id}-p-${pIdx}`} className="flex items-start gap-2">
                             <span className="text-[#2E6B48] dark:text-[#9EC5AB] font-medium shrink-0">
@@ -461,6 +302,24 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteSession)}
+        title="Delete Event Mode Session?"
+        message={
+          pendingDeleteSession
+            ? `Are you sure you want to delete "${pendingDeleteSession.eventName}"? Check-in notifications for this session will be removed.`
+            : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!pendingDeleteSession) return;
+          const id = pendingDeleteSession.id;
+          setPendingDeleteSession(null);
+          await onDeleteSession(id);
+        }}
+        onCancel={() => setPendingDeleteSession(null)}
+      />
     </div>
   );
 };

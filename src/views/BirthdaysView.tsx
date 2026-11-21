@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Bell, Cake, Copy, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import type { BirthdayEntry, BirthdayOffset, OffsetUnit } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { formatShortDate, getDaysUntilBirthday } from '../lib/dateUtils';
 import { copyText, shareText } from '../lib/share';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface BirthdaysViewProps {
   birthdays: BirthdayEntry[];
@@ -30,6 +31,9 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
   const [offsetUnit, setOffsetUnit] = useState<OffsetUnit>('hours');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sharedId, setSharedId] = useState<string | null>(null);
+  const [pendingDeleteBirthday, setPendingDeleteBirthday] = useState<BirthdayEntry | null>(null);
+
+  const inlineEditFormRef = useRef<HTMLFormElement | null>(null);
 
   const sortedBirthdays = useMemo(() => {
     return [...birthdays]
@@ -52,13 +56,16 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
   };
 
   const openEditForm = (entry: BirthdayEntry) => {
+    setShowAdd(false);
     setEditingEntry(entry);
     setName(entry.name);
     setBirthDate(entry.birthDate);
     setRelationship(entry.relationship);
     setWishTemplate(entry.wishTemplate);
     setOffsets(entry.offsets.length > 0 ? entry.offsets.map((o) => ({ ...o })) : []);
-    setShowAdd(true);
+    window.setTimeout(() => {
+      inlineEditFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   };
 
   const addOffset = () => {
@@ -131,125 +138,137 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
         </button>
       </header>
 
-      {showAdd && (
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#F2B8A2]/30 p-5 sm:p-7 space-y-4"
-        >
-          <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
-            {editingEntry ? 'Edit Birthday & Alert Offsets' : 'Track Birthday & Alert Offsets'}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Person's name"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            />
-            <input
-              type="date"
-              required
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            />
-            <input
-              type="text"
-              value={relationship}
-              onChange={(e) => setRelationship(e.target.value)}
-              placeholder="Relationship (e.g. Family, Friend)"
-              className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            />
-          </div>
-
-          <textarea
-            rows={3}
-            value={wishTemplate}
-            onChange={(e) => setWishTemplate(e.target.value)}
-            placeholder="Pre-write a thoughtful birthday wish for one-tap copy or sharing..."
-            className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          />
-
-          {/* Customizable Notification Engine Offsets */}
-          <div className="space-y-2.5">
-            <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
-              Linked Notification Engine (notify before birthday)
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
+      {(() => {
+        const renderForm = (isInlineEdit: boolean) => (
+          <form
+            ref={isInlineEdit ? inlineEditFormRef : undefined}
+            onSubmit={handleSubmit}
+            className={`rounded-3xl bg-white dark:bg-[#171A21] border border-[#F2B8A2]/35 p-5 sm:p-7 space-y-4 ${
+              isInlineEdit ? 'md:col-span-2' : ''
+            }`}
+          >
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6]">
+              {editingEntry ? 'Edit Birthday & Alert Offsets' : 'Track Birthday & Alert Offsets'}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <input
-                type="number"
-                min={1}
-                value={offsetVal}
-                onChange={(e) => setOffsetVal(Number(e.target.value))}
-                className="w-20 min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Person's name"
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               />
-              <select
-                value={offsetUnit}
-                onChange={(e) => setOffsetUnit(e.target.value as OffsetUnit)}
-                className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
-              >
-                <option value="minutes">minutes before</option>
-                <option value="hours">hours before</option>
-                <option value="days">days before</option>
-              </select>
+              <input
+                type="date"
+                required
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+              />
+              <input
+                type="text"
+                value={relationship}
+                onChange={(e) => setRelationship(e.target.value)}
+                placeholder="Relationship (e.g. Family, Friend)"
+                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+              />
+            </div>
+
+            <textarea
+              rows={3}
+              value={wishTemplate}
+              onChange={(e) => setWishTemplate(e.target.value)}
+              placeholder="Pre-write a thoughtful birthday wish for one-tap copy or sharing..."
+              className="w-full p-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+            />
+
+            {/* Customizable Notification Engine Offsets */}
+            <div className="space-y-2.5">
+              <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
+                Linked Notification Engine (notify before birthday)
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={offsetVal}
+                  onChange={(e) => setOffsetVal(Number(e.target.value))}
+                  className="w-20 min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+                />
+                <select
+                  value={offsetUnit}
+                  onChange={(e) => setOffsetUnit(e.target.value as OffsetUnit)}
+                  className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
+                >
+                  <option value="minutes">minutes before</option>
+                  <option value="hours">hours before</option>
+                  <option value="days">days before</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={addOffset}
+                  className="min-h-[40px] px-3.5 rounded-xl bg-slate-900/[0.06] dark:bg-white/[0.06] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2]"
+                >
+                  Add Alert Offset
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-[#5B6472] dark:text-[#98A2B3]">
+                {offsets.map((off) => (
+                  <button
+                    key={off.id}
+                    type="button"
+                    onClick={() => setOffsets((prev) => prev.filter((o) => o.id !== off.id))}
+                    className="hover:text-[#A6482D] dark:hover:text-[#F2B8A2]"
+                  >
+                    {off.value} {off.unit} before ×
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={addOffset}
-                className="min-h-[40px] px-3.5 rounded-xl bg-slate-900/[0.06] dark:bg-white/[0.06] text-xs font-medium text-[#A6482D] dark:text-[#F2B8A2]"
+                onClick={() => {
+                  resetForm();
+                  setShowAdd(false);
+                }}
+                className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
               >
-                Add Alert Offset
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="min-h-[44px] px-5 rounded-2xl bg-[#F2B8A2] text-[#0F1115] text-sm font-semibold"
+              >
+                {editingEntry ? 'Update Birthday' : 'Save Birthday'}
               </button>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs text-[#5B6472] dark:text-[#98A2B3]">
-              {offsets.map((off) => (
-                <button
-                  key={off.id}
-                  type="button"
-                  onClick={() => setOffsets((prev) => prev.filter((o) => o.id !== off.id))}
-                  className="hover:text-[#A6482D] dark:hover:text-[#F2B8A2]"
-                >
-                  {off.value} {off.unit} before ×
-                </button>
-              ))}
-            </div>
-          </div>
+          </form>
+        );
 
-          <div className="flex justify-end gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                setShowAdd(false);
-              }}
-              className="min-h-[44px] px-4 rounded-2xl bg-slate-900/[0.05] dark:bg-white/[0.05] text-sm text-[#334155] dark:text-[#D0D5DD]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="min-h-[44px] px-5 rounded-2xl bg-[#F2B8A2] text-[#0F1115] text-sm font-semibold"
-            >
-              {editingEntry ? 'Update Birthday' : 'Save Birthday'}
-            </button>
-          </div>
-        </form>
-      )}
+        return (
+          <>
+            {showAdd && !editingEntry && renderForm(false)}
 
-      {sortedBirthdays.length === 0 ? (
-        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
-          <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
-            No birthdays added yet. Save dates, custom wishes, and advance reminders.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {sortedBirthdays.map(({ entry, info }) => (
-            <article
-              key={entry.id}
-              className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4"
-            >
+            {sortedBirthdays.length === 0 ? (
+              <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-10 text-center">
+                <p className="text-sm text-[#5B6472] dark:text-[#98A2B3]">
+                  No birthdays added yet. Save dates, custom wishes, and advance reminders.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {sortedBirthdays.map(({ entry, info }) => {
+                  if (editingEntry && editingEntry.id === entry.id) {
+                    return <React.Fragment key={entry.id}>{renderForm(true)}</React.Fragment>;
+                  }
+                  return (
+                    <article
+                      key={entry.id}
+                      className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-5 sm:p-6 flex flex-col justify-between gap-4"
+                    >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -319,7 +338,7 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onDeleteBirthday(entry.id)}
+                    onClick={() => setPendingDeleteBirthday(entry)}
                     aria-label="Delete birthday"
                     className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
                   >
@@ -327,10 +346,32 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                   </button>
                 </div>
               </div>
-            </article>
-          ))}
-        </div>
-      )}
+                  </article>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        );
+      })()}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteBirthday)}
+        title="Delete Birthday?"
+        message={
+          pendingDeleteBirthday
+            ? `Are you sure you want to remove ${pendingDeleteBirthday.name}'s birthday and its reminders?`
+            : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!pendingDeleteBirthday) return;
+          const id = pendingDeleteBirthday.id;
+          setPendingDeleteBirthday(null);
+          await onDeleteBirthday(id);
+        }}
+        onCancel={() => setPendingDeleteBirthday(null)}
+      />
     </div>
   );
 };

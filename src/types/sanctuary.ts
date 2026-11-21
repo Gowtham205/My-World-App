@@ -111,6 +111,9 @@ export interface TaskReminderItem {
   endTime?: string; // optional e.g. 17:00
   recurrence: RecurrencePattern;
   customRecurrenceNote?: string;
+  customRecurrenceUnit?: 'weekly' | 'monthly';
+  customRecurrenceDays?: number[]; // 0=Sun..6=Sat
+  customRecurrenceMonthDays?: number[]; // 1..31
   completed: boolean;
   completedAt?: string;
   linkedAlarmId?: string;
