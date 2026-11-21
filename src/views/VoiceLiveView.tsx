@@ -3,6 +3,7 @@ import { BookOpen, Mic, MicOff, Phone, PhoneOff, Volume2 } from 'lucide-react';
 import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { getLiveWsUrl } from '../lib/api';
+import { ModernSelect } from '../components/ModernSelect';
 
 interface TranscriptEntry {
   id: string;
@@ -405,35 +406,29 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
           <div className="w-full grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block mb-1">Voice</label>
-              <select
+              <ModernSelect
+                ariaLabel="Voice"
+                title="Select Voice"
+                accent="sage"
                 disabled={status !== 'idle'}
                 value={voice}
-                onChange={(e) => setVoice(e.target.value as (typeof VOICES)[number])}
-                className="w-full min-h-[42px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] disabled:opacity-50"
-              >
-                {VOICES.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setVoice(val as (typeof VOICES)[number])}
+                options={VOICES.map((v) => ({ value: v, label: v }))}
+              />
             </div>
             <div>
               <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block mb-1">Companion Mode</label>
-              <select
+              <ModernSelect
+                ariaLabel="Companion Mode"
+                title="Companion Mode"
+                accent="sage"
                 disabled={status !== 'idle'}
                 value={persona}
-                onChange={(e) =>
-                  setPersona(e.target.value as (typeof PERSONAS)[number]['id'])
+                onChange={(val) =>
+                  setPersona(val as (typeof PERSONAS)[number]['id'])
                 }
-                className="w-full min-h-[42px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] disabled:opacity-50"
-              >
-                {PERSONAS.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+                options={PERSONAS.map((p) => ({ value: p.id, label: p.label }))}
+              />
             </div>
           </div>
 

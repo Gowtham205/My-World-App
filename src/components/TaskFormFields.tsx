@@ -22,6 +22,9 @@ import {
   formatCustomRecurrenceSummary,
   parseLocalDate,
 } from '../lib/taskRecurrence';
+import { ModernSelect } from './ModernSelect';
+import { ModernDatePicker } from './ModernDatePicker';
+import { ModernTimePicker } from './ModernTimePicker';
 
 export const TASK_PRIORITIES: TaskPriority[] = ['High', 'Medium', 'Low'];
 export const TASK_CATEGORIES: TaskCategory[] = ['Personal', 'Work', 'Health', 'Learning', 'Home'];
@@ -99,17 +102,24 @@ export function taskToFormDraft(
   };
 }
 
-export function validateTaskDraft(draft: TaskFormDraft): string | null {
+export function validateTaskDraft(
+  draft: TaskFormDraft,
+  options?: { skipPastValidation?: boolean }
+): string | null {
   if (!draft.title.trim()) {
     return 'Please enter a task or reminder title.';
   }
-  const dateErr = validateFutureDateTime({
-    date: draft.dueDate,
-    time: draft.dueTime || undefined,
-    dateLabel: 'Due Date',
-    timeLabel: 'Alert Time',
-  });
-  if (dateErr) return dateErr;
+  if (!options?.skipPastValidation) {
+    const dateErr = validateFutureDateTime({
+      date: draft.dueDate,
+      time: draft.dueTime || undefined,
+      dateLabel: 'Due Date',
+      timeLabel: 'Alert Time',
+    });
+    if (dateErr) return dateErr;
+  } else if (!draft.dueDate) {
+    return 'Due Date is required.';
+  }
 
   if (draft.recurrence === 'Custom') {
     if (draft.customRecurrenceUnit === 'weekly' && draft.customRecurrenceDays.length === 0) {
@@ -286,6 +296,7 @@ interface TaskFormFieldsProps {
   customAudioTones: CustomAudioTone[];
   onSaveCustomTone: (tone: CustomAudioTone) => Promise<void>;
   validationError?: string | null;
+  allowPastDates?: boolean;
 }
 
 export const TaskFormFields: React.FC<TaskFormFieldsProps> = ({
@@ -294,6 +305,7 @@ export const TaskFormFields: React.FC<TaskFormFieldsProps> = ({
   customAudioTones,
   onSaveCustomTone,
   validationError,
+  allowPastDates = false,
 }) => {
   const [previewing, setPreviewing] = useState(false);
   const uploadRef = useRef<HTMLInputElement | null>(null);
@@ -360,42 +372,43 @@ export const TaskFormFields: React.FC<TaskFormFieldsProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Priority</label>
-          <select
+          <ModernSelect
+            ariaLabel="Task priority"
+            title="Choose Priority"
+            accent="lavender"
             value={draft.priority}
-            onChange={(e) =>
-              onChange((prev) => ({ ...prev, priority: e.target.value as TaskPriority }))
+            onChange={(val) =>
+              onChange((prev) => ({ ...prev, priority: val as TaskPriority }))
             }
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          >
-            {TASK_PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p} Priority
-              </option>
-            ))}
-          </select>
+            options={TASK_PRIORITIES.map((p) => ({
+              value: p,
+              label: `${p} Priority`,
+              colorDot: p === 'High' ? '#F2B8A2' : p === 'Medium' ? '#BEB4DC' : '#9EC5AB',
+            }))}
+          />
         </div>
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Category</label>
-          <select
+          <ModernSelect
+            ariaLabel="Task category"
+            title="Choose Category"
+            accent="lavender"
             value={draft.category}
-            onChange={(e) =>
-              onChange((prev) => ({ ...prev, category: e.target.value as TaskCategory }))
+            onChange={(val) =>
+              onChange((prev) => ({ ...prev, category: val as TaskCategory }))
             }
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          >
-            {TASK_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            options={TASK_CATEGORIES.map((c) => ({ value: c, label: c }))}
+          />
         </div>
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Recurring</label>
-          <select
+          <ModernSelect
+            ariaLabel="Task recurrence"
+            title="Repeat Schedule"
+            accent="lavender"
             value={draft.recurrence}
-            onChange={(e) => {
-              const nextRec = e.target.value as RecurrencePattern;
+            onChange={(val) => {
+              const nextRec = val as RecurrencePattern;
               onChange((prev) => {
                 if (nextRec === 'Custom') {
                   const parsed = parseLocalDate(prev.dueDate || todayStr);
@@ -415,14 +428,8 @@ export const TaskFormFields: React.FC<TaskFormFieldsProps> = ({
                 return { ...prev, recurrence: nextRec };
               });
             }}
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          >
-            {TASK_RECURRENCES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+            options={TASK_RECURRENCES.map((r) => ({ value: r, label: r }))}
+          />
         </div>
       </div>
 
@@ -530,34 +537,41 @@ export const TaskFormFields: React.FC<TaskFormFieldsProps> = ({
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
             {draft.recurrence === 'Once' ? 'Due Date' : 'Start Date'}
           </label>
-          <input
-            type="date"
-            min={todayStr}
+          <ModernDatePicker
+            ariaLabel={draft.recurrence === 'Once' ? 'Due Date' : 'Start Date'}
+            title={draft.recurrence === 'Once' ? 'Due Date' : 'Start Date'}
+            accent="lavender"
+            minDate={allowPastDates ? undefined : todayStr}
             value={draft.dueDate}
-            onChange={(e) => onChange((prev) => ({ ...prev, dueDate: e.target.value }))}
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+            onChange={(nextDate) => onChange((prev) => ({ ...prev, dueDate: nextDate }))}
           />
         </div>
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
             Start / Alert Time
           </label>
-          <input
-            type="time"
+          <ModernTimePicker
+            ariaLabel="Start or Alert Time"
+            title="Start / Alert Time"
+            accent="lavender"
+            allowClear
+            placeholder="No alert time"
             value={draft.dueTime}
-            onChange={(e) => onChange((prev) => ({ ...prev, dueTime: e.target.value }))}
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+            onChange={(nextTime) => onChange((prev) => ({ ...prev, dueTime: nextTime }))}
           />
         </div>
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
             End Time (optional)
           </label>
-          <input
-            type="time"
+          <ModernTimePicker
+            ariaLabel="End Time"
+            title="End Time"
+            accent="lavender"
+            allowClear
+            placeholder="Optional"
             value={draft.endTime}
-            onChange={(e) => onChange((prev) => ({ ...prev, endTime: e.target.value }))}
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+            onChange={(nextTime) => onChange((prev) => ({ ...prev, endTime: nextTime }))}
           />
         </div>
       </div>
@@ -569,30 +583,27 @@ export const TaskFormFields: React.FC<TaskFormFieldsProps> = ({
               Alarm / Reminder Sound
             </label>
             <div className="flex items-center gap-2">
-              <select
-                value={draft.selectedSoundId}
-                onChange={(e) =>
-                  onChange((prev) => ({ ...prev, selectedSoundId: e.target.value }))
-                }
-                className="flex-1 min-w-0 min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
-              >
-                <optgroup label="Built-In Tones">
-                  {BUILTIN_TONES.map((tone) => (
-                    <option key={tone.id} value={tone.id}>
-                      {tone.label}
-                    </option>
-                  ))}
-                </optgroup>
-                {customAudioTones.length > 0 && (
-                  <optgroup label="Your Uploaded Audio">
-                    {customAudioTones.map((tone) => (
-                      <option key={tone.id} value={tone.id}>
-                        {tone.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+              <div className="flex-1 min-w-0">
+                <ModernSelect
+                  ariaLabel="Alarm or reminder sound"
+                  title="Choose Reminder Sound"
+                  accent="lavender"
+                  value={draft.selectedSoundId}
+                  onChange={(val) => onChange((prev) => ({ ...prev, selectedSoundId: val }))}
+                  options={[
+                    ...BUILTIN_TONES.map((tone) => ({
+                      value: tone.id,
+                      label: tone.label,
+                      group: 'Built-In Tones',
+                    })),
+                    ...customAudioTones.map((tone) => ({
+                      value: tone.id,
+                      label: tone.name,
+                      group: 'Your Uploaded Audio',
+                    })),
+                  ]}
+                />
+              </div>
 
               <button
                 type="button"

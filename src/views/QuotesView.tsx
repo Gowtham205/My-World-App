@@ -4,6 +4,7 @@ import type { MotivationalQuote, QuoteMood } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { copyText } from '../lib/share';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ModernSelect } from '../components/ModernSelect';
 
 // Future-ready QuoteProvider interface so an optional mood-based generator can plug in cleanly later
 export interface QuoteProvider {
@@ -206,17 +207,15 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
                 placeholder="Author or source (optional)"
                 className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               />
-              <select
+              <ModernSelect
+                ariaLabel="Quote mood"
+                title="Quote Mood"
+                prefixLabel="Mood"
+                accent="lavender"
                 value={mood}
-                onChange={(e) => setMood(e.target.value as QuoteMood)}
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              >
-                {MOODS.map((m) => (
-                  <option key={m} value={m}>
-                    Mood: {m}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setMood(val as QuoteMood)}
+                options={MOODS.map((m) => ({ value: m, label: m }))}
+              />
             </div>
             <div className="flex justify-end gap-2.5">
               <button

@@ -31,6 +31,8 @@ import {
   type AudioDiagnostics,
 } from '../lib/nativeAudio';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ModernSelect } from '../components/ModernSelect';
+import { ModernTimePicker } from '../components/ModernTimePicker';
 
 interface AlarmsViewProps {
   alarms: AlarmItem[];
@@ -279,12 +281,12 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
           placeholder="Label (e.g. Take medicine, Morning routine)"
           className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
         />
-        <input
-          type="time"
-          required
+        <ModernTimePicker
+          ariaLabel="Alarm time"
+          title="Alarm Time"
+          accent="peach"
           value={time}
-          onChange={(e) => setTime(e.target.value)}
-          className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+          onChange={setTime}
         />
       </div>
 
@@ -316,42 +318,44 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
             Auto-Stop (1m) &amp; Snooze Default
           </label>
-          <select
-            value={snoozeMinutes}
-            onChange={(e) => setSnoozeMinutes(Number(e.target.value))}
-            className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          >
-            <option value={5}>5 minutes (Default)</option>
-            <option value={10}>10 minutes</option>
-            <option value={15}>15 minutes</option>
-          </select>
+          <ModernSelect
+            ariaLabel="Auto-Stop & Snooze Default"
+            title="Auto-Stop & Snooze Default"
+            accent="peach"
+            value={String(snoozeMinutes)}
+            onChange={(val) => setSnoozeMinutes(Number(val))}
+            options={[
+              { value: '5', label: '5 minutes (Default)' },
+              { value: '10', label: '10 minutes' },
+              { value: '15', label: '15 minutes' },
+            ]}
+          />
         </div>
 
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Alarm Ringtone</label>
           <div className="flex items-center gap-2">
-            <select
-              value={selectedSoundId}
-              onChange={(e) => setSelectedSoundId(e.target.value)}
-              className="flex-1 min-w-0 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-            >
-              <optgroup label="Built-In Sanctuary Tones">
-                {BUILTIN_TONES.map((tone) => (
-                  <option key={tone.id} value={tone.id}>
-                    {tone.label}
-                  </option>
-                ))}
-              </optgroup>
-              {customAudioTones.length > 0 && (
-                <optgroup label="Your Uploaded Audio Files">
-                  {customAudioTones.map((tone) => (
-                    <option key={tone.id} value={tone.id}>
-                      {tone.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
+            <div className="flex-1 min-w-0">
+              <ModernSelect
+                ariaLabel="Alarm Ringtone"
+                title="Alarm Ringtone"
+                accent="peach"
+                value={selectedSoundId}
+                onChange={setSelectedSoundId}
+                options={[
+                  ...BUILTIN_TONES.map((tone) => ({
+                    value: tone.id,
+                    label: tone.label,
+                    group: 'Built-In Sanctuary Tones',
+                  })),
+                  ...customAudioTones.map((tone) => ({
+                    value: tone.id,
+                    label: tone.name,
+                    group: 'Your Uploaded Audio Files',
+                  })),
+                ]}
+              />
+            </div>
 
             <button
               type="button"
@@ -542,29 +546,28 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
                 {/* Per-Alarm Sound Picker */}
                 <div className="flex items-center gap-2">
                   <Music2 className="w-3.5 h-3.5 text-[#255F8A] dark:text-[#9BC4E2] shrink-0" />
-                  <select
-                    aria-label={`Ringtone for ${alarm.label}`}
-                    value={currentSoundId}
-                    onChange={(e) => void handleUpdateAlarmSound(alarm, e.target.value)}
-                    className="flex-1 min-w-0 min-h-[38px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.08] dark:border-white/[0.06] text-xs text-[#334155] dark:text-[#D0D5DD]"
-                  >
-                    <optgroup label="Built-In Tones">
-                      {BUILTIN_TONES.map((tone) => (
-                        <option key={tone.id} value={tone.id}>
-                          {tone.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                    {customAudioTones.length > 0 && (
-                      <optgroup label="Uploaded Audio">
-                        {customAudioTones.map((tone) => (
-                          <option key={tone.id} value={tone.id}>
-                            {tone.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
+                  <div className="flex-1 min-w-0">
+                    <ModernSelect
+                      ariaLabel={`Ringtone for ${alarm.label}`}
+                      title={`Ringtone · ${alarm.label}`}
+                      accent="peach"
+                      triggerClassName="min-h-[38px] rounded-xl text-xs"
+                      value={currentSoundId}
+                      onChange={(val) => void handleUpdateAlarmSound(alarm, val)}
+                      options={[
+                        ...BUILTIN_TONES.map((tone) => ({
+                          value: tone.id,
+                          label: tone.label,
+                          group: 'Built-In Tones',
+                        })),
+                        ...customAudioTones.map((tone) => ({
+                          value: tone.id,
+                          label: tone.name,
+                          group: 'Uploaded Audio',
+                        })),
+                      ]}
+                    />
+                  </div>
                 </div>
 
                 <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-center justify-between gap-3">
@@ -624,18 +627,19 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <select
-              aria-label="Category for uploaded audio"
-              value={uploadCategory}
-              onChange={(e) => setUploadCategory(e.target.value as AudioToneCategory)}
-              className="min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
-            >
-              {TONE_CATEGORIES.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.label}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-[180px]">
+              <ModernSelect
+                ariaLabel="Category for uploaded audio"
+                title="Upload Audio Category"
+                accent="peach"
+                value={uploadCategory}
+                onChange={(val) => setUploadCategory(val as AudioToneCategory)}
+                options={TONE_CATEGORIES.map((cat) => ({
+                  value: cat.id,
+                  label: cat.label,
+                }))}
+              />
+            </div>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -688,29 +692,28 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <select
-              aria-label="Default notification sound"
-              value={defaultNotificationSoundId}
-              onChange={(e) => onChangeDefaultNotificationSound(e.target.value)}
-              className="min-h-[42px] px-3.5 rounded-xl bg-white dark:bg-[#13161C] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] max-w-[220px]"
-            >
-              <optgroup label="Built-In Chimes">
-                {BUILTIN_TONES.map((tone) => (
-                  <option key={tone.id} value={tone.id}>
-                    {tone.label}
-                  </option>
-                ))}
-              </optgroup>
-              {customAudioTones.length > 0 && (
-                <optgroup label="Uploaded Audio">
-                  {customAudioTones.map((tone) => (
-                    <option key={tone.id} value={tone.id}>
-                      {tone.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
+            <div className="w-[210px] sm:w-[230px]">
+              <ModernSelect
+                ariaLabel="Default notification sound"
+                title="Default Notification & Event Calm Sound"
+                accent="peach"
+                triggerClassName="min-h-[42px] rounded-xl bg-white dark:bg-[#13161C] text-xs"
+                value={defaultNotificationSoundId}
+                onChange={onChangeDefaultNotificationSound}
+                options={[
+                  ...BUILTIN_TONES.map((tone) => ({
+                    value: tone.id,
+                    label: tone.label,
+                    group: 'Built-In Chimes',
+                  })),
+                  ...customAudioTones.map((tone) => ({
+                    value: tone.id,
+                    label: tone.name,
+                    group: 'Uploaded Audio',
+                  })),
+                ]}
+              />
+            </div>
             <button
               type="button"
               onClick={() => handleTogglePreview(defaultNotificationSoundId)}

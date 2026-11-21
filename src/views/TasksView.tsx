@@ -161,7 +161,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
   const handleEditSubmit = async (e: React.FormEvent, existingTask: TaskReminderItem) => {
     e.preventDefault();
-    const err = validateTaskDraft(editDraft);
+    const err = validateTaskDraft(editDraft, { skipPastValidation: true });
     if (err) {
       setEditError(err);
       return;
@@ -401,6 +401,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                     customAudioTones={customAudioTones}
                     onSaveCustomTone={onSaveCustomTone}
                     validationError={editError}
+                    allowPastDates
                   />
 
                   <div className="flex justify-end gap-2.5 pt-2">

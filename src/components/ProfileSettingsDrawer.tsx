@@ -35,6 +35,7 @@ import { generateSalt, hashPin } from '../lib/crypto';
 import { exportToDevicePublicStorage } from '../lib/nativeAudio';
 import { BUILTIN_TONES } from '../lib/sound';
 import { exportLocalBackupJson, getSetting, putInStore } from '../lib/storage';
+import { ModernSelect } from './ModernSelect';
 
 interface ProfileSettingsDrawerProps {
   open: boolean;
@@ -467,29 +468,27 @@ export const ProfileSettingsDrawer: React.FC<ProfileSettingsDrawerProps> = ({
                 <Volume2 className="w-3.5 h-3.5" />
                 Default Reminder & Event Calm Sound
               </label>
-              <select
+              <ModernSelect
                 id="settings-default-chime"
+                ariaLabel="Default Reminder and Event Calm Sound"
+                title="Default Notification Sound"
+                accent="sky"
+                triggerClassName="bg-white dark:bg-[#1D212A]"
                 value={defaultNotificationSoundId}
-                onChange={(e) => onChangeDefaultNotificationSound(e.target.value)}
-                className="w-full min-h-[44px] px-3.5 rounded-2xl bg-white dark:bg-[#1D212A] border border-slate-900/[0.1] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              >
-                <optgroup label="Built-In Tones">
-                  {BUILTIN_TONES.map((tone) => (
-                    <option key={tone.id} value={tone.id}>
-                      {tone.label}
-                    </option>
-                  ))}
-                </optgroup>
-                {customAudioTones.length > 0 && (
-                  <optgroup label="Uploaded Audio">
-                    {customAudioTones.map((tone) => (
-                      <option key={tone.id} value={tone.id}>
-                        {tone.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+                onChange={onChangeDefaultNotificationSound}
+                options={[
+                  ...BUILTIN_TONES.map((tone) => ({
+                    value: tone.id,
+                    label: tone.label,
+                    group: 'Built-In Tones',
+                  })),
+                  ...customAudioTones.map((tone) => ({
+                    value: tone.id,
+                    label: tone.name,
+                    group: 'Uploaded Audio',
+                  })),
+                ]}
+              />
             </div>
           </section>
 

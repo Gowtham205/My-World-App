@@ -15,6 +15,7 @@ import type { NoteChecklistItem, PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { formatShortDate } from '../lib/dateUtils';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ModernSelect } from '../components/ModernSelect';
 
 interface NotesViewProps {
   notes: PersonalNote[];
@@ -25,10 +26,11 @@ interface NotesViewProps {
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 const DEFAULT_FOLDERS = ['Personal', 'Work', 'Home', 'Links'];
 const CUSTOM_FOLDERS_STORAGE_KEY = 'my_world_note_folders_v1';
+const REMOVED_DEFAULT_FOLDERS_KEY = 'my_world_removed_note_folders_v1';
 
-function loadSavedFolders(): string[] {
+function loadStringList(key: string): string[] {
   try {
-    const raw = localStorage.getItem(CUSTOM_FOLDERS_STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
@@ -42,7 +44,12 @@ function loadSavedFolders(): string[] {
 export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDeleteNote }) => {
   const [search, setSearch] = useState('');
   const [folderFilter, setFolderFilter] = useState<string>('All');
-  const [savedFolders, setSavedFolders] = useState<string[]>(() => loadSavedFolders());
+  const [savedFolders, setSavedFolders] = useState<string[]>(() =>
+    loadStringList(CUSTOM_FOLDERS_STORAGE_KEY)
+  );
+  const [removedDefaultFolders, setRemovedDefaultFolders] = useState<string[]>(() =>
+    loadStringList(REMOVED_DEFAULT_FOLDERS_KEY)
+  );
 
   // Create-mode vs Inline-edit-mode state
   const [creatingNote, setCreatingNote] = useState<PersonalNote | null>(null);
@@ -62,6 +69,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
 
   const [pendingDeleteNote, setPendingDeleteNote] = useState<PersonalNote | null>(null);
   const [pendingDeleteStep, setPendingDeleteStep] = useState<NoteChecklistItem | null>(null);
+  const [pendingDeleteFolder, setPendingDeleteFolder] = useState<string | null>(null);
 
   const createFormRef = useRef<HTMLFormElement | null>(null);
   const inlineEditFormRef = useRef<HTMLFormElement | null>(null);
@@ -69,12 +77,14 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
   useEffect(() => {
     try {
       localStorage.setItem(CUSTOM_FOLDERS_STORAGE_KEY, JSON.stringify(savedFolders));
+      localStorage.setItem(REMOVED_DEFAULT_FOLDERS_KEY, JSON.stringify(removedDefaultFolders));
     } catch {
       // ignore storage quota errors
     }
-  }, [savedFolders]);
+  }, [savedFolders, removedDefaultFolders]);
 
   const availableFolders = useMemo(() => {
+    const removedLower = new Set(removedDefaultFolders.map((f) => f.toLowerCase()));
     const byLower = new Map<string, string>();
     const addFolder = (name?: string) => {
       const trimmed = name?.trim();
@@ -84,11 +94,14 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
         byLower.set(key, trimmed);
       }
     };
-    DEFAULT_FOLDERS.forEach(addFolder);
+    DEFAULT_FOLDERS.forEach((df) => {
+      if (!removedLower.has(df.toLowerCase())) addFolder(df);
+    });
     savedFolders.forEach(addFolder);
     notes.forEach((n) => addFolder(n.folder));
-    return Array.from(byLower.values());
-  }, [notes, savedFolders]);
+    const list = Array.from(byLower.values());
+    return list.length > 0 ? list : ['Personal'];
+  }, [notes, savedFolders, removedDefaultFolders]);
 
   const filterTabs = useMemo(() => ['All', ...availableFolders], [availableFolders]);
 
@@ -180,8 +193,53 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
         error: `Folder "${existing}" already exists. Please enter a different name.`,
       };
     }
+    setRemovedDefaultFolders((prev) =>
+      prev.filter((f) => f.toLowerCase() !== trimmed.toLowerCase())
+    );
     setSavedFolders((prev) => [...prev, trimmed]);
     return { ok: true, folderName: trimmed };
+  };
+
+  const getFallbackFolderFor = (folderToDelete: string): string => {
+    const targetLower = folderToDelete.toLowerCase();
+    const remaining = availableFolders.filter((f) => f.toLowerCase() !== targetLower);
+    return (
+      remaining.find((f) => f.toLowerCase() === 'personal') ||
+      remaining[0] ||
+      'Personal'
+    );
+  };
+
+  const confirmDeleteFolder = async (folderToDelete: string) => {
+    const targetLower = folderToDelete.toLowerCase();
+    const fallbackFolder = getFallbackFolderFor(folderToDelete);
+
+    // Move any notes in the deleted folder cleanly into the fallback folder
+    const affectedNotes = notes.filter((n) => n.folder.toLowerCase() === targetLower);
+    for (const note of affectedNotes) {
+      await onSaveNote({
+        ...note,
+        folder: fallbackFolder,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    setSavedFolders((prev) => prev.filter((f) => f.toLowerCase() !== targetLower));
+    if (DEFAULT_FOLDERS.some((df) => df.toLowerCase() === targetLower)) {
+      setRemovedDefaultFolders((prev) =>
+        prev.some((f) => f.toLowerCase() === targetLower) ? prev : [...prev, folderToDelete]
+      );
+    }
+
+    if (folderFilter.toLowerCase() === targetLower) {
+      setFolderFilter('All');
+    }
+    if (creatingNote && creatingNote.folder.toLowerCase() === targetLower) {
+      setCreatingNote({ ...creatingNote, folder: fallbackFolder });
+    }
+    if (editingNote && editingNote.folder.toLowerCase() === targetLower) {
+      setEditingNote({ ...editingNote, folder: fallbackFolder });
+    }
   };
 
   const handleCreateInlineFolder = () => {
@@ -321,33 +379,40 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
         />
 
         <div className="flex items-center gap-2">
-          <select
-            aria-label="Note folder"
-            value={
-              availableFolders.some((f) => f.toLowerCase() === draft.folder.toLowerCase())
-                ? availableFolders.find((f) => f.toLowerCase() === draft.folder.toLowerCase())!
-                : availableFolders[0] || 'Personal'
-            }
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === '__create_new__') {
-                setShowNewFolderInput(true);
-                setNewFolderError(null);
-              } else {
-                setShowNewFolderInput(false);
-                setNewFolderError(null);
-                setActiveDraft({ ...draft, folder: val });
+          <div className="flex-1 min-w-0">
+            <ModernSelect
+              ariaLabel="Note folder"
+              title="Choose Folder"
+              prefixLabel="Folder"
+              accent="sky"
+              value={
+                availableFolders.some((f) => f.toLowerCase() === draft.folder.toLowerCase())
+                  ? availableFolders.find((f) => f.toLowerCase() === draft.folder.toLowerCase())!
+                  : availableFolders[0] || 'Personal'
               }
-            }}
-            className="flex-1 min-w-0 min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] focus:outline-none focus:border-[#9BC4E2]/50"
-          >
-            {availableFolders.map((folderName) => (
-              <option key={folderName} value={folderName}>
-                Folder: {folderName}
-              </option>
-            ))}
-            <option value="__create_new__">+ Create New Folder...</option>
-          </select>
+              onChange={(val) => {
+                if (val === '__create_new__') {
+                  setShowNewFolderInput(true);
+                  setNewFolderError(null);
+                } else {
+                  setShowNewFolderInput(false);
+                  setNewFolderError(null);
+                  setActiveDraft({ ...draft, folder: val });
+                }
+              }}
+              options={[
+                ...availableFolders.map((folderName) => ({
+                  value: folderName,
+                  label: folderName,
+                })),
+                {
+                  value: '__create_new__',
+                  label: '+ Create New Folder...',
+                  accentAction: true,
+                },
+              ]}
+            />
+          </div>
 
           <button
             type="button"
@@ -361,6 +426,18 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
           >
             <FolderPlus className="w-4 h-4" />
           </button>
+
+          {availableFolders.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setPendingDeleteFolder(draft.folder)}
+              title={`Delete "${draft.folder}" folder`}
+              aria-label={`Delete ${draft.folder} folder`}
+              className="min-w-[44px] min-h-[44px] rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-[#F2B8A2]/20 border border-slate-900/[0.10] dark:border-white/[0.08] text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center shrink-0"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -619,20 +696,39 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
           />
         </div>
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          {filterTabs.map((folder) => (
-            <button
-              key={folder}
-              type="button"
-              onClick={() => setFolderFilter(folder)}
-              className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                folderFilter === folder
-                  ? 'bg-[#9BC4E2]/20 text-[#255F8A] dark:text-[#9BC4E2] border border-[#9BC4E2]/30'
-                  : 'bg-white dark:bg-[#171A21] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
-              }`}
-            >
-              {folder}
-            </button>
-          ))}
+          {filterTabs.map((folder) => {
+            const isActive = folderFilter === folder;
+            const canDelete = isActive && folder !== 'All' && availableFolders.length > 1;
+            return (
+              <div
+                key={folder}
+                className={`min-h-[44px] rounded-2xl flex items-center transition-colors shrink-0 ${
+                  isActive
+                    ? 'bg-[#9BC4E2]/20 text-[#255F8A] dark:text-[#9BC4E2] border border-[#9BC4E2]/30'
+                    : 'bg-white dark:bg-[#171A21] text-[#5B6472] dark:text-[#98A2B3] border border-slate-900/[0.08] dark:border-white/[0.06] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setFolderFilter(folder)}
+                  className="min-h-[42px] px-3.5 text-xs font-medium whitespace-nowrap"
+                >
+                  {folder}
+                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => setPendingDeleteFolder(folder)}
+                    title={`Delete "${folder}" folder`}
+                    aria-label={`Delete ${folder} folder`}
+                    className="min-w-[34px] min-h-[34px] mr-1 rounded-xl hover:bg-[#F2B8A2]/25 text-[#5B6472] dark:text-[#98A2B3] hover:text-[#A6482D] dark:hover:text-[#F2B8A2] flex items-center justify-center"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -794,6 +890,31 @@ export const NotesView: React.FC<NotesViewProps> = ({ notes, onSaveNote, onDelet
           });
         }}
         onCancel={() => setPendingDeleteStep(null)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteFolder)}
+        title="Delete Folder?"
+        message={(() => {
+          if (!pendingDeleteFolder) return '';
+          const count = notes.filter(
+            (n) => n.folder.toLowerCase() === pendingDeleteFolder.toLowerCase()
+          ).length;
+          const fallback = getFallbackFolderFor(pendingDeleteFolder);
+          return count > 0
+            ? `Are you sure you want to delete the "${pendingDeleteFolder}" folder? ${count} ${
+                count === 1 ? 'note' : 'notes'
+              } inside will be moved safely to "${fallback}".`
+            : `Are you sure you want to delete the empty folder "${pendingDeleteFolder}"?`;
+        })()}
+        confirmLabel="Delete Folder"
+        onConfirm={async () => {
+          if (!pendingDeleteFolder) return;
+          const target = pendingDeleteFolder;
+          setPendingDeleteFolder(null);
+          await confirmDeleteFolder(target);
+        }}
+        onCancel={() => setPendingDeleteFolder(null)}
       />
     </div>
   );

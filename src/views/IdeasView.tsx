@@ -3,6 +3,7 @@ import { Link2, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { CreativeIdeaCard, IdeaBoardType, IdeaCardColor } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ModernSelect } from '../components/ModernSelect';
 
 interface IdeasViewProps {
   ideas: CreativeIdeaCard[];
@@ -163,31 +164,32 @@ export const IdeasView: React.FC<IdeasViewProps> = ({ ideas, onSaveIdea, onDelet
                 placeholder="e.g. I want to learn watercolor sketching"
                 className="sm:col-span-2 min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               />
-              <select
+              <ModernSelect
+                ariaLabel="Idea board"
+                title="Choose Board"
+                prefixLabel="Board"
+                accent="lavender"
                 value={board}
-                onChange={(e) => setBoard(e.target.value as IdeaBoardType)}
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              >
-                {BOARDS.map((b) => (
-                  <option key={b} value={b}>
-                    Board: {b}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={(val) => setBoard(val as IdeaBoardType)}
+                options={BOARDS.map((b) => ({ value: b, label: b }))}
+              />
+              <ModernSelect
+                ariaLabel="Connect to another idea"
+                title="Connect to Idea"
+                accent="lavender"
                 value={connectTargetId}
-                onChange={(e) => setConnectTargetId(e.target.value)}
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              >
-                <option value="">Connect to another idea (optional)</option>
-                {ideas
-                  .filter((i) => !editingIdea || i.id !== editingIdea.id)
-                  .map((i) => (
-                    <option key={i.id} value={i.id}>
-                      Link with: {i.title}
-                    </option>
-                  ))}
-              </select>
+                onChange={setConnectTargetId}
+                options={[
+                  { value: '', label: 'Connect to another idea (optional)' },
+                  ...ideas
+                    .filter((i) => !editingIdea || i.id !== editingIdea.id)
+                    .map((i) => ({
+                      value: i.id,
+                      label: i.title,
+                      description: i.board,
+                    })),
+                ]}
+              />
             </div>
 
             <textarea

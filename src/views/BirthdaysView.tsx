@@ -5,6 +5,8 @@ import { createId } from '../lib/storage';
 import { formatShortDate, getDaysUntilBirthday } from '../lib/dateUtils';
 import { copyText, shareText } from '../lib/share';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ModernDatePicker } from '../components/ModernDatePicker';
+import { ModernSelect } from '../components/ModernSelect';
 
 interface BirthdaysViewProps {
   birthdays: BirthdayEntry[];
@@ -159,12 +161,14 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                 placeholder="Person's name"
                 className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
               />
-              <input
-                type="date"
-                required
+              <ModernDatePicker
+                ariaLabel="Birth date"
+                title="Birth Date"
+                placeholder="Choose birth date"
+                accent="peach"
+                enableYearPicker
                 value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+                onChange={setBirthDate}
               />
               <input
                 type="text"
@@ -196,15 +200,21 @@ export const BirthdaysView: React.FC<BirthdaysViewProps> = ({
                   onChange={(e) => setOffsetVal(Number(e.target.value))}
                   className="w-20 min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
                 />
-                <select
-                  value={offsetUnit}
-                  onChange={(e) => setOffsetUnit(e.target.value as OffsetUnit)}
-                  className="min-h-[40px] px-3 rounded-xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-xs text-[#111827] dark:text-[#F1F3F6]"
-                >
-                  <option value="minutes">minutes before</option>
-                  <option value="hours">hours before</option>
-                  <option value="days">days before</option>
-                </select>
+                <div className="min-w-[165px]">
+                  <ModernSelect
+                    ariaLabel="Offset unit"
+                    title="Alert Unit"
+                    accent="peach"
+                    triggerClassName="min-h-[40px] rounded-xl text-xs"
+                    value={offsetUnit}
+                    onChange={(val) => setOffsetUnit(val as OffsetUnit)}
+                    options={[
+                      { value: 'minutes', label: 'minutes before' },
+                      { value: 'hours', label: 'hours before' },
+                      { value: 'days', label: 'days before' },
+                    ]}
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={addOffset}

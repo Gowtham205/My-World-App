@@ -61,7 +61,9 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
 
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    const err = validateEventCalmDraft(draft);
+    const err = validateEventCalmDraft(draft, {
+      skipPastValidation: Boolean(editingSession),
+    });
     if (err) {
       setFormError(err);
       return;
@@ -98,6 +100,7 @@ export const EventCalmView: React.FC<EventCalmViewProps> = ({
           setDraft(updater);
         }}
         validationError={formError}
+        allowPastDates={Boolean(editingSession)}
       />
 
       <div className="flex justify-end gap-2.5 pt-2">

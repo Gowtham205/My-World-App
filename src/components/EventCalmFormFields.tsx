@@ -3,6 +3,9 @@ import { X } from 'lucide-react';
 import type { EventCalmSession } from '../types/sanctuary';
 import { getTodayStr, validateFutureDateTime } from '../lib/dateUtils';
 import { createId } from '../lib/storage';
+import { ModernSelect } from './ModernSelect';
+import { ModernDatePicker } from './ModernDatePicker';
+import { ModernTimePicker } from './ModernTimePicker';
 
 export const BUILT_IN_CALM_PROMPTS = [
   "It's okay. You don't have to perform or impress anyone. You are just here to attend, and afterward you can leave.",
@@ -54,17 +57,25 @@ export function eventSessionToDraft(session: EventCalmSession): EventCalmFormDra
   };
 }
 
-export function validateEventCalmDraft(draft: EventCalmFormDraft): string | null {
+export function validateEventCalmDraft(
+  draft: EventCalmFormDraft,
+  options?: { skipPastValidation?: boolean }
+): string | null {
   if (!draft.eventName.trim()) {
     return 'Please enter an event name.';
   }
-  return validateFutureDateTime({
-    date: draft.date,
-    time: draft.startTime,
-    requireTime: true,
-    dateLabel: 'Event Date',
-    timeLabel: 'Start Time',
-  });
+  if (!options?.skipPastValidation) {
+    return validateFutureDateTime({
+      date: draft.date,
+      time: draft.startTime,
+      requireTime: true,
+      dateLabel: 'Event Date',
+      timeLabel: 'Start Time',
+    });
+  }
+  if (!draft.date) return 'Event Date is required.';
+  if (!draft.startTime) return 'Start Time is required.';
+  return null;
 }
 
 export async function persistEventCalmDraft(params: {
@@ -108,12 +119,14 @@ interface EventCalmFormFieldsProps {
   draft: EventCalmFormDraft;
   onChange: React.Dispatch<React.SetStateAction<EventCalmFormDraft>>;
   validationError?: string | null;
+  allowPastDates?: boolean;
 }
 
 export const EventCalmFormFields: React.FC<EventCalmFormFieldsProps> = ({
   draft,
   onChange,
   validationError,
+  allowPastDates = false,
 }) => {
   const [customPromptInput, setCustomPromptInput] = useState('');
   const todayStr = getTodayStr();
@@ -157,56 +170,60 @@ export const EventCalmFormFields: React.FC<EventCalmFormFieldsProps> = ({
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Date</label>
-          <input
-            type="date"
-            min={todayStr}
+          <ModernDatePicker
+            ariaLabel="Event Date"
+            title="Event Date"
+            accent="sage"
+            minDate={allowPastDates ? undefined : todayStr}
             value={draft.date}
-            onChange={(e) => onChange((prev) => ({ ...prev, date: e.target.value }))}
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
+            onChange={(nextDate) => onChange((prev) => ({ ...prev, date: nextDate }))}
           />
         </div>
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">Start Time</label>
-          <input
-            type="time"
-            required
+          <ModernTimePicker
+            ariaLabel="Event Start Time"
+            title="Start Time"
+            accent="sage"
             value={draft.startTime}
-            onChange={(e) => onChange((prev) => ({ ...prev, startTime: e.target.value }))}
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+            onChange={(nextTime) => onChange((prev) => ({ ...prev, startTime: nextTime }))}
           />
         </div>
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">End Time</label>
-          <input
-            type="time"
-            required
+          <ModernTimePicker
+            ariaLabel="Event End Time"
+            title="End Time"
+            accent="sage"
             value={draft.endTime}
-            onChange={(e) => onChange((prev) => ({ ...prev, endTime: e.target.value }))}
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+            onChange={(nextTime) => onChange((prev) => ({ ...prev, endTime: nextTime }))}
           />
         </div>
         <div>
           <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
             Check-In Cadence
           </label>
-          <select
+          <ModernSelect
+            ariaLabel="Check-In Cadence"
+            title="Check-In Cadence"
+            accent="sage"
             value={draft.intervalOption}
-            onChange={(e) =>
+            onChange={(val) =>
               onChange((prev) => ({
                 ...prev,
-                intervalOption: e.target.value as '15' | '20' | '30' | 'midpoint',
+                intervalOption: val as '15' | '20' | '30' | 'midpoint',
               }))
             }
-            className="w-full min-h-[44px] px-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-          >
-            <option value="15">Every 15 minutes</option>
-            <option value="20">Every 20 minutes</option>
-            <option value="30">Every 30 minutes</option>
-            <option value="midpoint">Single midpoint check-in</option>
-          </select>
+            options={[
+              { value: '15', label: 'Every 15 minutes' },
+              { value: '20', label: 'Every 20 minutes' },
+              { value: '30', label: 'Every 30 minutes' },
+              { value: 'midpoint', label: 'Single midpoint check-in' },
+            ]}
+          />
         </div>
       </div>
 

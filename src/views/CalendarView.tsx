@@ -52,6 +52,9 @@ import {
 } from '../components/EventCalmFormFields';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { stopSoundPreview } from '../lib/sound';
+import { ModernSelect } from '../components/ModernSelect';
+import { ModernDatePicker } from '../components/ModernDatePicker';
+import { ModernTimePicker } from '../components/ModernTimePicker';
 
 interface CalendarViewProps {
   events: CalendarEventItem[];
@@ -256,15 +259,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         return;
       }
       const targetDate = eventDate || selectedDate;
-      const err = validateFutureDateTime({
-        date: targetDate,
-        time: startTime || undefined,
-        dateLabel: 'Event Date',
-        timeLabel: 'Start Time',
-      });
-      if (err) {
-        setFormError(err);
-        return;
+      if (!editingEvent) {
+        const err = validateFutureDateTime({
+          date: targetDate,
+          time: startTime || undefined,
+          dateLabel: 'Event Date',
+          timeLabel: 'Start Time',
+        });
+        if (err) {
+          setFormError(err);
+          return;
+        }
       }
       setFormError(null);
 
@@ -290,7 +295,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
 
     if (entryType === 'task') {
-      const err = validateTaskDraft(taskDraft);
+      const err = validateTaskDraft(taskDraft, {
+        skipPastValidation: Boolean(editingTask),
+      });
       if (err) {
         setFormError(err);
         return;
@@ -319,7 +326,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
 
     if (entryType === 'event-calm') {
-      const err = validateEventCalmDraft(calmDraft);
+      const err = validateEventCalmDraft(calmDraft, {
+        skipPastValidation: Boolean(editingSession),
+      });
       if (err) {
         setFormError(err);
         return;
@@ -784,20 +793,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 >
                   Entry Type
                 </label>
-                <select
+                <ModernSelect
                   id="calendar-entry-type"
+                  ariaLabel="Entry Type"
+                  title="Choose Entry Type"
+                  accent="sky"
                   value={entryType}
-                  onChange={(e) => {
+                  onChange={(val) => {
                     stopSoundPreview();
                     setFormError(null);
-                    setEntryType(e.target.value as CalendarEntryType);
+                    setEntryType(val as CalendarEntryType);
                   }}
-                  className="w-full min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.12] dark:border-white/[0.1] text-sm font-medium text-[#111827] dark:text-[#F1F3F6]"
-                >
-                  <option value="calendar">Calendar Event</option>
-                  <option value="task">Task / Smart Reminder</option>
-                  <option value="event-calm">Event Calm Mode</option>
-                </select>
+                  options={[
+                    { value: 'calendar', label: 'Calendar Event', colorDot: '#9BC4E2' },
+                    { value: 'task', label: 'Task / Smart Reminder', colorDot: '#BEB4DC' },
+                    { value: 'event-calm', label: 'Event Calm Mode', colorDot: '#9EC5AB' },
+                  ]}
+                />
               </div>
             )}
           </div>
@@ -820,40 +832,47 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
                     Event Date
                   </label>
-                  <input
-                    type="date"
-                    min={todayStr}
+                  <ModernDatePicker
+                    ariaLabel="Event Date"
+                    title="Event Date"
+                    accent="sky"
+                    minDate={editingEvent ? undefined : todayStr}
                     value={eventDate}
-                    onChange={(e) => {
+                    onChange={(nextDate) => {
                       setFormError(null);
-                      setEventDate(e.target.value);
+                      setEventDate(nextDate);
                     }}
-                    className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
                     Start Time
                   </label>
-                  <input
-                    type="time"
+                  <ModernTimePicker
+                    ariaLabel="Event Start Time"
+                    title="Start Time"
+                    accent="sky"
                     value={startTime}
-                    onChange={(e) => {
+                    onChange={(nextTime) => {
                       setFormError(null);
-                      setStartTime(e.target.value);
+                      setStartTime(nextTime);
                     }}
-                    className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
                     End Time
                   </label>
-                  <input
-                    type="time"
+                  <ModernTimePicker
+                    ariaLabel="Event End Time"
+                    title="End Time"
+                    accent="sky"
+                    allowClear
                     value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] font-mono-tabular"
+                    onChange={(nextTime) => {
+                      setFormError(null);
+                      setEndTime(nextTime);
+                    }}
                   />
                 </div>
                 <input
@@ -863,16 +882,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   placeholder="Location (optional)"
                   className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
                 />
-                <select
+                <ModernSelect
+                  ariaLabel="Event Color"
+                  title="Event Color"
+                  accent="sky"
                   value={color}
-                  onChange={(e) => setColor(e.target.value as CalendarEventColor)}
-                  className="min-h-[44px] px-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-                >
-                  <option value="sky">Sky Blue</option>
-                  <option value="sage">Sage Green</option>
-                  <option value="lavender">Muted Lavender</option>
-                  <option value="peach">Warm Peach</option>
-                </select>
+                  onChange={(val) => setColor(val as CalendarEventColor)}
+                  options={[
+                    { value: 'sky', label: 'Sky Blue', colorDot: '#9BC4E2' },
+                    { value: 'sage', label: 'Sage Green', colorDot: '#9EC5AB' },
+                    { value: 'lavender', label: 'Muted Lavender', colorDot: '#BEB4DC' },
+                    { value: 'peach', label: 'Warm Peach', colorDot: '#F2B8A2' },
+                  ]}
+                />
               </div>
 
               <textarea
@@ -904,6 +926,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               customAudioTones={customAudioTones}
               onSaveCustomTone={onSaveCustomTone}
               validationError={formError}
+              allowPastDates={Boolean(editingTask)}
             />
           )}
 
@@ -915,6 +938,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 setCalmDraft(updater);
               }}
               validationError={formError}
+              allowPastDates={Boolean(editingSession)}
             />
           )}
 

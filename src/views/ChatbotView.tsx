@@ -13,6 +13,7 @@ import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { getApiUrl } from '../lib/api';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ModernSelect } from '../components/ModernSelect';
 
 interface ChatMessage {
   id: string;
@@ -329,32 +330,46 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block">Model</label>
-              <select
+              <ModernSelect
+                ariaLabel="Gemini Model"
+                title="Select Model"
+                accent="lavender"
                 value={model}
-                onChange={(e) =>
-                  setModel(e.target.value as 'gemini-4-hydrogen' | 'gemini-3.1-flash-lite')
+                onChange={(val) =>
+                  setModel(val as 'gemini-4-hydrogen' | 'gemini-3.1-flash-lite')
                 }
-                className="w-full min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-              >
-                <option value="gemini-4-hydrogen">Gemini 4 Hydrogen (Balanced & Thoughtful)</option>
-                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Fast)</option>
-              </select>
+                options={[
+                  {
+                    value: 'gemini-4-hydrogen',
+                    label: 'Gemini 4 Hydrogen',
+                    description: 'Balanced & Thoughtful',
+                  },
+                  {
+                    value: 'gemini-3.1-flash-lite',
+                    label: 'Gemini 3.1 Flash Lite',
+                    description: 'Fast responses',
+                  },
+                ]}
+              />
             </div>
 
             {model === 'gemini-4-hydrogen' && (
               <div className="space-y-1.5">
                 <label className="text-xs text-[#5B6472] dark:text-[#98A2B3] block">Reasoning Depth</label>
-                <select
+                <ModernSelect
+                  ariaLabel="Reasoning Depth"
+                  title="Reasoning Depth"
+                  accent="lavender"
                   value={thinkingLevel}
-                  onChange={(e) =>
-                    setThinkingLevel(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH')
+                  onChange={(val) =>
+                    setThinkingLevel(val as 'LOW' | 'MEDIUM' | 'HIGH')
                   }
-                  className="w-full min-h-[44px] px-3.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6]"
-                >
-                  <option value="LOW">Low (Quick response)</option>
-                  <option value="MEDIUM">Medium (Balanced)</option>
-                  <option value="HIGH">High (Deeper reasoning)</option>
-                </select>
+                  options={[
+                    { value: 'LOW', label: 'Low', description: 'Quick response' },
+                    { value: 'MEDIUM', label: 'Medium', description: 'Balanced' },
+                    { value: 'HIGH', label: 'High', description: 'Deeper reasoning' },
+                  ]}
+                />
               </div>
             )}
           </div>
