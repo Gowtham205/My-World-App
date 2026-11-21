@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.webkit.WebSettings;
+import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -16,7 +17,10 @@ public class MainActivity extends BridgeActivity {
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
 
         if (getBridge() != null && getBridge().getWebView() != null) {
-            WebSettings settings = getBridge().getWebView().getSettings();
+            WebView webView = getBridge().getWebView();
+            webView.setVerticalScrollBarEnabled(false);
+            webView.setHorizontalScrollBarEnabled(false);
+            WebSettings settings = webView.getSettings();
             settings.setMediaPlaybackRequiresUserGesture(false);
         }
 

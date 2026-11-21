@@ -74,31 +74,66 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom calm scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Hide visible scrollbars ("sliding bar") in native mobile app & touch/mobile viewports across all screens, drawers, and lists */
+.native-mobile-app,
+.native-mobile-app * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+.native-mobile-app::-webkit-scrollbar,
+.native-mobile-app *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(15, 23, 42, 0.16);
-  border-radius: 9999px;
+@media (max-width: 1023px), (hover: none) and (pointer: coarse) {
+  html,
+  body,
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+  }
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-}
+/* Custom calm scrollbars for desktop pointer devices only */
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  :root:not(.native-mobile-app) ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(15, 23, 42, 0.28);
-}
+  :root:not(.native-mobile-app) ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.24);
+  :root:not(.native-mobile-app) ::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.16);
+    border-radius: 9999px;
+  }
+
+  .dark:not(.native-mobile-app) ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  :root:not(.native-mobile-app) ::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 23, 42, 0.28);
+  }
+
+  .dark:not(.native-mobile-app) ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.24);
+  }
 }
 
 @keyframes breathe-circle {
