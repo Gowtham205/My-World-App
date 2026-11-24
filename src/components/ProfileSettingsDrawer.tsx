@@ -299,13 +299,13 @@ export const ProfileSettingsDrawer: React.FC<ProfileSettingsDrawerProps> = ({
       onClick={onClose}
     >
       <aside
-        className="w-full max-w-md h-full bg-[#FAFDFB] dark:bg-[#131722] border-l border-slate-900/[0.08] dark:border-white/[0.08] flex flex-col shadow-2xl"
+        className="w-full max-w-md h-full bg-[#FAFDFB] dark:bg-[#131722] border-l border-slate-900/[0.08] dark:border-white/[0.08] flex flex-col shadow-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-900/[0.08] dark:border-white/[0.07] bg-gradient-to-r from-[#EEF7F1] via-[#F4F1FA] to-[#EDF5FB] dark:from-[#17211F] dark:via-[#1B1826] dark:to-[#16202B] flex items-center justify-between gap-3 shrink-0">
-          <div>
-            <h2 className="font-display text-lg font-medium text-[#111827] dark:text-[#F1F3F6]">
+        <div className="px-4 sm:px-5 py-4 border-b border-slate-900/[0.08] dark:border-white/[0.07] bg-gradient-to-r from-[#EEF7F1] via-[#F4F1FA] to-[#EDF5FB] dark:from-[#17211F] dark:via-[#1B1826] dark:to-[#16202B] flex items-center justify-between gap-3 shrink-0">
+          <div className="min-w-0">
+            <h2 className="font-display text-lg font-medium text-[#111827] dark:text-[#F1F3F6] truncate">
               Profile & Settings
             </h2>
             <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">

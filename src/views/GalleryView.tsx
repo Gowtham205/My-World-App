@@ -535,13 +535,13 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       {/* Lightbox Viewer */}
       {viewerItem && objectUrls[viewerItem.id] && (
         <div
-          className="fixed inset-0 z-50 bg-[#0F1115]/95 backdrop-blur-xl flex flex-col items-center justify-center p-5"
+          className="fixed inset-0 z-50 bg-[#0F1115]/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto"
           role="dialog"
           aria-modal="true"
         >
           <div className="w-full max-w-4xl flex flex-col gap-2 mb-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-[#F1F3F6] truncate">{viewerItem.name}</p>
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+              <p className="text-sm text-[#F1F3F6] truncate min-w-0 flex-1">{viewerItem.name}</p>
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
@@ -612,12 +612,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       {/* Delete Confirmation Modal */}
       {pendingDeleteItem && (
         <div
-          className="fixed inset-0 z-[60] bg-slate-900/60 dark:bg-[#0F1115]/85 backdrop-blur-sm flex items-center justify-center p-5"
+          className="fixed inset-0 z-[60] bg-slate-900/60 dark:bg-[#0F1115]/85 backdrop-blur-sm flex items-center justify-center p-4 sm:p-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-label="Confirm media deletion"
         >
-          <div className="max-w-sm w-full rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.12] dark:border-white/[0.1] p-6 space-y-4">
+          <div className="max-w-sm w-full max-h-[92dvh] overflow-y-auto rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.12] dark:border-white/[0.1] p-5 sm:p-6 space-y-4">
             <div className="flex items-center gap-3">
               {pendingDeleteItem.kind === 'image' && objectUrls[pendingDeleteItem.id] ? (
                 <img

@@ -145,29 +145,29 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-[#0F1115]/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-5 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-[#0F1115]/95 backdrop-blur-xl flex items-center justify-center p-3 sm:p-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Event Calm Companion"
     >
-      <div className="max-w-lg w-full bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] rounded-3xl p-6 sm:p-8 relative text-center my-auto shadow-2xl">
+      <div className="max-w-lg w-full max-h-[92dvh] overflow-y-auto bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] rounded-3xl p-5 sm:p-8 relative text-center my-auto shadow-2xl">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close grounding screen"
-          className="absolute top-4 right-4 w-11 h-11 rounded-full bg-slate-900/[0.04] dark:bg-white/[0.04] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] transition-colors"
+          className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 w-11 h-11 rounded-full bg-slate-900/[0.04] dark:bg-white/[0.04] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center justify-center gap-2 text-xs text-[#2E6B48] dark:text-[#9EC5AB] mb-3 pr-8 pl-8">
+        <div className="flex items-center justify-center gap-2 text-xs text-[#2E6B48] dark:text-[#9EC5AB] mb-3 pr-10 pl-10">
           <Wind className="w-4 h-4 shrink-0" />
           <span className="truncate">Event Calm Mode · {session.eventName}</span>
         </div>
 
         {isRingingAlarm && (
-          <div className="mb-4 rounded-2xl bg-[#FCEEE9] dark:bg-[#291C19] border border-[#F2B8A2]/45 px-4 py-3 text-left flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
+          <div className="mb-4 rounded-2xl bg-[#FCEEE9] dark:bg-[#291C19] border border-[#F2B8A2]/45 px-3.5 sm:px-4 py-3 text-left flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
               <span className="text-xs font-semibold text-[#A6482D] dark:text-[#F2B8A2] inline-flex items-center gap-1.5">
                 <BellRing className="w-3.5 h-3.5 animate-pulse" />
                 <Play className="w-3 h-3 fill-current" />

@@ -431,17 +431,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* Monthly Grid + Selected Day Agenda ALWAYS at top */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Monthly Grid */}
-        <section className="lg:col-span-7 rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#9BC4E2]/30 dark:border-white/[0.08] p-5 sm:p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="font-display text-xl font-medium text-[#111827] dark:text-[#F1F3F6]">
+        <section className="lg:col-span-7 rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#9BC4E2]/30 dark:border-white/[0.08] p-3.5 sm:p-6 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-5">
+            <h2 className="font-display text-lg sm:text-xl font-medium text-[#111827] dark:text-[#F1F3F6] min-w-0 truncate">
               {monthLabel}
             </h2>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
               <button
                 type="button"
                 onClick={() => setViewCursor(new Date(year, month - 1, 1))}
                 aria-label="Previous month"
-                className="min-w-[44px] min-h-[44px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
+                className="min-w-[40px] sm:min-w-[44px] min-h-[40px] sm:min-h-[44px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -452,7 +452,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   setViewCursor(new Date(now.getFullYear(), now.getMonth(), 1));
                   setSelectedDate(todayStr);
                 }}
-                className="min-h-[40px] px-3 rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2]"
+                className="min-h-[40px] px-2.5 sm:px-3 rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2]"
               >
                 Today
               </button>
@@ -460,22 +460,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 type="button"
                 onClick={() => setViewCursor(new Date(year, month + 1, 1))}
                 aria-label="Next month"
-                className="min-w-[44px] min-h-[44px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
+                className="min-w-[40px] sm:min-w-[44px] min-h-[40px] sm:min-h-[44px] rounded-xl hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1 mb-2 text-center">
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-2 text-center">
             {WEEKDAY_HEADERS.map((wd) => (
-              <div key={wd} className="text-xs text-[#5B6472] dark:text-[#98A2B3] py-1">
+              <div key={wd} className="text-[11px] sm:text-xs text-[#5B6472] dark:text-[#98A2B3] py-1">
                 {wd}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
             {calendarDays.map((dateStr, idx) => {
               if (!dateStr) return <div key={`empty-${idx}`} className="h-12" />;
               const dayNum = Number(dateStr.slice(8));
@@ -567,11 +567,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </section>
 
         {/* Selected Day Agenda */}
-        <section className="lg:col-span-5 rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#9BC4E2]/30 dark:border-white/[0.08] p-5 sm:p-6 space-y-4 shadow-xs">
+        <section className="lg:col-span-5 rounded-3xl bg-white/85 dark:bg-[#181C26]/90 border border-[#9BC4E2]/30 dark:border-white/[0.08] p-4 sm:p-6 space-y-4 shadow-xs">
           <div className="flex items-center justify-between gap-2">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">Selected Day</p>
-              <h2 className="text-lg font-semibold text-[#111827] dark:text-[#F1F3F6]">
+              <h2 className="text-lg font-semibold text-[#111827] dark:text-[#F1F3F6] truncate">
                 {formatShortDate(selectedDate)}
                 {selectedDate === todayStr ? ' · Today' : ''}
               </h2>
@@ -579,7 +579,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             <button
               type="button"
               onClick={() => openCreateForm('calendar')}
-              className="min-h-[40px] px-3 rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] flex items-center gap-1.5"
+              className="min-h-[40px] px-3 rounded-xl bg-slate-900/[0.05] dark:bg-white/[0.05] hover:bg-slate-900/[0.09] dark:hover:bg-white/[0.09] text-xs font-medium text-[#255F8A] dark:text-[#9BC4E2] flex items-center gap-1.5 shrink-0"
             >
               <CalendarPlus className="w-3.5 h-3.5" />
               Add
@@ -741,7 +741,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-2 pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <span className="text-[11px] text-[#5B6472] dark:text-[#98A2B3]">
                       {session.isMidpointOnly
                         ? 'Single midpoint check-in'
@@ -750,7 +750,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onOpenBreathing(session)}
-                      className="min-h-[34px] px-3 rounded-xl bg-[#9EC5AB] text-[#0F1115] text-xs font-semibold inline-flex items-center gap-1.5"
+                      className="min-h-[36px] px-3 rounded-xl bg-[#9EC5AB] text-[#0F1115] text-xs font-semibold inline-flex items-center gap-1.5 shrink-0"
                     >
                       <Wind className="w-3.5 h-3.5" />
                       Calm &amp; Grounding

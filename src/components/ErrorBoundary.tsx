@@ -36,8 +36,8 @@ export class ErrorBoundary extends React.Component<
   override render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex items-center justify-center p-6">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] p-7 space-y-5 text-center">
+        <div className="min-h-[100dvh] bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex items-center justify-center p-5 sm:p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] p-6 sm:p-7 space-y-5 text-center">
             <div className="w-12 h-12 rounded-2xl bg-[#F2B8A2]/15 flex items-center justify-center mx-auto">
               <ShieldAlert className="w-6 h-6 text-[#A6482D] dark:text-[#F2B8A2]" />
             </div>

@@ -803,7 +803,7 @@ export const HealthMonitorView: React.FC<HealthMonitorViewProps> = ({
         </div>
 
         {/* Right KPI Column: Healthy Range, Daily Energy, Hydration & Optional Personal Badges */}
-        <div className="lg:col-span-5 grid grid-cols-2 gap-4">
+        <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.08] dark:border-white/[0.07] p-4 sm:p-5 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-[#5B6472] dark:text-[#98A2B3]">
               <span>Ideal Weight</span>
@@ -940,7 +940,7 @@ export const HealthMonitorView: React.FC<HealthMonitorViewProps> = ({
         </div>
 
         {/* Burn Metrics + Manual Step Override */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-stretch">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
           <div className="rounded-2xl bg-[#FDF1EC] dark:bg-[#261B18] border border-[#F2B8A2]/40 p-4">
             <p className="text-xs text-[#9A3F26] dark:text-[#F2B8A2]">Calories Burned Today</p>
             <p className="font-mono-tabular text-2xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-1">

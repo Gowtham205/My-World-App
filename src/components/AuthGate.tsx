@@ -130,7 +130,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex items-center justify-center p-4 sm:p-8">
+    <div className="min-h-[100dvh] bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex items-center justify-center p-4 sm:p-8 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-5xl rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] overflow-hidden grid grid-cols-1 lg:grid-cols-12 items-stretch">
         {/* Left Calm Sanctuary Panel */}
         <div className="lg:col-span-6 relative min-h-[220px] lg:min-h-[560px] flex flex-col justify-between p-7 sm:p-10 bg-gradient-to-br from-[#1C2229] via-[#151920] to-[#111419]">

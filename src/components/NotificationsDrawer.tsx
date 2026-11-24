@@ -91,11 +91,11 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
       onClick={onClose}
     >
       <aside
-        className="w-full max-w-md h-full bg-gradient-to-b from-[#F4F8F5] via-[#FAF8FC] to-[#F7F9FC] dark:from-[#151A25] dark:via-[#141722] dark:to-[#12151E] border-l border-[#9EC5AB]/30 dark:border-[#9EC5AB]/20 flex flex-col shadow-2xl"
+        className="w-full max-w-md h-full bg-gradient-to-b from-[#F4F8F5] via-[#FAF8FC] to-[#F7F9FC] dark:from-[#151A25] dark:via-[#141722] dark:to-[#12151E] border-l border-[#9EC5AB]/30 dark:border-[#9EC5AB]/20 flex flex-col shadow-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-900/[0.08] dark:border-white/[0.07] bg-white/55 dark:bg-white/[0.03] flex items-center justify-between gap-3 shrink-0">
+        <div className="px-4 sm:px-5 py-4 border-b border-slate-900/[0.08] dark:border-white/[0.07] bg-white/55 dark:bg-white/[0.03] flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-[#E4F2E9] dark:bg-[#1D2D24] border border-[#9EC5AB]/35 flex items-center justify-center">
               <Bell className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />
@@ -121,7 +121,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
         </div>
 
         {/* Filter Bar + Actions */}
-        <div className="px-5 py-3 border-b border-slate-900/[0.06] dark:border-white/[0.06] flex items-center justify-between gap-2 shrink-0">
+        <div className="px-4 sm:px-5 py-3 border-b border-slate-900/[0.06] dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1 p-1 rounded-xl bg-white/65 dark:bg-[#1D212A] border border-slate-900/[0.06] dark:border-white/[0.06]">
             {(['all', 'missed', 'unread'] as const).map((tab) => (
               <button

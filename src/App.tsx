@@ -111,6 +111,7 @@ import {
   startNativeRingtone,
   stopNativeRingtone,
   syncCustomToneFileToNative,
+  syncNativeSystemTheme,
   tryClaimNativeSlot,
   type NativeAlertEvent,
 } from './lib/nativeAudio';
@@ -402,10 +403,12 @@ export function App() {
   const notificationsDrawerOpenRef = useRef(notificationsDrawerOpen);
   notificationsDrawerOpenRef.current = notificationsDrawerOpen;
 
-  // Sync Dark / Light theme class on <html>
+  // Sync Dark / Light theme class on <html> & Android system bar theme
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
     saveTheme(theme);
+    void syncNativeSystemTheme(isDark);
   }, [theme]);
 
   const pushInboxNotification = useCallback(
@@ -2865,7 +2868,7 @@ export function App() {
 
   if (!authReady || !ready) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0F1115] flex items-center justify-center p-6">
+      <div className="min-h-[100dvh] bg-[#F4F6F8] dark:bg-[#0F1115] flex items-center justify-center p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <p className="font-display text-lg text-[#5B6472] dark:text-[#98A2B3]">Opening My World...</p>
       </div>
     );
@@ -2876,7 +2879,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen text-[#111827] dark:text-[#F1F3F6] flex flex-col transition-colors">
+    <div className="min-h-[100dvh] text-[#111827] dark:text-[#F1F3F6] flex flex-col transition-colors">
       {mapsQuotaExceeded && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
           <span>
@@ -3037,10 +3040,10 @@ export function App() {
       </aside>
 
       {/* Main Content Canvas */}
-      <main className="flex-1 min-w-0 pb-24 lg:pb-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
-          {/* Mobile Account & Navigation Header (non-sticky, restores scroll on Back) */}
-          <div className="mb-4 lg:hidden flex items-center justify-between gap-2">
+      <main className="flex-1 min-w-0 pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-12">
+        <div className="max-w-6xl mx-auto pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-6 lg:pt-8 pb-6 lg:pb-8 pl-[max(0.875rem,env(safe-area-inset-left))] pr-[max(0.875rem,env(safe-area-inset-right))] sm:px-6 lg:px-10">
+          {/* Mobile Account & Navigation Header (non-sticky, respects safe areas & fits any screen width) */}
+          <div className="mb-4 lg:hidden flex items-center justify-between gap-2 min-w-0">
             {isSecondaryRoute ? (
               <button
                 type="button"
@@ -3050,10 +3053,10 @@ export function App() {
                   }
                   navigateTo('explore', { pushHistory: false, restoreScroll: true });
                 }}
-                className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
+                className="min-h-[44px] px-2.5 sm:px-3 -ml-1.5 rounded-2xl inline-flex items-center gap-1.5 text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] min-w-0 flex-1 overflow-hidden"
               >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Explore Hub
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span className="truncate">Back to Explore Hub</span>
               </button>
             ) : route !== 'home' ? (
               <button
@@ -3064,17 +3067,17 @@ export function App() {
                   }
                   navigateTo('home', { pushHistory: false, restoreScroll: true });
                 }}
-                className="min-h-[44px] px-3 -ml-2 rounded-2xl inline-flex items-center gap-2 text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
+                className="min-h-[44px] px-2.5 sm:px-3 -ml-1.5 rounded-2xl inline-flex items-center gap-1.5 text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6] min-w-0 flex-1 overflow-hidden"
               >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Home
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span className="truncate">Back to Home</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setProfileDrawerOpen(true)}
                 aria-label="Open Profile & Settings"
-                className="min-h-[44px] px-2 -ml-2 rounded-2xl hover:bg-white/60 dark:hover:bg-white/[0.06] inline-flex items-center gap-2.5 min-w-0 transition-colors"
+                className="min-h-[44px] px-2 -ml-1.5 rounded-2xl hover:bg-white/60 dark:hover:bg-white/[0.06] inline-flex items-center gap-2 min-w-0 flex-1 overflow-hidden transition-colors"
               >
                 {authUser.photoURL ? (
                   <img
@@ -3089,7 +3092,7 @@ export function App() {
                   </div>
                 )}
                 {preferredGreetingName && (
-                  <span className="text-xs font-semibold text-[#334155] dark:text-[#D0D5DD] truncate max-w-[180px]">
+                  <span className="text-xs font-semibold text-[#334155] dark:text-[#D0D5DD] truncate min-w-0">
                     {preferredGreetingName}
                   </span>
                 )}
@@ -3415,10 +3418,10 @@ export function App() {
       </main>
       </div>
 
-      {/* Mobile Fixed 5-Tab Bottom Navigation Bar with clear pastel per-tab highlights (<= 15% sticky height cap) */}
+      {/* Mobile Fixed 5-Tab Bottom Navigation Bar with safe-area padding & flexible width */}
       <nav
         aria-label="Bottom Navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-[68px] bg-[#FAFDFB]/92 dark:bg-[#131722]/92 backdrop-blur-md border-t border-slate-900/[0.08] dark:border-white/[0.08] grid grid-cols-5 items-stretch px-1.5 pb-1 transition-colors shadow-[0_-4px_20px_rgba(15,23,42,0.05)]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 min-h-[64px] bg-[#FAFDFB]/92 dark:bg-[#131722]/92 backdrop-blur-md border-t border-slate-900/[0.08] dark:border-white/[0.08] grid grid-cols-5 items-stretch pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] transition-colors shadow-[0_-4px_20px_rgba(15,23,42,0.05)]"
       >
         {PRIMARY_TABS.map((tab) => {
           const Icon = tab.icon;
@@ -3429,26 +3432,26 @@ export function App() {
               type="button"
               onClick={() => navigateTo(tab.id)}
               aria-current={active ? 'page' : undefined}
-              className="relative min-h-[48px] flex flex-col items-center justify-center gap-1 pt-1 transition-all"
+              className="relative min-w-0 min-h-[48px] px-0.5 flex flex-col items-center justify-center gap-1 pt-1 transition-all"
             >
               {/* Crisp top active indicator bar */}
               <span
-                className={`absolute top-0 w-9 h-[3px] rounded-b-full transition-all duration-200 ${
+                className={`absolute top-0 w-8 sm:w-9 h-[3px] rounded-b-full transition-all duration-200 ${
                   active ? `${tab.activeBar} opacity-100 scale-x-100` : 'opacity-0 scale-x-50'
                 }`}
               />
               {/* Distinct pastel container for active tab icon */}
               <span
-                className={`px-3.5 py-1 rounded-2xl border transition-all duration-200 flex items-center justify-center ${
+                className={`px-2.5 sm:px-3.5 py-1 rounded-2xl border transition-all duration-200 flex items-center justify-center ${
                   active
                     ? `${tab.activeBox} ${tab.activeText} shadow-xs scale-[1.03]`
                     : `border-transparent ${tab.idleIcon}`
                 }`}
               >
-                <Icon className="w-[19px] h-[19px]" />
+                <Icon className="w-[18px] h-[18px] sm:w-[19px] sm:h-[19px]" />
               </span>
               <span
-                className={`text-[11px] tracking-tight leading-none whitespace-nowrap transition-colors ${
+                className={`text-[10.5px] sm:text-[11px] max-w-full truncate tracking-tight leading-none whitespace-nowrap transition-colors ${
                   active
                     ? `${tab.activeText} font-semibold`
                     : 'text-[#5B6472] dark:text-[#98A2B3] font-medium'
@@ -3506,7 +3509,7 @@ export function App() {
       {activeReminderNotice && (
         <div
           role="status"
-          className="fixed bottom-20 lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/50 p-4 shadow-xl space-y-3"
+          className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/50 p-4 shadow-xl space-y-3"
         >
           <div className="min-w-0">
             <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB] font-medium flex items-center gap-1.5">

@@ -34,12 +34,12 @@ export const ActiveAlarmOverlay: React.FC<ActiveAlarmOverlayProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-[#0F1115]/95 backdrop-blur-xl flex items-center justify-center p-6"
+      className="fixed inset-0 z-50 bg-slate-900/70 dark:bg-[#0F1115]/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Active Alarm"
     >
-      <div className="max-w-md w-full bg-white dark:bg-[#171A21] border border-slate-900/[0.1] dark:border-white/[0.1] rounded-3xl p-8 text-center shadow-2xl">
+      <div className="max-w-md w-full max-h-[92dvh] overflow-y-auto bg-white dark:bg-[#171A21] border border-slate-900/[0.1] dark:border-white/[0.1] rounded-3xl p-6 sm:p-8 text-center shadow-2xl my-auto">
         <div className="w-16 h-16 rounded-full bg-[#FCEEE9] dark:bg-[#F2B8A2]/15 border border-[#A6482D]/25 dark:border-[#F2B8A2]/30 flex items-center justify-center mx-auto mb-5">
           <BellRing className="w-7 h-7 text-[#A6482D] dark:text-[#F2B8A2] animate-pulse" />
         </div>

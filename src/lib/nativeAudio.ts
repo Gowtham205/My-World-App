@@ -86,6 +86,7 @@ interface SanctuaryAudioPluginContract {
     base64Data?: string;
     textContent?: string;
   }): Promise<{ ok: boolean; uri?: string; displayPath: string }>;
+  setSystemTheme(options: { isDark: boolean }): Promise<void>;
   addListener(
     eventName: 'nativeAlertEvent',
     listenerFunc: (event: NativeAlertEvent) => void
@@ -301,6 +302,15 @@ export async function openNativeExactAlarmSettings(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
     await SanctuaryAudio.openExactAlarmSettings();
+  } catch {
+    // ignore
+  }
+}
+
+export async function syncNativeSystemTheme(isDark: boolean): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await SanctuaryAudio.setSystemTheme({ isDark });
   } catch {
     // ignore
   }

@@ -498,6 +498,15 @@ public class SanctuaryAudioPlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void setSystemTheme(PluginCall call) {
+        boolean isDark = Boolean.TRUE.equals(call.getBoolean("isDark", true));
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> MainActivity.applySystemBarTheme(getActivity(), isDark));
+        }
+        call.resolve();
+    }
+
     private static void copyFileToStream(File sourceFile, OutputStream out) throws Exception {
         byte[] buffer = new byte[64 * 1024];
         try (InputStream in = new FileInputStream(sourceFile)) {
