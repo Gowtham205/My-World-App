@@ -10,6 +10,8 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import {
+  isCapacitorNative,
+  isEmbeddedMobileWebView,
   sendResetPasswordEmail,
   signInWithEmail,
   signInWithGoogle,
@@ -22,16 +24,28 @@ interface AuthGateProps {
 
 function mapAuthError(err: unknown): string {
   const code = (err as { code?: string })?.code || '';
+  const rawMessage = err instanceof Error ? err.message : '';
+  if (/invalid_request/i.test(rawMessage)) {
+    return 'Google blocked the web sign-in request from this mobile WebView (Error 400: invalid_request). Use Email & Password above, or open the web app in Chrome/Safari.';
+  }
   switch (code) {
+    case 'auth/native-webview-google-blocked':
+      return 'Google web sign-in is blocked by Google inside Android APK WebViews (Error 400: invalid_request). Sign in or Create Account with Email & Password above (already used Google on web? Enter your Gmail and tap Forgot password? to set a password).';
+    case 'auth/in-app-webview-blocked':
+      return 'Google blocks Sign-In inside in-app browsers. Open this link in Chrome or Safari to use Google Sign-In, or use Email & Password above.';
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
       return 'Sign-in popup was closed before completing. Please try again.';
     case 'auth/popup-blocked':
-      return 'Your browser blocked the sign-in popup. Allow popups or use Email & Password above.';
+      return 'Your browser blocked the sign-in popup. Allow popups in your browser settings or use Email & Password above.';
     case 'auth/unauthorized-domain':
       return 'This domain is not authorized in Firebase Authentication settings.';
     case 'auth/operation-not-allowed':
-      return 'Email/Password sign-in is not enabled yet in Firebase Console (Authentication → Sign-in method → Email/Password). Enable it there or continue with Google below.';
+      return 'Email/Password sign-in is not enabled yet in Firebase Console (Authentication → Sign-in method → Email/Password). Enable it there to sign in on mobile APK.';
+    case 'auth/network-request-failed':
+      return 'Network request failed. Please check your mobile internet connection and try again.';
+    case 'auth/internal-error':
+      return 'Authentication could not complete in this browser view. Try Email & Password above or open in Chrome/Safari.';
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
     case 'auth/user-not-found':
@@ -45,9 +59,7 @@ function mapAuthError(err: unknown): string {
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait a moment and try again.';
     default:
-      return err instanceof Error
-        ? err.message
-        : 'Unable to sign in right now. Please try again.';
+      return rawMessage || 'Unable to sign in right now. Please try again.';
   }
 }
 
@@ -60,6 +72,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
   const [loadingMethod, setLoadingMethod] = useState<'email' | 'google' | 'reset' | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const isNativeApk = isCapacitorNative();
+  const isInAppWebView = !isNativeApk && isEmbeddedMobileWebView();
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,9 +236,13 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
               {mode === 'signin' ? 'Welcome back' : 'Create your sanctuary'}
             </h2>
             <p className="text-xs sm:text-sm text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
-              {mode === 'signin'
-                ? 'Sign in with your email and password, or continue with Google.'
-                : 'Sign up with any email address or set up instantly using Google.'}
+              {isNativeApk
+                ? mode === 'signin'
+                  ? 'Sign in with your email and password to unlock your mobile sanctuary.'
+                  : 'Create your sanctuary account using your email address and password.'
+                : mode === 'signin'
+                  ? 'Sign in with your email and password, or continue with Google.'
+                  : 'Sign up with any email address or set up instantly using Google.'}
             </p>
           </div>
 
@@ -345,50 +363,81 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
             </button>
           </form>
 
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-900/[0.08] dark:bg-white/[0.08]" />
-            <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">or</span>
-            <div className="h-px flex-1 bg-slate-900/[0.08] dark:bg-white/[0.08]" />
-          </div>
+          {isNativeApk ? (
+            <div className="rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] p-4 space-y-1.5 text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
+              <p className="font-semibold text-[#111827] dark:text-[#F1F3F6]">
+                Mobile App Sign-In Note
+              </p>
+              <p>
+                Google web popups are blocked by Google inside Android WebViews (causing Error 400:
+                invalid_request). Please use <strong>Email &amp; Password</strong> above.
+              </p>
+              <p className="text-[#5B6472] dark:text-[#98A2B3]">
+                Already signed in with Google on the web? Enter that Gmail address above and tap{' '}
+                <strong>Forgot password?</strong> to set a password for the same account.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-900/[0.08] dark:bg-white/[0.08]" />
+                <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">or</span>
+                <div className="h-px flex-1 bg-slate-900/[0.08] dark:bg-white/[0.08]" />
+              </div>
 
-          <button
-            type="button"
-            disabled={loadingMethod !== null}
-            onClick={() => void handleGoogleAuth()}
-            className="w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.12] dark:border-white/[0.1] disabled:opacity-60 text-[#111827] dark:text-[#F1F3F6] text-sm font-medium flex items-center justify-center gap-3 transition-colors"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="w-4 h-4 shrink-0"
-            >
-              <path
-                fill="currentColor"
-                d="M21.805 10.023H12.2v3.955h5.52c-.238 1.275-.957 2.355-2.04 3.08v2.56h3.302c1.932-1.78 3.048-4.4 3.048-7.508 0-.705-.064-1.384-.225-2.087Z"
-              />
-              <path
-                fill="currentColor"
-                d="M12.2 22c2.76 0 5.075-.915 6.767-2.382l-3.302-2.56c-.915.613-2.085.975-3.465.975-2.665 0-4.922-1.8-5.73-4.218H3.058v2.642C4.74 19.798 8.202 22 12.2 22Z"
-              />
-              <path
-                fill="currentColor"
-                d="M6.47 13.815A5.97 5.97 0 0 1 6.155 12c0-.63.11-1.242.315-1.815V7.543H3.058A9.992 9.992 0 0 0 2 12c0 1.615.388 3.144 1.058 4.457l3.412-2.642Z"
-              />
-              <path
-                fill="currentColor"
-                d="M12.2 5.967c1.501 0 2.848.516 3.908 1.53l2.931-2.931C17.27 2.912 14.955 2 12.2 2 8.202 2 4.74 4.202 3.058 7.543l3.412 2.642c.808-2.418 3.065-4.218 5.73-4.218Z"
-              />
-            </svg>
-            <span>
-              {loadingMethod === 'google' ? 'Connecting Google...' : 'Continue with Google'}
-            </span>
-          </button>
+              {isInAppWebView && (
+                <div
+                  role="status"
+                  className="rounded-2xl bg-[#FCF5E6] dark:bg-[#292316] border border-[#EDD59E]/45 px-4 py-2.5 text-xs text-[#92400E] dark:text-[#EDD59E] leading-relaxed"
+                >
+                  You appear to be inside an in-app browser. Google blocks Sign-In inside embedded
+                  WebViews — open this page in <strong>Chrome</strong> or <strong>Safari</strong>,
+                  or use <strong>Email &amp; Password</strong> above.
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={loadingMethod !== null}
+                onClick={() => void handleGoogleAuth()}
+                className="w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.12] dark:border-white/[0.1] disabled:opacity-60 text-[#111827] dark:text-[#F1F3F6] text-sm font-medium flex items-center justify-center gap-3 transition-colors"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="w-4 h-4 shrink-0"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M21.805 10.023H12.2v3.955h5.52c-.238 1.275-.957 2.355-2.04 3.08v2.56h3.302c1.932-1.78 3.048-4.4 3.048-7.508 0-.705-.064-1.384-.225-2.087Z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M12.2 22c2.76 0 5.075-.915 6.767-2.382l-3.302-2.56c-.915.613-2.085.975-3.465.975-2.665 0-4.922-1.8-5.73-4.218H3.058v2.642C4.74 19.798 8.202 22 12.2 22Z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M6.47 13.815A5.97 5.97 0 0 1 6.155 12c0-.63.11-1.242.315-1.815V7.543H3.058A9.992 9.992 0 0 0 2 12c0 1.615.388 3.144 1.058 4.457l3.412-2.642Z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M12.2 5.967c1.501 0 2.848.516 3.908 1.53l2.931-2.931C17.27 2.912 14.955 2 12.2 2 8.202 2 4.74 4.202 3.058 7.543l3.412 2.642c.808-2.418 3.065-4.218 5.73-4.218Z"
+                  />
+                </svg>
+                <span>
+                  {loadingMethod === 'google' ? 'Connecting Google...' : 'Continue with Google'}
+                </span>
+              </button>
+            </>
+          )}
 
           <div className="pt-2 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-start gap-2.5 text-xs text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
             <ShieldCheck className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB] mt-0.5 shrink-0" />
             <span>
-              Secured by Firebase Authentication. Use Email & Password for mobile APK builds or
-              Google Sign-In on the web.
+              Secured by Firebase Authentication.
+              {isNativeApk
+                ? ' Email & Password works directly inside the mobile APK.'
+                : ' Use Email & Password or Google Sign-In in Chrome/Safari.'}
             </span>
           </div>
         </div>

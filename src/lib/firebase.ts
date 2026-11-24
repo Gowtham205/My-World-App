@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { initializeApp } from 'firebase/app';
 import {
   GoogleAuthProvider,
@@ -104,7 +105,34 @@ async function testConnection(): Promise<void> {
 
 void testConnection();
 
+export function isCapacitorNative(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+export function isEmbeddedMobileWebView(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isAndroidWebView = /; wv\)/i.test(ua) || /\bVersion\/\d+\.\d+.*Chrome\//i.test(ua);
+  const isIosWebView = /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(ua);
+  const isKnownInAppBrowser = /\b(FBAN|FBAV|Instagram|Line|MicroMessenger|WhatsApp|Snapchat)\b/i.test(ua);
+  return isAndroidWebView || isIosWebView || isKnownInAppBrowser;
+}
+
 export async function signInWithGoogle(): Promise<User> {
+  if (isCapacitorNative()) {
+    const err = new Error(
+      'Google Sign-In web popups are blocked inside Android APK WebViews. Use Email & Password to sign in.'
+    ) as Error & { code?: string };
+    err.code = 'auth/native-webview-google-blocked';
+    throw err;
+  }
+  if (isEmbeddedMobileWebView()) {
+    const err = new Error(
+      'Google Sign-In is blocked inside in-app browsers. Open this page in Chrome or Safari, or use Email & Password.'
+    ) as Error & { code?: string };
+    err.code = 'auth/in-app-webview-blocked';
+    throw err;
+  }
   const result = await signInWithPopup(auth, googleProvider);
   return result.user;
 }
