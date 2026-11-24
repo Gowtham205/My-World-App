@@ -14,6 +14,7 @@ import {
   Compass,
   FileText,
   Gamepad2,
+  HeartPulse,
   Home,
   Image as ImageIcon,
   Lightbulb,
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react';
 import { onAuthStateChanged, updateProfile, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import type {
   AlarmItem,
   AppNotificationItem,
@@ -41,6 +43,7 @@ import type {
   CustomAudioTone,
   EncryptedVaultRecord,
   EventCalmSession,
+  HealthProfile,
   MediaAlbum,
   MotivationalQuote,
   PersonalNote,
@@ -56,14 +59,20 @@ import {
   getAllFromStore,
   getCalmMinutesByDate,
   getDailyQuoteSelection,
+  getDailyStepsByDate,
   getDefaultNotificationSoundId,
+  getHealthProfile,
   getLocalPreferredName,
   getNotificationHistory,
   getSavedTheme,
   getSetting,
+  hasHealthMilestoneSent,
+  markHealthMilestoneSent,
   putInStore,
   recordCalmMinutes,
   saveDailyQuoteSelection,
+  saveDailyStepsForDate,
+  saveHealthProfileLocal,
   saveLocalPreferredName,
   saveNotificationHistory,
   saveTheme,
@@ -105,9 +114,16 @@ import {
   tryClaimNativeSlot,
   type NativeAlertEvent,
 } from './lib/nativeAudio';
+import {
+  attachNativeStepsListener,
+  getNativeStepStatus,
+  requestNativeStepTracking,
+} from './lib/nativeSteps';
+import { getReachedStepMilestones, isWeightRecheckDue } from './lib/healthMonitor';
 import { deletePrivateMediaFile } from './lib/privateMediaStorage';
 import {
   ALARM_MAX_RING_MS,
+  MAX_AUTO_SNOOZES,
   playNotificationSound,
   resolveSoundName,
   startAlarmRinging,
@@ -123,9 +139,11 @@ import {
   auth,
   db,
   handleFirestoreError,
+  loadHealthProfileFromFirestore,
   OperationType,
   reloadCurrentUser,
   resendVerificationEmail,
+  saveHealthProfileToFirestore,
   signOutSanctuary,
   upsertUserProfile,
   type UserProfileRecord,
@@ -142,6 +160,7 @@ import { CalendarView } from './views/CalendarView';
 import { AlarmsView } from './views/AlarmsView';
 import { IdeasView } from './views/IdeasView';
 import { EventCalmView } from './views/EventCalmView';
+import { HealthMonitorView } from './views/HealthMonitorView';
 import { SoundscapesView } from './views/SoundscapesView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { MapsView } from './views/MapsView';
@@ -229,6 +248,7 @@ const SECONDARY_LINKS: {
   { route: 'gallery', label: 'Private Gallery', icon: ImageIcon, iconColor: 'text-[#1E5F8A] dark:text-[#9BC4E2]' },
   { route: 'ideas', label: 'Ideas Hub', icon: Lightbulb, iconColor: 'text-[#8A6218] dark:text-[#EDD59E]' },
   { route: 'event-calm', label: 'Event Calm Mode', icon: Wind, iconColor: 'text-[#2E6B48] dark:text-[#9EC5AB]' },
+  { route: 'health', label: 'Health Monitor', icon: HeartPulse, iconColor: 'text-[#2E6B48] dark:text-[#9EC5AB]' },
   { route: 'soundscapes', label: 'Soundscapes', icon: AudioLines, iconColor: 'text-[#1E5F8A] dark:text-[#9BC4E2]' },
   { route: 'analytics', label: 'Analytics', icon: BarChart3, iconColor: 'text-[#8A6218] dark:text-[#EDD59E]' },
   { route: 'maps', label: 'Sanctuary Maps', icon: MapPin, iconColor: 'text-[#2E6B48] dark:text-[#9EC5AB]' },
@@ -307,6 +327,14 @@ export function App() {
   const [defaultNotificationSoundId, setDefaultNotificationSoundId] = useState<string>(() =>
     getDefaultNotificationSoundId()
   );
+  const [healthProfile, setHealthProfile] = useState<HealthProfile | null>(null);
+  const [dailyStepsByDate, setDailyStepsByDate] = useState<Record<string, number>>(() =>
+    getDailyStepsByDate()
+  );
+  const [nativeStepStatus, setNativeStepStatus] = useState<{
+    sensorAvailable: boolean;
+    permissionGranted: boolean;
+  }>({ sensorAvailable: false, permissionGranted: false });
 
   // In-memory cryptographic key (cleared immediately on background/visibility hidden)
   const [vaultKey, setVaultKey] = useState<CryptoKey | null>(null);
@@ -327,7 +355,23 @@ export function App() {
     prompt: string;
     startedAtMs: number;
     muteInitialChime?: boolean;
+    isRingingAlarm?: boolean;
+    autoSnoozeCount?: number;
+    snoozeMinutes?: number;
+    slotSeed?: string;
   } | null>(null);
+  const snoozedCalmAlertsRef = useRef<
+    Array<{
+      id: string;
+      session: EventCalmSession;
+      targetDate: string;
+      targetTime: string;
+      prompt: string;
+      fullChecklist: string;
+      autoSnoozeCount: number;
+      snoozeMinutes: number;
+    }>
+  >([]);
   const [calmMinutesByDate, setCalmMinutesByDate] = useState<Record<string, number>>(() =>
     getCalmMinutesByDate()
   );
@@ -347,6 +391,8 @@ export function App() {
   customAudioTonesRef.current = customAudioTones;
   const defaultNotificationSoundIdRef = useRef(defaultNotificationSoundId);
   defaultNotificationSoundIdRef.current = defaultNotificationSoundId;
+  const healthProfileRef = useRef(healthProfile);
+  healthProfileRef.current = healthProfile;
   const activeReminderNoticeRef = useRef(activeReminderNotice);
   activeReminderNoticeRef.current = activeReminderNotice;
   const breathingPromptStateRef = useRef(breathingPromptState);
@@ -464,7 +510,7 @@ export function App() {
 
   const loadAll = useCallback(async () => {
     await seedInitialSanctuaryDataIfNeeded();
-    const [n, v, q, t, b, al, m, c, arm, id, ev, tones] = await Promise.all([
+    const [n, v, q, t, b, al, m, c, arm, id, ev, tones, hp] = await Promise.all([
       getAllFromStore<PersonalNote>('notes'),
       getAllFromStore<EncryptedVaultRecord>('vault'),
       getAllFromStore<MotivationalQuote>('quotes'),
@@ -477,6 +523,7 @@ export function App() {
       getAllFromStore<CreativeIdeaCard>('ideas'),
       getAllFromStore<EventCalmSession>('events'),
       getAllFromStore<CustomAudioTone>('custom_audio'),
+      getHealthProfile(),
     ]);
     setNotes(n);
     setVaultRecords(v);
@@ -490,6 +537,7 @@ export function App() {
     setIdeas(id);
     setEventSessions(ev);
     setCustomAudioTones(tones);
+    setHealthProfile(hp);
     setReady(true);
   }, []);
 
@@ -538,6 +586,240 @@ export function App() {
 
     return () => unsubscribe();
   }, [authReady, authUser, isEmailVerified]);
+
+  // Step milestones helper (1,000 steps first, then every 5,000 steps)
+  const checkAndDispatchStepMilestones = useCallback(
+    (steps: number) => {
+      const today = getTodayStr();
+      const reached = getReachedStepMilestones(steps);
+      if (reached.length === 0) return;
+
+      const newlyReached: number[] = [];
+      for (const milestone of reached) {
+        const key = `steps:${today}:${milestone}`;
+        if (!hasHealthMilestoneSent(key)) {
+          markHealthMilestoneSent(key);
+          newlyReached.push(milestone);
+        }
+      }
+      if (newlyReached.length === 0) return;
+
+      const highest = newlyReached[newlyReached.length - 1];
+      const dedupeKey = `health:steps:${today}:${highest}`;
+      const title = `${highest.toLocaleString()} Steps Reached Today`;
+      const body =
+        highest === 1000
+          ? 'Great first 1,000 steps! Your daily movement rhythm is underway. Next milestone: 5,000 steps.'
+          : `Awesome stride — you crossed ${highest.toLocaleString()} steps today! Next milestone: ${(highest + 5000).toLocaleString()} steps.`;
+
+      pushInboxNotification({
+        dedupeKey,
+        kind: 'health',
+        status: 'delivered',
+        title,
+        body,
+        scheduledAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        read: false,
+        route: 'health',
+      });
+
+      void sendSystemNotification({
+        dedupeKey,
+        slotSeed: `health:steps:${today}`,
+        title,
+        body,
+        channel: 'health',
+        route: 'health',
+        entityId: String(highest),
+        replaceInPlace: true,
+      });
+    },
+    [pushInboxNotification]
+  );
+
+  // Sync Health Profile with Firestore when verified
+  useEffect(() => {
+    if (!ready || !authReady || !authUser || !isEmailVerified) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const remote = await loadHealthProfileFromFirestore(authUser);
+        if (cancelled) return;
+        const local = healthProfileRef.current;
+        if (remote && (!local || remote.updatedAt > local.updatedAt)) {
+          await saveHealthProfileLocal(remote);
+          setHealthProfile(remote);
+        } else if (local && !remote) {
+          await saveHealthProfileToFirestore(authUser, local);
+        }
+      } catch {
+        // Offline-first fallback
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, authReady, authUser, isEmailVerified]);
+
+  // Listen to native hardware step counter when available on Android
+  useEffect(() => {
+    if (!ready || !Capacitor.isNativePlatform()) return;
+    let active = true;
+
+    const applySensorSteps = (todaySteps: number, available: boolean, permGranted?: boolean) => {
+      if (!active) return;
+      setNativeStepStatus((prev) => ({
+        sensorAvailable: available,
+        permissionGranted: permGranted ?? prev.permissionGranted,
+      }));
+      if (todaySteps > 0) {
+        const today = getTodayStr();
+        const currentStored = getDailyStepsByDate()[today] || 0;
+        const merged = Math.max(currentStored, todaySteps);
+        if (merged !== currentStored) {
+          const updatedMap = saveDailyStepsForDate(today, merged);
+          setDailyStepsByDate(updatedMap);
+          checkAndDispatchStepMilestones(merged);
+        }
+      }
+    };
+
+    void getNativeStepStatus().then((status) => {
+      applySensorSteps(status.todaySteps, status.sensorAvailable, status.permissionGranted);
+    });
+
+    const detach = attachNativeStepsListener((ev) => {
+      applySensorSteps(ev.todaySteps, ev.sensorAvailable, true);
+    });
+
+    return () => {
+      active = false;
+      detach();
+    };
+  }, [ready, checkAndDispatchStepMilestones]);
+
+  // Check if periodic weight recheck reminder (default every 30 days) is due
+  useEffect(() => {
+    if (!ready || !healthProfile) return;
+    const today = getTodayStr();
+    const recheck = isWeightRecheckDue(healthProfile, today);
+    if (!recheck.due) return;
+
+    const sentKey = `weight-recheck:${healthProfile.lastWeightLoggedAt}:${today}`;
+    if (hasHealthMilestoneSent(sentKey)) return;
+    markHealthMilestoneSent(sentKey);
+
+    const dedupeKey = `health:${sentKey}`;
+    const title = 'Weight & Health Check-In Due';
+    const body = `It has been ${recheck.daysElapsed} days since your last logged weight (${healthProfile.weightKg} kg). Update your weight in Health Monitor to refresh your BMI & plan.`;
+
+    pushInboxNotification({
+      dedupeKey,
+      kind: 'health',
+      status: 'delivered',
+      title,
+      body,
+      scheduledAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      read: false,
+      route: 'health',
+    });
+
+    void sendSystemNotification({
+      dedupeKey,
+      slotSeed: 'health:weight-recheck',
+      title,
+      body,
+      channel: 'health',
+      route: 'health',
+      replaceInPlace: true,
+    });
+  }, [ready, healthProfile, pushInboxNotification]);
+
+  const handleSaveHealthProfile = useCallback(
+    async (nextProfile: HealthProfile) => {
+      await saveHealthProfileLocal(nextProfile);
+      setHealthProfile(nextProfile);
+
+      if (authUser && isEmailVerified) {
+        try {
+          await saveHealthProfileToFirestore(authUser, nextProfile);
+        } catch {
+          // Offline-first; syncs cleanly next time online
+        }
+      }
+
+      if (Capacitor.isNativePlatform()) {
+        const recheckId = hashToNotificationId('health:weight-recheck');
+        try {
+          await LocalNotifications.cancel({ notifications: [{ id: recheckId }] }).catch(() => {});
+          if (nextProfile.weightReminderDays > 0) {
+            const recheck = isWeightRecheckDue(nextProfile, getTodayStr());
+            if (recheck.nextDueDate) {
+              const [y, m, d] = recheck.nextDueDate.split('-').map(Number);
+              const at = new Date(y, m - 1, d, 9, 0, 0, 0);
+              if (at.getTime() > Date.now() + 60_000) {
+                const granted = await ensureNotificationSetup();
+                if (granted) {
+                  await LocalNotifications.schedule({
+                    notifications: [
+                      {
+                        id: recheckId,
+                        title: '30-Day Health & Weight Check-In',
+                        body: `Time for your ${nextProfile.weightReminderDays}-day weight update in Personal Health Monitor.`,
+                        channelId: 'my-world-reminders',
+                        extra: {
+                          route: 'health',
+                          kind: 'health',
+                          slotSeed: 'health:weight-recheck',
+                        },
+                        schedule: {
+                          at,
+                          allowWhileIdle: true,
+                        },
+                      },
+                    ],
+                  });
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore local schedule failure
+        }
+      }
+    },
+    [authUser, isEmailVerified]
+  );
+
+  const handleUpdateTodaySteps = useCallback(
+    async (steps: number) => {
+      const today = getTodayStr();
+      const updatedMap = saveDailyStepsForDate(today, steps);
+      setDailyStepsByDate(updatedMap);
+      checkAndDispatchStepMilestones(steps);
+    },
+    [checkAndDispatchStepMilestones]
+  );
+
+  const handleRequestNativeSteps = useCallback(async () => {
+    const status = await requestNativeStepTracking();
+    setNativeStepStatus({
+      sensorAvailable: status.sensorAvailable,
+      permissionGranted: status.permissionGranted,
+    });
+    if (status.todaySteps > 0) {
+      const today = getTodayStr();
+      const currentStored = getDailyStepsByDate()[today] || 0;
+      const merged = Math.max(currentStored, status.todaySteps);
+      const updatedMap = saveDailyStepsForDate(today, merged);
+      setDailyStepsByDate(updatedMap);
+      checkAndDispatchStepMilestones(merged);
+    }
+  }, [checkAndDispatchStepMilestones]);
 
   // Listen for Google Maps Platform Case A quota exhaustion events globally
   useEffect(() => {
@@ -658,6 +940,10 @@ export function App() {
                 prompt: leadPrompt,
                 startedAtMs: ev.timestampMs || now,
                 muteInitialChime: true,
+                isRingingAlarm: true,
+                autoSnoozeCount: ev.autoSnoozeCount || 0,
+                snoozeMinutes: ev.snoozeMinutes || 5,
+                slotSeed: ev.scheduleId,
               });
             }
           }
@@ -667,7 +953,7 @@ export function App() {
               kind: 'calm',
               status: 'delivered',
               title: ev.title || 'Event Calm',
-              body: ev.body || 'Gentle grounding check-in.',
+              body: ev.body || 'Event Calm check-in alarm.',
               scheduledAt: new Date(ev.timestampMs || now).toISOString(),
               createdAt: new Date().toISOString(),
               read: false,
@@ -690,6 +976,28 @@ export function App() {
           snoozeTarget.getMinutes()
         ).padStart(2, '0')}`;
 
+        if (ev.kind === 'calm') {
+          setBreathingPromptState((curr) =>
+            !ev.entityId || curr?.session.id === ev.entityId ? null : curr
+          );
+          if (ev.type === 'auto_snoozed') {
+            const count = ev.autoSnoozeCount || 1;
+            const formattedTime = formatTime12h(snoozeTime);
+            pushInboxNotification({
+              dedupeKey: `calm:${ev.entityId}:autosnooze:${snoozeDate}T${snoozeTime}`,
+              kind: 'calm',
+              status: 'missed',
+              title: `Auto-snoozed ${effectiveMinutes}m · ${ev.title || 'Event Calm'}`,
+              body: `Next Event Calm check-in at ${formattedTime} (auto-snooze ${count}/${MAX_AUTO_SNOOZES}).`,
+              scheduledAt: snoozeTarget.toISOString(),
+              createdAt: new Date().toISOString(),
+              read: false,
+              route: 'event-calm',
+            });
+          }
+          return;
+        }
+
         if (ev.kind === 'reminder') {
           const matchedTask = tasksRef.current.find((t) => t.id === ev.entityId);
           if (matchedTask) {
@@ -709,11 +1017,16 @@ export function App() {
         const matchedAlarm =
           alarmsRef.current.find((a) => a.id === ev.entityId) || ringingAlarmRef.current;
         if (matchedAlarm) {
+          const nextCount =
+            ev.type === 'auto_snoozed'
+              ? ev.autoSnoozeCount ?? (matchedAlarm.autoSnoozeCount || 0) + 1
+              : 0;
           const updated: AlarmItem = {
             ...matchedAlarm,
             enabled: true,
             snoozedUntilDate: snoozeDate,
             snoozedUntilTime: snoozeTime,
+            autoSnoozeCount: nextCount,
             lastTriggeredMinute: undefined,
           };
           await putInStore('alarms', updated);
@@ -728,7 +1041,9 @@ export function App() {
               kind: 'alarm',
               status: 'missed',
               title: `Auto-snoozed ${effectiveMinutes}m · ${alarmTitle}`,
-              body: updated.linkedReminderNotes || `Next alarm at ${formattedTime}.`,
+              body: `${
+                updated.linkedReminderNotes ? `${updated.linkedReminderNotes} · ` : ''
+              }Next alarm at ${formattedTime} (auto-snooze ${nextCount}/${MAX_AUTO_SNOOZES}).`,
               scheduledAt: snoozeTarget.toISOString(),
               createdAt: new Date().toISOString(),
               read: false,
@@ -741,7 +1056,65 @@ export function App() {
         return;
       }
 
+      if (ev.type === 'auto_stopped') {
+        if (ev.kind === 'calm') {
+          setBreathingPromptState((curr) =>
+            !ev.entityId || curr?.session.id === ev.entityId ? null : curr
+          );
+          pushInboxNotification({
+            dedupeKey: `calm:${ev.entityId}:exhausted:${Date.now()}`,
+            kind: 'calm',
+            status: 'missed',
+            title: `Missed · ${ev.title || 'Event Calm'}`,
+            body: `Auto-stopped after ${MAX_AUTO_SNOOZES} auto-snoozes without dismissal.`,
+            scheduledAt: new Date(ev.timestampMs || now).toISOString(),
+            createdAt: new Date().toISOString(),
+            read: false,
+            route: 'event-calm',
+          });
+          return;
+        }
+
+        const matchedAlarm =
+          alarmsRef.current.find((a) => a.id === ev.entityId) || ringingAlarmRef.current;
+        if (matchedAlarm) {
+          const nextState = getNextAlarmStateAfterFire(matchedAlarm, tasksRef.current);
+          const cleaned: AlarmItem = {
+            ...matchedAlarm,
+            enabled: nextState.enabled,
+            date: nextState.date,
+            snoozedUntilDate: undefined,
+            snoozedUntilTime: undefined,
+            autoSnoozeCount: 0,
+          };
+          await putInStore('alarms', cleaned);
+          setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
+          const alarmTitle = cleaned.linkedReminderTitle || cleaned.label || 'Sanctuary Alarm';
+          pushInboxNotification({
+            dedupeKey: `alarm:${cleaned.id}:exhausted:${Date.now()}`,
+            kind: 'alarm',
+            status: 'missed',
+            title: `Missed · ${alarmTitle}`,
+            body: `Auto-stopped after ${MAX_AUTO_SNOOZES} auto-snoozes without dismissal.`,
+            scheduledAt: new Date(ev.timestampMs || now).toISOString(),
+            createdAt: new Date().toISOString(),
+            read: false,
+            route: 'alarms',
+          });
+        }
+        setRingingAlarm((curr) =>
+          !ev.entityId || curr?.id === ev.entityId ? null : curr
+        );
+        return;
+      }
+
       if (ev.type === 'dismiss') {
+        if (ev.kind === 'calm') {
+          setBreathingPromptState((curr) =>
+            !ev.entityId || curr?.session.id === ev.entityId ? null : curr
+          );
+          return;
+        }
         if (ev.kind === 'reminder') {
           setActiveReminderNotice((curr) =>
             !ev.entityId || curr?.id === ev.entityId ? null : curr
@@ -750,11 +1123,17 @@ export function App() {
         }
         const matchedAlarm =
           alarmsRef.current.find((a) => a.id === ev.entityId) || ringingAlarmRef.current;
-        if (matchedAlarm && (matchedAlarm.snoozedUntilDate || matchedAlarm.snoozedUntilTime)) {
+        if (
+          matchedAlarm &&
+          (matchedAlarm.snoozedUntilDate ||
+            matchedAlarm.snoozedUntilTime ||
+            (matchedAlarm.autoSnoozeCount || 0) > 0)
+        ) {
           const cleaned: AlarmItem = {
             ...matchedAlarm,
             snoozedUntilDate: undefined,
             snoozedUntilTime: undefined,
+            autoSnoozeCount: 0,
           };
           await putInStore('alarms', cleaned);
           setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
@@ -849,7 +1228,7 @@ export function App() {
     async (
       targetAlarm: AlarmItem,
       minutes: number,
-      options?: { autoSnoozed?: boolean; slotSeed?: string }
+      options?: { autoSnoozed?: boolean; slotSeed?: string; nextAutoSnoozeCount?: number }
     ) => {
       stopAlarmRinging();
       const effectiveMinutes = minutes > 0 ? minutes : 5;
@@ -861,11 +1240,16 @@ export function App() {
         snoozeTarget.getMinutes()
       ).padStart(2, '0')}`;
 
+      const nextAutoCount = options?.autoSnoozed
+        ? options.nextAutoSnoozeCount ?? (targetAlarm.autoSnoozeCount || 0) + 1
+        : 0;
+
       const updated: AlarmItem = {
         ...targetAlarm,
         enabled: true,
         snoozedUntilDate: snoozeDate,
         snoozedUntilTime: snoozeTime,
+        autoSnoozeCount: nextAutoCount,
         lastTriggeredMinute: undefined,
       };
       await putInStore('alarms', updated);
@@ -886,7 +1270,9 @@ export function App() {
           kind: 'alarm',
           status: 'missed',
           title: `Auto-snoozed ${effectiveMinutes}m · ${alarmTitle}`,
-          body: updated.linkedReminderNotes || `Next alarm at ${formattedTime}.`,
+          body: `${
+            updated.linkedReminderNotes ? `${updated.linkedReminderNotes} · ` : ''
+          }Next alarm at ${formattedTime} (auto-snooze ${nextAutoCount}/${MAX_AUTO_SNOOZES}).`,
           scheduledAt: snoozeTarget.toISOString(),
           createdAt: new Date().toISOString(),
           read: false,
@@ -897,7 +1283,9 @@ export function App() {
           dedupeKey: autoKey,
           slotSeed,
           title: `Snoozed ${effectiveMinutes}m · ${alarmTitle}`,
-          body: updated.linkedReminderNotes || `Next alarm at ${formattedTime}`,
+          body: `${
+            updated.linkedReminderNotes ? `${updated.linkedReminderNotes} · ` : ''
+          }Next at ${formattedTime} (auto-snooze ${nextAutoCount}/${MAX_AUTO_SNOOZES})`,
           channel: 'alarm',
           route: 'alarms',
           entityId: updated.id,
@@ -914,6 +1302,55 @@ export function App() {
           void removeNotificationBySlotSeed(slotSeed);
         }
       }
+    },
+    [getAlarmSlotSeed, pushInboxNotification]
+  );
+
+  const exhaustAlarmAutoSnoozes = useCallback(
+    async (targetAlarm: AlarmItem, slotSeedOverride?: string) => {
+      stopAlarmRinging();
+      setRingingAlarm((curr) => (curr?.id === targetAlarm.id ? null : curr));
+
+      const nextState = getNextAlarmStateAfterFire(targetAlarm, tasksRef.current);
+      const cleaned: AlarmItem = {
+        ...targetAlarm,
+        enabled: nextState.enabled,
+        date: nextState.date,
+        snoozedUntilDate: undefined,
+        snoozedUntilTime: undefined,
+        autoSnoozeCount: 0,
+      };
+      await putInStore('alarms', cleaned);
+      setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
+
+      const slotSeed = slotSeedOverride || getAlarmSlotSeed(cleaned);
+      const alarmTitle = cleaned.linkedReminderTitle || cleaned.label || 'Sanctuary Alarm';
+      const exhaustedKey = `alarm:${cleaned.id}:exhausted:${Date.now()}`;
+
+      pushInboxNotification({
+        dedupeKey: exhaustedKey,
+        kind: 'alarm',
+        status: 'missed',
+        title: `Missed · ${alarmTitle}`,
+        body: `Auto-stopped after ${MAX_AUTO_SNOOZES} auto-snoozes without dismissal.`,
+        scheduledAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        read: false,
+        route: 'alarms',
+      });
+
+      void sendSystemNotification({
+        dedupeKey: exhaustedKey,
+        slotSeed,
+        title: `Missed · ${alarmTitle}`,
+        body: `Auto-stopped after ${MAX_AUTO_SNOOZES} auto-snoozes without dismissal`,
+        channel: 'alarm',
+        route: 'alarms',
+        entityId: cleaned.id,
+        isPlaying: false,
+        ongoing: false,
+        replaceInPlace: true,
+      });
     },
     [getAlarmSlotSeed, pushInboxNotification]
   );
@@ -943,10 +1380,12 @@ export function App() {
     async (alarm: AlarmItem, options?: { isTest?: boolean }) => {
       const soundLabel =
         alarm.soundName || resolveSoundName(customAudioTones, alarm.soundId);
+      const currentAutoCount = alarm.autoSnoozeCount || 0;
       const alarmWithSound: AlarmItem = {
         ...alarm,
         soundName: soundLabel,
         snoozeMinutes: alarm.snoozeMinutes || 5,
+        autoSnoozeCount: currentAutoCount,
       };
       setRingingAlarm(alarmWithSound);
       setRingingStartedAtMs(Date.now());
@@ -997,6 +1436,7 @@ export function App() {
           soundName: soundLabel,
           route: 'alarms',
           snoozeMinutes: alarmWithSound.snoozeMinutes,
+          autoSnoozeCount: currentAutoCount,
           isTest: Boolean(options?.isTest),
           slotKey: options?.isTest ? '' : alarmDedupeKey,
         });
@@ -1026,20 +1466,252 @@ export function App() {
         onAutoTimeout: () => {
           const latestAlarm =
             alarmsRef.current.find((a) => a.id === alarmWithSound.id) || alarmWithSound;
-          void snoozeAlarmByEntity(latestAlarm, latestAlarm.snoozeMinutes || 5, {
-            autoSnoozed: true,
-          });
+          const count = latestAlarm.autoSnoozeCount ?? currentAutoCount;
+          if (count >= MAX_AUTO_SNOOZES) {
+            void exhaustAlarmAutoSnoozes(latestAlarm, slotSeed);
+          } else {
+            void snoozeAlarmByEntity(latestAlarm, latestAlarm.snoozeMinutes || 5, {
+              autoSnoozed: true,
+              slotSeed,
+              nextAutoSnoozeCount: count + 1,
+            });
+          }
         },
       });
     },
     [
       customAudioTones,
+      exhaustAlarmAutoSnoozes,
       getAlarmSlotSeed,
       handleStopAllSoundscapes,
       pushInboxNotification,
       snoozeAlarmByEntity,
     ]
   );
+
+  const triggerCalmCheckInAlarm = useCallback(
+    async (params: {
+      session: EventCalmSession;
+      leadPrompt: string;
+      fullChecklist: string;
+      minuteKey: string;
+      autoSnoozeCount?: number;
+      snoozeMinutes?: number;
+    }) => {
+      const {
+        session,
+        leadPrompt,
+        fullChecklist,
+        minuteKey,
+        autoSnoozeCount = 0,
+        snoozeMinutes = 5,
+      } = params;
+      const calmDedupeKey = `calm:${session.id}:${minuteKey}`;
+      const calmSlotKey = calmDedupeKey;
+      const now = new Date();
+
+      pushInboxNotification({
+        dedupeKey: calmDedupeKey,
+        kind: 'calm',
+        status: 'delivered',
+        title: `${session.eventName} · Event Calm`,
+        body: fullChecklist,
+        scheduledAt: now.toISOString(),
+        createdAt: now.toISOString(),
+        read: false,
+        route: 'event-calm',
+      });
+
+      handleStopAllSoundscapes();
+      stopSoundPreview();
+
+      const soundId = defaultNotificationSoundIdRef.current;
+      const matchedTone = customAudioTonesRef.current.find((t) => t.id === soundId);
+      const soundLabel = resolveSoundName(customAudioTonesRef.current, soundId);
+
+      if (Capacitor.isNativePlatform()) {
+        const soundPath = matchedTone ? await syncCustomToneFileToNative(matchedTone) : '';
+        await startNativeRingtone({
+          scheduleId: calmDedupeKey,
+          notifId: hashToNotificationId(calmDedupeKey),
+          kind: 'calm',
+          entityId: session.id,
+          title: `${session.eventName} · Event Calm`,
+          body: fullChecklist,
+          soundId,
+          soundPath: soundPath || '',
+          soundName: soundLabel,
+          route: 'event-calm',
+          snoozeMinutes,
+          autoSnoozeCount,
+          slotKey: calmSlotKey,
+        });
+        setBreathingPromptState({
+          session,
+          prompt: leadPrompt,
+          startedAtMs: Date.now(),
+          muteInitialChime: true,
+          isRingingAlarm: true,
+          autoSnoozeCount,
+          snoozeMinutes,
+          slotSeed: calmDedupeKey,
+        });
+        return;
+      }
+
+      setBreathingPromptState({
+        session,
+        prompt: leadPrompt,
+        startedAtMs: Date.now(),
+        muteInitialChime: true,
+        isRingingAlarm: true,
+        autoSnoozeCount,
+        snoozeMinutes,
+        slotSeed: calmDedupeKey,
+      });
+
+      await sendSystemNotification({
+        dedupeKey: calmDedupeKey,
+        slotSeed: calmDedupeKey,
+        title: `${session.eventName} · Event Calm`,
+        body: fullChecklist,
+        channel: 'calm',
+        route: 'event-calm',
+        entityId: session.id,
+        isPlaying: true,
+        ongoing: true,
+        replaceInPlace: true,
+        soundLabel,
+        snoozeMinutes,
+      });
+
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
+
+      startAlarmRinging(matchedTone, soundId, {
+        maxDurationMs: ALARM_MAX_RING_MS,
+        onAutoTimeout: () => {
+          stopAlarmRinging();
+          setBreathingPromptState((curr) =>
+            curr?.session.id === session.id ? null : curr
+          );
+
+          if (autoSnoozeCount >= MAX_AUTO_SNOOZES) {
+            const exhaustedKey = `calm:${session.id}:exhausted:${Date.now()}`;
+            pushInboxNotification({
+              dedupeKey: exhaustedKey,
+              kind: 'calm',
+              status: 'missed',
+              title: `Missed · ${session.eventName} · Event Calm`,
+              body: `Auto-stopped after ${MAX_AUTO_SNOOZES} auto-snoozes without dismissal.`,
+              scheduledAt: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+              read: false,
+              route: 'event-calm',
+            });
+            void sendSystemNotification({
+              dedupeKey: exhaustedKey,
+              slotSeed: calmDedupeKey,
+              title: `Missed · ${session.eventName}`,
+              body: `Event Calm alarm auto-stopped after ${MAX_AUTO_SNOOZES} auto-snoozes`,
+              channel: 'calm',
+              route: 'event-calm',
+              entityId: session.id,
+              isPlaying: false,
+              ongoing: false,
+              replaceInPlace: true,
+            });
+            return;
+          }
+
+          const nextCount = autoSnoozeCount + 1;
+          const snoozeTarget = new Date(Date.now() + snoozeMinutes * 60_000);
+          const sDate = `${snoozeTarget.getFullYear()}-${String(
+            snoozeTarget.getMonth() + 1
+          ).padStart(2, '0')}-${String(snoozeTarget.getDate()).padStart(2, '0')}`;
+          const sTime = `${String(snoozeTarget.getHours()).padStart(2, '0')}:${String(
+            snoozeTarget.getMinutes()
+          ).padStart(2, '0')}`;
+
+          snoozedCalmAlertsRef.current = [
+            ...snoozedCalmAlertsRef.current.filter((item) => item.session.id !== session.id),
+            {
+              id: createId('calmsnz'),
+              session,
+              targetDate: sDate,
+              targetTime: sTime,
+              prompt: leadPrompt,
+              fullChecklist,
+              autoSnoozeCount: nextCount,
+              snoozeMinutes,
+            },
+          ];
+
+          const autoKey = `calm:${session.id}:autosnooze:${sDate}T${sTime}`;
+          pushInboxNotification({
+            dedupeKey: autoKey,
+            kind: 'calm',
+            status: 'missed',
+            title: `Auto-snoozed ${snoozeMinutes}m · ${session.eventName}`,
+            body: `Next Event Calm check-in at ${formatTime12h(sTime)} (auto-snooze ${nextCount}/${MAX_AUTO_SNOOZES}).`,
+            scheduledAt: snoozeTarget.toISOString(),
+            createdAt: new Date().toISOString(),
+            read: false,
+            route: 'event-calm',
+          });
+          void sendSystemNotification({
+            dedupeKey: autoKey,
+            slotSeed: calmDedupeKey,
+            title: `Snoozed ${snoozeMinutes}m · ${session.eventName}`,
+            body: `Next check-in at ${formatTime12h(sTime)} (auto-snooze ${nextCount}/${MAX_AUTO_SNOOZES})`,
+            channel: 'calm',
+            route: 'event-calm',
+            entityId: session.id,
+            isPlaying: false,
+            ongoing: false,
+            replaceInPlace: true,
+          });
+        },
+      });
+    },
+    [handleStopAllSoundscapes, pushInboxNotification]
+  );
+
+  const handleSnoozeCalmOverlay = useCallback((minutes: number) => {
+    const active = breathingPromptStateRef.current;
+    if (!active) return;
+
+    const effectiveMinutes = minutes > 0 ? minutes : 5;
+    stopAlarmRinging();
+    if (active.slotSeed) {
+      void removeNotificationBySlotSeed(active.slotSeed);
+    } else {
+      void stopNativeRingtone();
+    }
+
+    const snoozeTarget = new Date(Date.now() + effectiveMinutes * 60_000);
+    const sDate = `${snoozeTarget.getFullYear()}-${String(
+      snoozeTarget.getMonth() + 1
+    ).padStart(2, '0')}-${String(snoozeTarget.getDate()).padStart(2, '0')}`;
+    const sTime = `${String(snoozeTarget.getHours()).padStart(2, '0')}:${String(
+      snoozeTarget.getMinutes()
+    ).padStart(2, '0')}`;
+
+    snoozedCalmAlertsRef.current = [
+      ...snoozedCalmAlertsRef.current.filter((item) => item.session.id !== active.session.id),
+      {
+        id: createId('calmsnz'),
+        session: active.session,
+        targetDate: sDate,
+        targetTime: sTime,
+        prompt: active.prompt,
+        fullChecklist: formatEventCalmPrompts(active.session),
+        autoSnoozeCount: 0, // manual snooze resets auto-snooze count
+        snoozeMinutes: effectiveMinutes,
+      },
+    ];
+
+    setBreathingPromptState(null);
+  }, []);
 
   // Setup Android notification channels, native Broadcast listeners, & tap routing
   useEffect(() => {
@@ -1059,6 +1731,19 @@ export function App() {
       onNavigate: (targetRoute) => navigateTo(targetRoute),
       onNativeReceived: (item) => pushInboxNotification(item),
       onActionPerformed: (payload) => {
+        if (payload.kind === 'calm') {
+          if (payload.actionId === 'snooze') {
+            handleSnoozeCalmOverlay(payload.snoozeMinutes || 5);
+          } else {
+            stopAlarmRinging();
+            if (payload.slotSeed) void removeNotificationBySlotSeed(payload.slotSeed);
+            setBreathingPromptState((curr) =>
+              !payload.entityId || curr?.session.id === payload.entityId ? null : curr
+            );
+          }
+          return;
+        }
+
         if (payload.kind === 'reminder' && payload.entityId) {
           const targetTask = tasksRef.current.find((t) => t.id === payload.entityId);
           if (payload.actionId === 'snooze' && targetTask) {
@@ -1088,11 +1773,17 @@ export function App() {
           }
         } else if (payload.actionId === 'dismiss') {
           stopAlarmRinging();
-          if (matchedAlarm && (matchedAlarm.snoozedUntilDate || matchedAlarm.snoozedUntilTime)) {
+          if (
+            matchedAlarm &&
+            (matchedAlarm.snoozedUntilDate ||
+              matchedAlarm.snoozedUntilTime ||
+              (matchedAlarm.autoSnoozeCount || 0) > 0)
+          ) {
             const cleaned: AlarmItem = {
               ...matchedAlarm,
               snoozedUntilDate: undefined,
               snoozedUntilTime: undefined,
+              autoSnoozeCount: 0,
             };
             void putInStore('alarms', cleaned);
             setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
@@ -1112,6 +1803,7 @@ export function App() {
     ready,
     authUser,
     handleNativeAlertEvent,
+    handleSnoozeCalmOverlay,
     navigateTo,
     pushInboxNotification,
     snoozeAlarmByEntity,
@@ -1428,58 +2120,35 @@ export function App() {
         );
         await putInStore('events', updatedSession);
 
-        const calmDedupeKey = `calm:${updatedSession.id}:${minuteKey}`;
-        pushInboxNotification({
-          dedupeKey: calmDedupeKey,
-          kind: 'calm',
-          status: 'delivered',
-          title: `${updatedSession.eventName} · Event Calm`,
-          body: fullPromptChecklist,
-          scheduledAt: now.toISOString(),
-          createdAt: now.toISOString(),
-          read: false,
-          route: 'event-calm',
+        await triggerCalmCheckInAlarm({
+          session: updatedSession,
+          leadPrompt,
+          fullChecklist: fullPromptChecklist,
+          minuteKey,
+          autoSnoozeCount: 0,
+          snoozeMinutes: 5,
         });
+      }
 
-        if (Capacitor.isNativePlatform()) {
-          const matchedTone = customAudioTones.find((t) => t.id === defaultNotificationSoundId);
-          const soundPath = matchedTone ? await syncCustomToneFileToNative(matchedTone) : '';
-          await startNativeRingtone({
-            scheduleId: calmDedupeKey,
-            notifId: hashToNotificationId(calmDedupeKey),
-            kind: 'calm',
-            entityId: updatedSession.id,
-            title: `${updatedSession.eventName} · Event Calm`,
-            body: fullPromptChecklist,
-            soundId: defaultNotificationSoundId,
-            soundPath: soundPath || '',
-            soundName: 'Calm Bell',
-            route: 'event-calm',
-            snoozeMinutes: 5,
-            slotKey: calmSlotKey,
-          });
-          setBreathingPromptState({
-            session: updatedSession,
-            prompt: leadPrompt,
-            startedAtMs: Date.now(),
-            muteInitialChime: true,
-          });
-        } else {
-          setBreathingPromptState({
-            session: updatedSession,
-            prompt: leadPrompt,
-            startedAtMs: Date.now(),
-          });
-          void sendSystemNotification({
-            dedupeKey: calmDedupeKey,
-            slotSeed: calmDedupeKey,
-            title: `${updatedSession.eventName} · Event Calm`,
-            body: fullPromptChecklist,
-            channel: 'calm',
-            route: 'event-calm',
-            entityId: updatedSession.id,
-            summaryText:
-              pool.length > 1 ? `${pool.length} grounding prompts` : undefined,
+      // 2b. Check snoozed Event Calm check-ins (from manual or auto-snooze in foreground/Web)
+      const dueCalmSnooze = snoozedCalmAlertsRef.current.find(
+        (item) => item.targetDate === today && item.targetTime === currentHHMM
+      );
+      if (dueCalmSnooze) {
+        snoozedCalmAlertsRef.current = snoozedCalmAlertsRef.current.filter(
+          (item) => item.id !== dueCalmSnooze.id
+        );
+        const latestSession =
+          eventSessionsRef.current.find((s) => s.id === dueCalmSnooze.session.id) ||
+          dueCalmSnooze.session;
+        if (latestSession.active) {
+          await triggerCalmCheckInAlarm({
+            session: latestSession,
+            leadPrompt: dueCalmSnooze.prompt,
+            fullChecklist: dueCalmSnooze.fullChecklist,
+            minuteKey,
+            autoSnoozeCount: dueCalmSnooze.autoSnoozeCount,
+            snoozeMinutes: dueCalmSnooze.snoozeMinutes,
           });
         }
       }
@@ -1596,6 +2265,7 @@ export function App() {
     defaultNotificationSoundId,
     pushInboxNotification,
     triggerActiveAlarm,
+    triggerCalmCheckInAlarm,
   ]);
 
   // Persistence Handlers
@@ -1850,11 +2520,16 @@ export function App() {
       if (slotSeed !== primarySeed) {
         void removeNotificationBySlotSeed(slotSeed);
       }
-      if (active.snoozedUntilDate || active.snoozedUntilTime) {
+      if (
+        active.snoozedUntilDate ||
+        active.snoozedUntilTime ||
+        (active.autoSnoozeCount || 0) > 0
+      ) {
         const cleaned: AlarmItem = {
           ...active,
           snoozedUntilDate: undefined,
           snoozedUntilTime: undefined,
+          autoSnoozeCount: 0,
         };
         void putInStore('alarms', cleaned);
         setAlarms((prev) => prev.map((a) => (a.id === cleaned.id ? cleaned : a)));
@@ -1868,6 +2543,15 @@ export function App() {
   const handleCloseBreathingOverlay = useCallback(() => {
     const active = breathingPromptStateRef.current;
     if (!active) return;
+    stopAlarmRinging();
+    if (active.slotSeed) {
+      void removeNotificationBySlotSeed(active.slotSeed);
+    } else if (active.isRingingAlarm) {
+      void stopNativeRingtone();
+    }
+    snoozedCalmAlertsRef.current = snoozedCalmAlertsRef.current.filter(
+      (item) => item.session.id !== active.session.id
+    );
     const elapsedMinutes = Math.max(
       1,
       Math.round((Date.now() - active.startedAtMs) / 60000)
@@ -2547,6 +3231,7 @@ export function App() {
                 ideas: ideas.length,
                 events: eventSessions.length,
                 activeSoundscapes: activeSoundscapeIds.length,
+                todaySteps: dailyStepsByDate[getTodayStr()] || 0,
               }}
               onNavigate={navigateTo}
             />
@@ -2665,6 +3350,19 @@ export function App() {
             />
           )}
 
+          {route === 'health' && (
+            <HealthMonitorView
+              profile={healthProfile}
+              dailyStepsByDate={dailyStepsByDate}
+              nativeStepSensorAvailable={nativeStepStatus.sensorAvailable}
+              nativeStepPermissionGranted={nativeStepStatus.permissionGranted}
+              isNativePlatform={Capacitor.isNativePlatform()}
+              onSaveProfile={handleSaveHealthProfile}
+              onUpdateTodaySteps={handleUpdateTodaySteps}
+              onRequestNativeSteps={handleRequestNativeSteps}
+            />
+          )}
+
           {route === 'soundscapes' && (
             <SoundscapesView
               activeTracks={activeSoundscapes}
@@ -2690,6 +3388,9 @@ export function App() {
               calmMinutesByDate={calmMinutesByDate}
               quotes={quotes}
               ideas={ideas}
+              healthProfile={healthProfile}
+              dailyStepsByDate={dailyStepsByDate}
+              onNavigate={navigateTo}
             />
           )}
 
@@ -2854,6 +3555,11 @@ export function App() {
           customAudioTones={customAudioTones}
           notificationSoundId={defaultNotificationSoundId}
           muteInitialChime={breathingPromptState.muteInitialChime}
+          isRingingAlarm={breathingPromptState.isRingingAlarm}
+          ringingStartedAtMs={breathingPromptState.startedAtMs}
+          autoSnoozeCount={breathingPromptState.autoSnoozeCount}
+          snoozeMinutes={breathingPromptState.snoozeMinutes}
+          onSnooze={handleSnoozeCalmOverlay}
           onClose={handleCloseBreathingOverlay}
         />
       )}

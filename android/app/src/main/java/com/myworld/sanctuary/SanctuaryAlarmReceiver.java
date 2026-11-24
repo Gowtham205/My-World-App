@@ -31,6 +31,7 @@ public class SanctuaryAlarmReceiver extends BroadcastReceiver {
         String route = intent.getStringExtra(SanctuaryNotificationHelper.EXTRA_ROUTE);
         if (route == null) route = "alarms";
         int snoozeMinutes = intent.getIntExtra(SanctuaryNotificationHelper.EXTRA_SNOOZE_MINUTES, 5);
+        int autoSnoozeCount = intent.getIntExtra(SanctuaryNotificationHelper.EXTRA_AUTO_SNOOZE_COUNT, 0);
 
         long nowMs = System.currentTimeMillis();
         String minuteKey = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US).format(new Date(nowMs));
@@ -67,6 +68,9 @@ public class SanctuaryAlarmReceiver extends BroadcastReceiver {
         serviceIntent.putExtra(SanctuaryNotificationHelper.EXTRA_SOUND_NAME, soundName);
         serviceIntent.putExtra(SanctuaryNotificationHelper.EXTRA_ROUTE, route);
         serviceIntent.putExtra(SanctuaryNotificationHelper.EXTRA_SNOOZE_MINUTES, snoozeMinutes);
+        serviceIntent.putExtra(SanctuaryNotificationHelper.EXTRA_AUTO_SNOOZE_COUNT, autoSnoozeCount);
+
+        boolean isAlarmLike = "alarm".equals(kind) || "calm".equals(kind);
 
         try {
             ContextCompat.startForegroundService(context, serviceIntent);
@@ -84,13 +88,13 @@ public class SanctuaryAlarmReceiver extends BroadcastReceiver {
                     body,
                     route,
                     snoozeMinutes,
-                    "alarm".equals(kind),
+                    isAlarmLike,
                     true
                 )
             );
             try {
                 android.net.Uri uri = android.media.RingtoneManager.getDefaultUri(
-                    "alarm".equals(kind)
+                    isAlarmLike
                         ? android.media.RingtoneManager.TYPE_ALARM
                         : android.media.RingtoneManager.TYPE_NOTIFICATION
                 );
@@ -124,6 +128,7 @@ public class SanctuaryAlarmReceiver extends BroadcastReceiver {
             ev.put("soundName", soundName != null ? soundName : "");
             ev.put("route", route);
             ev.put("snoozeMinutes", snoozeMinutes);
+            ev.put("autoSnoozeCount", autoSnoozeCount);
             ev.put("minuteKey", minuteKey);
             ev.put("timestampMs", nowMs);
 

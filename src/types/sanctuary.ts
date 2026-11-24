@@ -17,7 +17,8 @@ export type AppRoute =
   | 'game'
   | 'ai-chat'
   | 'voice-live'
-  | 'transcribe';
+  | 'transcribe'
+  | 'health';
 
 export type BottomTab = 'home' | 'tasks' | 'calendar' | 'alarms' | 'explore';
 
@@ -191,6 +192,7 @@ export interface AlarmItem {
   lastTriggeredMinute?: string; // YYYY-MM-DDTHH:MM
   snoozedUntilDate?: string; // YYYY-MM-DD
   snoozedUntilTime?: string; // HH:MM
+  autoSnoozeCount?: number; // Number of consecutive auto-snoozes without user action (max 5)
   createdAt: string;
 }
 
@@ -251,7 +253,7 @@ export interface SecuritySettings {
 
 export type AppTheme = 'dark' | 'light';
 
-export type AppNotificationKind = 'alarm' | 'reminder' | 'calm' | 'birthday';
+export type AppNotificationKind = 'alarm' | 'reminder' | 'calm' | 'birthday' | 'health';
 
 export type AppNotificationStatus = 'missed' | 'delivered';
 
@@ -266,4 +268,35 @@ export interface AppNotificationItem {
   createdAt: string;
   read: boolean;
   route: AppRoute;
+}
+
+export type DietPreference = 'veg' | 'non-veg' | 'both';
+export type HealthActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active';
+export type BiologicalSex = 'male' | 'female' | 'other';
+
+export interface WeightLogEntry {
+  date: string; // YYYY-MM-DD
+  weightKg: number;
+  note?: string;
+}
+
+export interface HealthProfile {
+  id: 'health_profile';
+  weightKg: number;
+  heightCm: number;
+  dob: string; // YYYY-MM-DD
+  biologicalSex?: BiologicalSex;
+  dietPreference: DietPreference;
+  activityLevel: HealthActivityLevel;
+  dailyStepGoal: number;
+  targetWeightKg?: number;
+  // Optional personal information (clearly separated from clinical health metrics)
+  sunSign?: string;
+  birthStar?: string;
+  // Weight recheck reminder cadence in days (default 30, 0 = off)
+  weightReminderDays: number;
+  lastWeightLoggedAt: string; // YYYY-MM-DD
+  weightHistory: WeightLogEntry[];
+  updatedAt: string;
+  createdAt: string;
 }

@@ -21,6 +21,7 @@ export const BUILTIN_TONES: BuiltinToneOption[] = [
 ];
 
 export const ALARM_MAX_RING_MS = 60_000;
+export const MAX_AUTO_SNOOZES = 5;
 
 let audioCtx: AudioContext | null = null;
 let alarmLoopTimer: number | null = null;

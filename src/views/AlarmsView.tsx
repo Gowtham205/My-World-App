@@ -425,8 +425,8 @@ export const AlarmsView: React.FC<AlarmsViewProps> = ({
             Wake-Up, Medicine & Break Alarms
           </h1>
           <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1">
-            Upload your own music or audio clips for alarm ringtones, reminder alerts, and
-            notification chimes.
+            Each alarm rings up to 1 minute, auto-snoozes up to 5 times if untouched, then stops
+            automatically. Upload your own audio for ringtones, reminders, and Event Calm alerts.
           </p>
         </div>
         <button

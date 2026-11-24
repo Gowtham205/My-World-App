@@ -14,6 +14,7 @@ export interface NativeScheduleItem {
   soundName: string;
   route: AppRoute;
   snoozeMinutes: number;
+  autoSnoozeCount?: number;
   repeating: boolean;
   repeatDays?: number[];
   hhmm?: string;
@@ -21,7 +22,7 @@ export interface NativeScheduleItem {
 }
 
 export interface NativeAlertEvent {
-  type: 'fired' | 'snooze' | 'auto_snoozed' | 'dismiss';
+  type: 'fired' | 'snooze' | 'auto_snoozed' | 'auto_stopped' | 'dismiss';
   scheduleId: string;
   notifId: number;
   kind: 'alarm' | 'reminder' | 'calm';
@@ -32,6 +33,7 @@ export interface NativeAlertEvent {
   soundName?: string;
   route?: AppRoute;
   snoozeMinutes?: number;
+  autoSnoozeCount?: number;
   snoozeTargetMs?: number;
   minuteKey?: string;
   timestampMs?: number;
@@ -65,6 +67,7 @@ interface SanctuaryAudioPluginContract {
     soundName?: string;
     route?: AppRoute;
     snoozeMinutes?: number;
+    autoSnoozeCount?: number;
     isTest?: boolean;
     slotKey?: string;
   }): Promise<{ started: boolean; reason?: string }>;
@@ -216,6 +219,7 @@ export async function startNativeRingtone(params: {
   soundName?: string;
   route?: AppRoute;
   snoozeMinutes?: number;
+  autoSnoozeCount?: number;
   isTest?: boolean;
   slotKey?: string;
 }): Promise<boolean> {

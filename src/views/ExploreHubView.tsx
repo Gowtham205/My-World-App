@@ -9,6 +9,7 @@ import {
   Download,
   FileText,
   Gamepad2,
+  HeartPulse,
   Image as ImageIcon,
   Lightbulb,
   Lock,
@@ -37,6 +38,7 @@ interface ExploreHubViewProps {
     ideas: number;
     events: number;
     activeSoundscapes: number;
+    todaySteps?: number;
   };
   onNavigate: (route: AppRoute) => void;
 }
@@ -200,10 +202,22 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       icon: AudioLines,
     },
     {
+      id: 'health',
+      route: 'health',
+      title: 'Personal Health Monitor',
+      subtitle: 'BMI spectrum gauge, age/diet nutrition tips, step calorie burn, and 30-day weight checks.',
+      meta:
+        typeof counts.todaySteps === 'number' && counts.todaySteps > 0
+          ? `${counts.todaySteps.toLocaleString()} steps today`
+          : 'BMI · Steps · Diet',
+      tone: 'peach',
+      icon: HeartPulse,
+    },
+    {
       id: 'analytics',
       route: 'analytics',
       title: 'Analytics & Wellbeing',
-      subtitle: 'Charts for daily tasks completed, notes written, and Event Calm Mode time.',
+      subtitle: 'Charts for daily tasks, notes, Event Calm time, steps, and calorie burn.',
       meta: 'Trends · Charts',
       tone: 'honey',
       icon: BarChart3,

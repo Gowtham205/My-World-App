@@ -210,3 +210,149 @@ export async function upsertUserProfile(
     }
   }
 }
+
+export async function saveHealthProfileToFirestore(
+  user: User,
+  profile: {
+    weightKg: number;
+    heightCm: number;
+    dob: string;
+    biologicalSex?: 'male' | 'female' | 'other';
+    dietPreference: 'veg' | 'non-veg' | 'both';
+    activityLevel: 'sedentary' | 'light' | 'moderate' | 'active';
+    dailyStepGoal: number;
+    targetWeightKg?: number;
+    sunSign?: string;
+    birthStar?: string;
+    weightReminderDays: number;
+    lastWeightLoggedAt: string;
+    weightHistory: Array<{ date: string; weightKg: number; note?: string }>;
+  }
+): Promise<void> {
+  const path = `users/${user.uid}/health/profile`;
+  const docRef = doc(db, 'users', user.uid, 'health', 'profile');
+
+  const safeWeight = Math.max(20, Math.min(400, Number(profile.weightKg) || 68));
+  const safeHeight = Math.max(50, Math.min(260, Number(profile.heightCm) || 168));
+  const safeStepGoal = Math.max(500, Math.min(100000, Math.round(Number(profile.dailyStepGoal) || 8000)));
+  const safeReminderDays = Math.max(0, Math.min(365, Math.round(Number(profile.weightReminderDays ?? 30))));
+  const safeDob = /^\d{4}-\d{2}-\d{2}$/.test(profile.dob) ? profile.dob : '1996-01-01';
+  const safeLastLog = /^\d{4}-\d{2}-\d{2}$/.test(profile.lastWeightLoggedAt)
+    ? profile.lastWeightLoggedAt
+    : new Date().toISOString().slice(0, 10);
+
+  const commonFields: Record<string, unknown> = {
+    weightKg: safeWeight,
+    heightCm: safeHeight,
+    dob: safeDob,
+    biologicalSex:
+      profile.biologicalSex && ['male', 'female', 'other'].includes(profile.biologicalSex)
+        ? profile.biologicalSex
+        : 'other',
+    dietPreference: profile.dietPreference,
+    activityLevel: profile.activityLevel,
+    dailyStepGoal: safeStepGoal,
+    weightReminderDays: safeReminderDays,
+    lastWeightLoggedAt: safeLastLog,
+    weightHistory: Array.isArray(profile.weightHistory) ? profile.weightHistory.slice(-60) : [],
+    updatedAt: serverTimestamp(),
+  };
+
+  if (
+    typeof profile.targetWeightKg === 'number' &&
+    Number.isFinite(profile.targetWeightKg) &&
+    profile.targetWeightKg >= 20 &&
+    profile.targetWeightKg <= 400
+  ) {
+    commonFields.targetWeightKg = profile.targetWeightKg;
+  }
+  if (typeof profile.sunSign === 'string' && profile.sunSign.trim()) {
+    commonFields.sunSign = profile.sunSign.trim().slice(0, 40);
+  }
+  if (typeof profile.birthStar === 'string' && profile.birthStar.trim()) {
+    commonFields.birthStar = profile.birthStar.trim().slice(0, 40);
+  }
+
+  let existingSnap;
+  try {
+    existingSnap = await getDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+
+  if (!existingSnap.exists()) {
+    try {
+      await setDoc(docRef, {
+        uid: user.uid.slice(0, 128),
+        ...commonFields,
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  } else {
+    try {
+      await updateDoc(docRef, commonFields);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  }
+}
+
+export async function loadHealthProfileFromFirestore(user: User): Promise<{
+  id: 'health_profile';
+  weightKg: number;
+  heightCm: number;
+  dob: string;
+  biologicalSex?: 'male' | 'female' | 'other';
+  dietPreference: 'veg' | 'non-veg' | 'both';
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active';
+  dailyStepGoal: number;
+  targetWeightKg?: number;
+  sunSign?: string;
+  birthStar?: string;
+  weightReminderDays: number;
+  lastWeightLoggedAt: string;
+  weightHistory: Array<{ date: string; weightKg: number; note?: string }>;
+  updatedAt: string;
+  createdAt: string;
+} | null> {
+  const path = `users/${user.uid}/health/profile`;
+  const docRef = doc(db, 'users', user.uid, 'health', 'profile');
+  try {
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return null;
+    const raw = snap.data() as Record<string, unknown>;
+    const toIso = (val: unknown) => {
+      if (val && typeof (val as { toDate?: () => Date }).toDate === 'function') {
+        return (val as { toDate: () => Date }).toDate().toISOString();
+      }
+      return typeof val === 'string' ? val : new Date().toISOString();
+    };
+    return {
+      id: 'health_profile',
+      weightKg: Number(raw.weightKg) || 68,
+      heightCm: Number(raw.heightCm) || 168,
+      dob: typeof raw.dob === 'string' ? raw.dob : '1996-01-01',
+      biologicalSex: (raw.biologicalSex as 'male' | 'female' | 'other' | undefined) || 'other',
+      dietPreference: (raw.dietPreference as 'veg' | 'non-veg' | 'both') || 'both',
+      activityLevel: (raw.activityLevel as 'sedentary' | 'light' | 'moderate' | 'active') || 'moderate',
+      dailyStepGoal: Number(raw.dailyStepGoal) || 8000,
+      targetWeightKg: typeof raw.targetWeightKg === 'number' ? raw.targetWeightKg : undefined,
+      sunSign: typeof raw.sunSign === 'string' ? raw.sunSign : undefined,
+      birthStar: typeof raw.birthStar === 'string' ? raw.birthStar : undefined,
+      weightReminderDays: typeof raw.weightReminderDays === 'number' ? raw.weightReminderDays : 30,
+      lastWeightLoggedAt:
+        typeof raw.lastWeightLoggedAt === 'string'
+          ? raw.lastWeightLoggedAt
+          : new Date().toISOString().slice(0, 10),
+      weightHistory: Array.isArray(raw.weightHistory)
+        ? (raw.weightHistory as Array<{ date: string; weightKg: number; note?: string }>)
+        : [],
+      createdAt: toIso(raw.createdAt),
+      updatedAt: toIso(raw.updatedAt),
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+}

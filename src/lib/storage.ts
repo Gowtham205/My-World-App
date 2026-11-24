@@ -14,6 +14,7 @@ import type {
   SecuritySettings,
   TaskReminderItem,
   EncryptedVaultRecord,
+  HealthProfile,
 } from '../types/sanctuary';
 
 const DB_NAME = 'my_world_sanctuary_db';
@@ -430,7 +431,7 @@ export async function seedInitialSanctuaryDataIfNeeded(): Promise<void> {
 }
 
 export async function exportLocalBackupJson(): Promise<string> {
-  const [notes, vault, quotes, tasks, birthdays, calendar, alarms, ideas, events, albums] =
+  const [notes, vault, quotes, tasks, birthdays, calendar, alarms, ideas, events, albums, healthProfile] =
     await Promise.all([
       getAllFromStore<PersonalNote>('notes'),
       getAllFromStore<EncryptedVaultRecord>('vault'),
@@ -442,6 +443,7 @@ export async function exportLocalBackupJson(): Promise<string> {
       getAllFromStore<CreativeIdeaCard>('ideas'),
       getAllFromStore<EventCalmSession>('events'),
       getAllFromStore<MediaAlbum>('albums'),
+      getHealthProfile(),
     ]);
 
   return JSON.stringify(
@@ -458,6 +460,8 @@ export async function exportLocalBackupJson(): Promise<string> {
       ideas,
       events,
       albums,
+      healthProfile,
+      dailyStepsByDate: getDailyStepsByDate(),
     },
     null,
     2
@@ -652,6 +656,112 @@ export function saveDailyQuoteSelection(date: string, quoteId: string): void {
   }
 }
 
+export async function getHealthProfile(): Promise<HealthProfile | null> {
+  try {
+    const stored = await getSetting<HealthProfile>('health_profile');
+    if (stored && typeof stored.weightKg === 'number' && typeof stored.heightCm === 'number') {
+      return stored;
+    }
+  } catch {
+    // fallback below
+  }
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('my_world_health_profile_v1');
+    return raw ? (JSON.parse(raw) as HealthProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveHealthProfileLocal(profile: HealthProfile): Promise<void> {
+  await putInStore('settings', profile as HealthProfile & { id: string });
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('my_world_health_profile_v1', JSON.stringify(profile));
+    } catch {
+      // ignore
+    }
+  }
+}
+
+const DAILY_STEPS_STORAGE_KEY = 'my_world_daily_steps_v1';
+
+export function getDailyStepsByDate(): Record<string, number> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(DAILY_STEPS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const clean: Record<string, number> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+        clean[k] = Math.round(v);
+      }
+    }
+    return clean;
+  } catch {
+    return {};
+  }
+}
+
+export function saveDailyStepsForDate(
+  dateStr: string,
+  steps: number
+): Record<string, number> {
+  const current = getDailyStepsByDate();
+  const next: Record<string, number> = {
+    ...current,
+    [dateStr]: Math.max(0, Math.round(steps)),
+  };
+  // Keep latest 90 dates sorted
+  const keys = Object.keys(next).sort().slice(-90);
+  const bounded: Record<string, number> = {};
+  for (const k of keys) bounded[k] = next[k];
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(DAILY_STEPS_STORAGE_KEY, JSON.stringify(bounded));
+    } catch {
+      // ignore
+    }
+  }
+  return bounded;
+}
+
+const HEALTH_MILESTONE_SENT_KEY = 'my_world_health_milestones_sent_v1';
+
+export function hasHealthMilestoneSent(key: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(HEALTH_MILESTONE_SENT_KEY);
+    if (!raw) return false;
+    const map = JSON.parse(raw) as Record<string, number>;
+    return Boolean(map[key]);
+  } catch {
+    return false;
+  }
+}
+
+export function markHealthMilestoneSent(key: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(HEALTH_MILESTONE_SENT_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+    const pruned: Record<string, number> = {};
+    for (const [k, ts] of Object.entries(parsed)) {
+      if (typeof ts === 'number' && ts > cutoff) {
+        pruned[k] = ts;
+      }
+    }
+    pruned[key] = Date.now();
+    localStorage.setItem(HEALTH_MILESTONE_SENT_KEY, JSON.stringify(pruned));
+  } catch {
+    // ignore
+  }
+}
+
 export type {
   PersonalNote,
   EncryptedVaultRecord,
@@ -668,4 +778,5 @@ export type {
   CustomAudioTone,
   AppTheme,
   AppNotificationItem,
+  HealthProfile,
 };

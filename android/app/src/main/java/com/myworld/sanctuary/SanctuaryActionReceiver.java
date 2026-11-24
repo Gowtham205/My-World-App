@@ -41,7 +41,8 @@ public class SanctuaryActionReceiver extends BroadcastReceiver {
                 body,
                 route,
                 snoozeMinutes,
-                false
+                false,
+                0
             );
         } else {
             performDismiss(
@@ -67,7 +68,8 @@ public class SanctuaryActionReceiver extends BroadcastReceiver {
         String body,
         String route,
         int snoozeMinutes,
-        boolean autoSnoozed
+        boolean autoSnoozed,
+        int autoSnoozeCount
     ) {
         stopServiceAndClearNotif(context, notifId);
 
@@ -87,6 +89,7 @@ public class SanctuaryActionReceiver extends BroadcastReceiver {
             snoozeSchedule.put("soundName", stored != null ? stored.optString("soundName", "Sanctuary Chime") : "Sanctuary Chime");
             snoozeSchedule.put("route", route);
             snoozeSchedule.put("snoozeMinutes", snoozeMinutes);
+            snoozeSchedule.put("autoSnoozeCount", autoSnoozed ? Math.max(0, autoSnoozeCount) : 0);
             snoozeSchedule.put("repeating", false);
             snoozeSchedule.put("triggerAtMs", snoozeTargetMs);
 
@@ -103,7 +106,65 @@ public class SanctuaryActionReceiver extends BroadcastReceiver {
             ev.put("body", body);
             ev.put("route", route);
             ev.put("snoozeMinutes", snoozeMinutes);
+            ev.put("autoSnoozeCount", autoSnoozed ? Math.max(0, autoSnoozeCount) : 0);
             ev.put("snoozeTargetMs", snoozeTargetMs);
+            if (!SanctuaryAudioPlugin.emitEventToJs("nativeAlertEvent", ev)) {
+                SanctuaryScheduleStore.queuePendingEvent(context, ev);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    public static void performAutoStopExhausted(
+        Context context,
+        String scheduleId,
+        int notifId,
+        String kind,
+        String entityId,
+        String title,
+        String body,
+        String route
+    ) {
+        stopServiceAndClearNotif(context, notifId);
+        if (!scheduleId.isEmpty()) {
+            String snoozeId = scheduleId + ":snooze";
+            SanctuaryScheduleStore.removeScheduleById(context, snoozeId);
+        }
+
+        String missedSummary = "Missed · Auto-stopped after "
+            + SanctuaryNotificationHelper.MAX_AUTO_SNOOZES
+            + " snoozes"
+            + (body != null && !body.trim().isEmpty() ? (" · " + body.trim()) : "");
+
+        try {
+            androidx.core.app.NotificationManagerCompat.from(context).notify(
+                notifId,
+                SanctuaryNotificationHelper.buildPlaybackNotification(
+                    context,
+                    notifId,
+                    scheduleId,
+                    kind,
+                    entityId,
+                    title,
+                    missedSummary,
+                    route,
+                    5,
+                    false,
+                    false
+                )
+            );
+        } catch (Exception ignored) {}
+
+        try {
+            JSONObject ev = new JSONObject();
+            ev.put("type", "auto_stopped");
+            ev.put("scheduleId", scheduleId);
+            ev.put("notifId", notifId);
+            ev.put("kind", kind);
+            ev.put("entityId", entityId);
+            ev.put("title", title);
+            ev.put("body", body);
+            ev.put("route", route);
+            ev.put("autoSnoozeCount", SanctuaryNotificationHelper.MAX_AUTO_SNOOZES);
             if (!SanctuaryAudioPlugin.emitEventToJs("nativeAlertEvent", ev)) {
                 SanctuaryScheduleStore.queuePendingEvent(context, ev);
             }

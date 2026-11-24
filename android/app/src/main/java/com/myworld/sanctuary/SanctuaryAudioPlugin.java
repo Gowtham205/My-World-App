@@ -139,6 +139,7 @@ public class SanctuaryAudioPlugin extends Plugin {
         String soundName = call.getString("soundName", "Sanctuary Chime");
         String route = call.getString("route", "alarms");
         int snoozeMinutes = call.getInt("snoozeMinutes", 5);
+        int autoSnoozeCount = call.getInt("autoSnoozeCount", 0);
         boolean isTest = Boolean.TRUE.equals(call.getBoolean("isTest", false));
         String slotKey = call.getString("slotKey", "");
 
@@ -167,6 +168,9 @@ public class SanctuaryAudioPlugin extends Plugin {
         serviceIntent.putExtra(SanctuaryNotificationHelper.EXTRA_SOUND_NAME, soundName);
         serviceIntent.putExtra(SanctuaryNotificationHelper.EXTRA_ROUTE, route);
         serviceIntent.putExtra(SanctuaryNotificationHelper.EXTRA_SNOOZE_MINUTES, snoozeMinutes);
+        serviceIntent.putExtra(SanctuaryNotificationHelper.EXTRA_AUTO_SNOOZE_COUNT, autoSnoozeCount);
+
+        boolean isAlarmLike = "alarm".equals(kind) || "calm".equals(kind);
 
         try {
             ContextCompat.startForegroundService(context, serviceIntent);
@@ -183,7 +187,7 @@ public class SanctuaryAudioPlugin extends Plugin {
                     body,
                     route,
                     snoozeMinutes,
-                    "alarm".equals(kind),
+                    isAlarmLike,
                     true
                 )
             );

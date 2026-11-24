@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import {
+  BellRing,
   Check,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Compass,
   HandHeart,
   Navigation,
+  Play,
   Sparkles,
+  Volume2,
   Wind,
   X,
 } from 'lucide-react';
 import type { CustomAudioTone, EventCalmSession } from '../types/sanctuary';
 import { buildGoogleMapsDirectionsUrl } from '../lib/dateUtils';
-import { playNotificationSound } from '../lib/sound';
+import { ALARM_MAX_RING_MS, MAX_AUTO_SNOOZES, playNotificationSound } from '../lib/sound';
 
 interface EventCheckInOverlayProps {
   session: EventCalmSession;
@@ -20,6 +24,11 @@ interface EventCheckInOverlayProps {
   customAudioTones: CustomAudioTone[];
   notificationSoundId: string;
   muteInitialChime?: boolean;
+  isRingingAlarm?: boolean;
+  ringingStartedAtMs?: number;
+  autoSnoozeCount?: number;
+  snoozeMinutes?: number;
+  onSnooze?: (minutes: number) => void;
   onClose: () => void;
 }
 
@@ -65,6 +74,11 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
   customAudioTones,
   notificationSoundId,
   muteInitialChime,
+  isRingingAlarm,
+  ringingStartedAtMs,
+  autoSnoozeCount = 0,
+  snoozeMinutes = 5,
+  onSnooze,
   onClose,
 }) => {
   const [activityTab, setActivityTab] = useState<CalmActivityTab>('breathing');
@@ -73,6 +87,9 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
     phaseIndex: 0,
     secondsLeft: BREATH_PATTERNS['calm-435'].phases[0].seconds,
   });
+
+  const maxSeconds = Math.round(ALARM_MAX_RING_MS / 1000);
+  const [ringSecondsLeft, setRingSecondsLeft] = useState<number>(maxSeconds);
 
   const [checkedSenses, setCheckedSenses] = useState<Record<string, boolean>>({});
   const allPrompts = Array.from(
@@ -86,11 +103,23 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
   const [quietThought, setQuietThought] = useState('');
 
   useEffect(() => {
-    if (!muteInitialChime) {
+    if (!muteInitialChime && !isRingingAlarm) {
       playNotificationSound(customAudioTones, notificationSoundId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!isRingingAlarm) return;
+    const start = ringingStartedAtMs ?? Date.now();
+    const update = () => {
+      const elapsedSec = Math.floor((Date.now() - start) / 1000);
+      setRingSecondsLeft(Math.max(0, maxSeconds - elapsedSec));
+    };
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [isRingingAlarm, ringingStartedAtMs, maxSeconds]);
 
   useEffect(() => {
     const phases = BREATH_PATTERNS[breathPattern].phases;
@@ -135,6 +164,44 @@ export const EventCheckInOverlay: React.FC<EventCheckInOverlayProps> = ({
           <Wind className="w-4 h-4 shrink-0" />
           <span className="truncate">Event Calm Mode · {session.eventName}</span>
         </div>
+
+        {isRingingAlarm && (
+          <div className="mb-4 rounded-2xl bg-[#FCEEE9] dark:bg-[#291C19] border border-[#F2B8A2]/45 px-4 py-3 text-left flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-[#A6482D] dark:text-[#F2B8A2] inline-flex items-center gap-1.5">
+                <BellRing className="w-3.5 h-3.5 animate-pulse" />
+                <Play className="w-3 h-3 fill-current" />
+                <span>Check-In Alarm Ringing</span>
+                <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+              </span>
+              <span className="text-[11px] font-mono-tabular text-[#913B22] dark:text-[#F5C1AD] tabular-nums">
+                {autoSnoozeCount >= MAX_AUTO_SNOOZES
+                  ? `Final ring · 0:${String(ringSecondsLeft).padStart(2, '0')}`
+                  : `Auto-snooze ${autoSnoozeCount + 1}/${MAX_AUTO_SNOOZES} · 0:${String(ringSecondsLeft).padStart(2, '0')}`}
+              </span>
+            </div>
+            {onSnooze && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSnooze(snoozeMinutes)}
+                  className="flex-1 min-h-[38px] px-3 rounded-xl bg-white/85 dark:bg-[#171A21] border border-slate-900/[0.1] dark:border-white/[0.1] text-xs font-medium text-[#111827] dark:text-[#F1F3F6] inline-flex items-center justify-center gap-1.5"
+                >
+                  <Clock className="w-3.5 h-3.5 text-[#5B4D8A] dark:text-[#BEB4DC]" />
+                  Snooze {snoozeMinutes}m
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 min-h-[38px] px-3 rounded-xl bg-[#9EC5AB] text-[#0F1115] text-xs font-semibold inline-flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  Stop Alarm
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Multi-Activity Selector Tabs */}
         <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.06] dark:border-white/[0.06] mb-5">

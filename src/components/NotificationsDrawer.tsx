@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlarmClock, Bell, Cake, CheckCheck, Clock, Trash2, Wind, X } from 'lucide-react';
+import { AlarmClock, Bell, Cake, CheckCheck, Clock, HeartPulse, Trash2, Wind, X } from 'lucide-react';
 import type { AppNotificationItem, AppNotificationKind, AppRoute } from '../types/sanctuary';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -19,6 +19,7 @@ const KIND_LABELS: Record<AppNotificationKind, string> = {
   reminder: 'Task Reminder',
   calm: 'Event Calm',
   birthday: 'Birthday',
+  health: 'Health Monitor',
 };
 
 function formatNotificationTime(iso: string): string {
@@ -74,6 +75,8 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
         return <Wind className="w-4 h-4 text-[#255F8A] dark:text-[#9BC4E2]" />;
       case 'birthday':
         return <Cake className="w-4 h-4 text-[#5B4D8A] dark:text-[#BEB4DC]" />;
+      case 'health':
+        return <HeartPulse className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />;
       default:
         return <Clock className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB]" />;
     }

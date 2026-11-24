@@ -37,6 +37,9 @@ public final class SanctuaryNotificationHelper {
     public static final String EXTRA_SNOOZE_MINUTES = "sanctuary_snooze_minutes";
     public static final String EXTRA_ACTION_TYPE = "sanctuary_action_type";
     public static final String EXTRA_IS_REPEATING = "sanctuary_is_repeating";
+    public static final String EXTRA_AUTO_SNOOZE_COUNT = "sanctuary_auto_snooze_count";
+
+    public static final int MAX_AUTO_SNOOZES = 5;
 
     public static final String ACTION_SNOOZE = "com.myworld.sanctuary.ACTION_SNOOZE";
     public static final String ACTION_DISMISS = "com.myworld.sanctuary.ACTION_DISMISS";
@@ -119,13 +122,15 @@ public final class SanctuaryNotificationHelper {
         }
         PendingIntent contentPi = PendingIntent.getActivity(context, notifId, tapIntent, contentFlags);
 
+        boolean isAlarmCategory = "alarm".equals(kind) || "calm".equals(kind);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_sanctuary)
             .setColor(Color.parseColor("#9EC5AB"))
             .setContentTitle(displayTitle)
             .setContentText(cleanBody.isEmpty() ? "My World" : cleanBody)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory("alarm".equals(kind) ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(isAlarmCategory ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(ongoing)
             .setAutoCancel(!ongoing)
@@ -143,7 +148,7 @@ public final class SanctuaryNotificationHelper {
             broadcastFlags |= PendingIntent.FLAG_IMMUTABLE;
         }
 
-        if ("alarm".equals(kind) || "reminder".equals(kind)) {
+        if ("alarm".equals(kind) || "reminder".equals(kind) || "calm".equals(kind)) {
             int safeSnooze = snoozeMinutes > 0 ? snoozeMinutes : 5;
             Intent snoozeIntent = new Intent(context, SanctuaryActionReceiver.class);
             snoozeIntent.setAction(ACTION_SNOOZE);
@@ -223,6 +228,7 @@ public final class SanctuaryNotificationHelper {
         intent.putExtra(EXTRA_ROUTE, schedule.optString("route", "alarms"));
         intent.putExtra(EXTRA_SNOOZE_MINUTES, schedule.optInt("snoozeMinutes", 5));
         intent.putExtra(EXTRA_IS_REPEATING, schedule.optBoolean("repeating", false));
+        intent.putExtra(EXTRA_AUTO_SNOOZE_COUNT, schedule.optInt("autoSnoozeCount", 0));
 
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -243,9 +249,9 @@ public final class SanctuaryNotificationHelper {
         boolean canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms();
 
         try {
-            if ("alarm".equals(kind) && canExact) {
+            if (("alarm".equals(kind) || "calm".equals(kind)) && canExact) {
                 Intent showIntent = new Intent(context, MainActivity.class);
-                showIntent.putExtra(EXTRA_ROUTE, "alarms");
+                showIntent.putExtra(EXTRA_ROUTE, schedule.optString("route", "calm".equals(kind) ? "events" : "alarms"));
                 int showFlags = PendingIntent.FLAG_UPDATE_CURRENT;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     showFlags |= PendingIntent.FLAG_IMMUTABLE;

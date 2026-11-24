@@ -9,6 +9,7 @@ import {
   Circle,
   Download,
   ExternalLink,
+  Flag,
   MapPin,
   Pencil,
   Plus,
@@ -34,6 +35,11 @@ import {
   validateFutureDateTime,
 } from '../lib/dateUtils';
 import { doesTaskMatchDate, formatTaskRecurrenceLabel } from '../lib/taskRecurrence';
+import {
+  formatHolidayTypeLabel,
+  getIndianHolidaysForDate,
+  getUpcomingIndianHolidays,
+} from '../lib/indianHolidays';
 import {
   TaskFormFields,
   makeEmptyTaskDraft,
@@ -107,6 +113,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 }) => {
   const todayStr = getTodayStr();
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [showIndianHolidays, setShowIndianHolidays] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('my_world_show_indian_holidays');
+      return saved === null ? true : saved === '1';
+    } catch {
+      return true;
+    }
+  });
   const [viewCursor, setViewCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -170,10 +184,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const dayTasks = tasks.filter((t) => doesTaskMatchDate(t, dateStr));
     const dayCalmSessions = eventSessions.filter((s) => s.date === dateStr);
     const dayBirthdays = birthdays.filter((b) => b.birthDate.slice(5) === mmdd);
-    return { dayEvents, dayTasks, dayCalmSessions, dayBirthdays };
+    const dayHolidays = showIndianHolidays ? getIndianHolidaysForDate(dateStr) : [];
+    return { dayEvents, dayTasks, dayCalmSessions, dayBirthdays, dayHolidays };
   };
 
   const selectedAgenda = getItemsForDate(selectedDate);
+  const upcomingIndianHolidays = useMemo(
+    () => (showIndianHolidays ? getUpcomingIndianHolidays(todayStr, 4) : []),
+    [showIndianHolidays, todayStr]
+  );
+
+  const toggleIndianHolidays = () => {
+    setShowIndianHolidays((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('my_world_show_indian_holidays', next ? '1' : '0');
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
 
   const scrollFormIntoView = () => {
     window.setTimeout(() => {
@@ -372,14 +403,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => openCreateForm('calendar')}
-          className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9BC4E2] hover:bg-[#8AB6D6] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          Add Event
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={toggleIndianHolidays}
+            aria-pressed={showIndianHolidays}
+            className={`min-h-[44px] px-4 py-2 rounded-2xl border text-xs font-medium flex items-center gap-2 transition-colors whitespace-nowrap ${
+              showIndianHolidays
+                ? 'bg-[#FEF3C7] dark:bg-[#2B2212] border-[#D97706]/35 text-[#92400E] dark:text-[#FCD34D]'
+                : 'bg-white/80 dark:bg-[#181C26] border-slate-900/[0.1] dark:border-white/[0.1] text-[#5B6472] dark:text-[#98A2B3]'
+            }`}
+          >
+            <Flag className="w-3.5 h-3.5 shrink-0" />
+            <span>Holidays in India: {showIndianHolidays ? 'On' : 'Off'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => openCreateForm('calendar')}
+            className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#9BC4E2] hover:bg-[#8AB6D6] text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 whitespace-nowrap shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            Add Event
+          </button>
+        </div>
       </header>
 
       {/* Monthly Grid + Selected Day Agenda ALWAYS at top */}
@@ -435,7 +481,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               const dayNum = Number(dateStr.slice(8));
               const isSelected = dateStr === selectedDate;
               const isToday = dateStr === todayStr;
-              const { dayEvents, dayTasks, dayCalmSessions, dayBirthdays } =
+              const { dayEvents, dayTasks, dayCalmSessions, dayBirthdays, dayHolidays } =
                 getItemsForDate(dateStr);
 
               return (
@@ -448,7 +494,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       ? 'bg-[#9BC4E2] text-[#0F1115] font-semibold'
                       : isToday
                         ? 'bg-slate-900/[0.07] dark:bg-white/[0.07] text-[#111827] dark:text-[#F1F3F6]'
-                        : 'hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.04] text-[#334155] dark:text-[#D0D5DD]'
+                        : dayHolidays.length > 0
+                          ? 'bg-[#FEF9EC] dark:bg-[#231D12] text-[#92400E] dark:text-[#FCD34D] hover:bg-[#FEF3C7]/70 dark:hover:bg-[#2B2212]'
+                          : 'hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.04] text-[#334155] dark:text-[#D0D5DD]'
                   }`}
                 >
                   <span className="text-xs font-mono-tabular">{dayNum}</span>
@@ -480,6 +528,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         style={{ backgroundColor: isSelected ? '#0F1115' : '#F2B8A2' }}
                       />
                     )}
+                    {dayHolidays.length > 0 && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: isSelected ? '#0F1115' : '#D97706' }}
+                      />
+                    )}
                   </div>
                 </button>
               );
@@ -503,6 +557,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-[#F2B8A2]" />
               Birthday
             </span>
+            {showIndianHolidays && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#D97706]" />
+                Indian Holiday
+              </span>
+            )}
           </div>
         </section>
 
@@ -526,7 +586,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </button>
           </div>
 
-          {selectedAgenda.dayBirthdays.length === 0 &&
+          {selectedAgenda.dayHolidays.length === 0 &&
+          selectedAgenda.dayBirthdays.length === 0 &&
           selectedAgenda.dayEvents.length === 0 &&
           selectedAgenda.dayCalmSessions.length === 0 &&
           selectedAgenda.dayTasks.length === 0 ? (
@@ -535,6 +596,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </p>
           ) : (
             <div className="space-y-3">
+              {/* Indian Public Holidays */}
+              {selectedAgenda.dayHolidays.map((h) => (
+                <div
+                  key={`${h.date}-${h.name}`}
+                  className="p-4 rounded-2xl bg-[#FEF9EC] dark:bg-[#231D12] border border-[#D97706]/30 flex items-start gap-3"
+                >
+                  <Flag className="w-4 h-4 text-[#B45309] dark:text-[#FCD34D] mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium text-[#92400E] dark:text-[#FCD34D]">
+                      {formatHolidayTypeLabel(h.type)}
+                    </p>
+                    <p className="text-sm font-semibold text-[#111827] dark:text-[#F1F3F6] mt-0.5">
+                      {h.name}
+                    </p>
+                    <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
+                      {h.note}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
               {/* Birthdays */}
               {selectedAgenda.dayBirthdays.map((b) => (
                 <div
@@ -751,6 +833,38 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {upcomingIndianHolidays.length > 0 && (
+            <div className="pt-3 border-t border-slate-900/[0.08] dark:border-white/[0.06] space-y-2">
+              <p className="text-[11px] font-medium text-[#92400E] dark:text-[#FCD34D] flex items-center gap-1.5">
+                <Flag className="w-3.5 h-3.5" />
+                <span>Upcoming Holidays in India</span>
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {upcomingIndianHolidays.map((h) => (
+                  <button
+                    key={`up-${h.date}-${h.name}`}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(h.date);
+                      const parsed = new Date(`${h.date}T12:00:00`);
+                      if (!Number.isNaN(parsed.getTime())) {
+                        setViewCursor(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+                      }
+                    }}
+                    className="p-2.5 rounded-xl bg-[#FEF9EC]/80 dark:bg-[#231D12]/80 border border-[#D97706]/25 text-left hover:bg-[#FEF3C7]/70 dark:hover:bg-[#2B2212] transition-colors"
+                  >
+                    <p className="text-[11px] font-mono-tabular text-[#92400E] dark:text-[#FCD34D]">
+                      {formatShortDate(h.date)}
+                    </p>
+                    <p className="text-xs font-medium text-[#111827] dark:text-[#F1F3F6] truncate mt-0.5">
+                      {h.name}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </section>

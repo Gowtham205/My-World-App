@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SanctuaryAudioPlugin.class);
+        registerPlugin(SanctuaryStepsPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Align hardware Volume Up/Down rocker with media playback stream

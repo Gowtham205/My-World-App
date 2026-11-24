@@ -51,6 +51,72 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidHealthProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'weightKg',
+          'heightCm',
+          'dob',
+          'dietPreference',
+          'activityLevel',
+          'dailyStepGoal',
+          'weightReminderDays',
+          'lastWeightLoggedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'weightKg',
+          'heightCm',
+          'dob',
+          'biologicalSex',
+          'dietPreference',
+          'activityLevel',
+          'dailyStepGoal',
+          'targetWeightKg',
+          'sunSign',
+          'birthStar',
+          'weightReminderDays',
+          'lastWeightLoggedAt',
+          'weightHistory',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && (data.weightKg is int || data.weightKg is float)
+        && data.weightKg >= 20
+        && data.weightKg <= 400
+        && (data.heightCm is int || data.heightCm is float)
+        && data.heightCm >= 50
+        && data.heightCm <= 260
+        && data.dob is string
+        && data.dob.size() == 10
+        && data.dob.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && (!('biologicalSex' in data) || data.biologicalSex in ['male', 'female', 'other'])
+        && data.dietPreference in ['veg', 'non-veg', 'both']
+        && data.activityLevel in ['sedentary', 'light', 'moderate', 'active']
+        && (data.dailyStepGoal is int || data.dailyStepGoal is float)
+        && data.dailyStepGoal >= 500
+        && data.dailyStepGoal <= 100000
+        && (!('targetWeightKg' in data) || ((data.targetWeightKg is int || data.targetWeightKg is float) && data.targetWeightKg >= 20 && data.targetWeightKg <= 400))
+        && (!('sunSign' in data) || (data.sunSign is string && data.sunSign.size() <= 40))
+        && (!('birthStar' in data) || (data.birthStar is string && data.birthStar.size() <= 40))
+        && (data.weightReminderDays is int || data.weightReminderDays is float)
+        && data.weightReminderDays >= 0
+        && data.weightReminderDays <= 365
+        && data.lastWeightLoggedAt is string
+        && data.lastWeightLoggedAt.size() == 10
+        && data.lastWeightLoggedAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && (!('weightHistory' in data) || (data.weightHistory is list && data.weightHistory.size() <= 60 && (data.weightHistory.size() == 0 || data.weightHistory[0] is map)))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     match /users/{userId} {
       // Strictly owner-only PII protection; never allow listing all users
       allow get: if isOwner(userId) && isValidId(userId);
@@ -77,6 +143,46 @@ service cloud.firestore {
         ]);
 
       allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /health/{docId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(docId);
+        allow list: if isOwner(userId) && isValidId(userId) && resource.data.uid == request.auth.uid;
+
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(docId)
+          && isValidHealthProfile(incoming(), userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(docId)
+          && isValidHealthProfile(incoming(), userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'weightKg',
+            'heightCm',
+            'dob',
+            'biologicalSex',
+            'dietPreference',
+            'activityLevel',
+            'dailyStepGoal',
+            'targetWeightKg',
+            'sunSign',
+            'birthStar',
+            'weightReminderDays',
+            'lastWeightLoggedAt',
+            'weightHistory',
+            'updatedAt'
+          ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(docId);
+      }
     }
   }
 }

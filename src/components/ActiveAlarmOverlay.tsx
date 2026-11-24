@@ -63,8 +63,9 @@ export const ActiveAlarmOverlay: React.FC<ActiveAlarmOverlayProps> = ({
             <Volume2 className="w-3.5 h-3.5 animate-pulse" />
           </p>
           <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3] tabular-nums">
-            Stops automatically &amp; snoozes {snoozeMins}m in 0:
-            {String(secondsLeft).padStart(2, '0')}
+            {(alarm.autoSnoozeCount || 0) >= 5
+              ? `Final ring (5/5 auto-snoozes used) · stops permanently in 0:${String(secondsLeft).padStart(2, '0')}`
+              : `Auto-stops & snoozes ${snoozeMins}m in 0:${String(secondsLeft).padStart(2, '0')} · Auto-snooze ${(alarm.autoSnoozeCount || 0) + 1}/5`}
           </p>
         </div>
 

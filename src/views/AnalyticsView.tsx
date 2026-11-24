@@ -10,15 +10,27 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { CheckCircle2, FileText, Lightbulb, Wind } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  FileText,
+  Flame,
+  Footprints,
+  HeartPulse,
+  Lightbulb,
+  Wind,
+} from 'lucide-react';
 import type {
+  AppRoute,
   CreativeIdeaCard,
   EventCalmSession,
+  HealthProfile,
   MotivationalQuote,
   PersonalNote,
   TaskCategory,
   TaskReminderItem,
 } from '../types/sanctuary';
+import { assessBmi, calculateStepsBurn } from '../lib/healthMonitor';
 
 interface AnalyticsViewProps {
   tasks: TaskReminderItem[];
@@ -27,6 +39,9 @@ interface AnalyticsViewProps {
   calmMinutesByDate: Record<string, number>;
   quotes: MotivationalQuote[];
   ideas: CreativeIdeaCard[];
+  healthProfile?: HealthProfile | null;
+  dailyStepsByDate?: Record<string, number>;
+  onNavigate?: (route: AppRoute) => void;
 }
 
 type TimeRangeDays = 7 | 14 | 30;
@@ -38,6 +53,8 @@ interface DailyPoint {
   tasksCompleted: number;
   notesWritten: number;
   calmMinutes: number;
+  steps: number;
+  caloriesBurned: number;
 }
 
 function getDateKey(date: Date): string {
@@ -90,9 +107,25 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   calmMinutesByDate,
   quotes,
   ideas,
+  healthProfile = null,
+  dailyStepsByDate = {},
+  onNavigate,
 }) => {
   const [rangeDays, setRangeDays] = useState<TimeRangeDays>(7);
   const [metricFocus, setMetricFocus] = useState<MetricFocus>('all');
+
+  const todayKey = getDateKey(new Date());
+  const todaySteps = dailyStepsByDate[todayKey] || 0;
+  const activeWeight = healthProfile?.weightKg ?? 68;
+  const activeHeight = healthProfile?.heightCm ?? 168;
+  const todayBurn = useMemo(
+    () => calculateStepsBurn(todaySteps, activeWeight, activeHeight),
+    [todaySteps, activeWeight, activeHeight]
+  );
+  const bmiInfo = useMemo(
+    () => (healthProfile ? assessBmi(healthProfile.weightKg, healthProfile.heightCm) : null),
+    [healthProfile]
+  );
 
   const dailySeries = useMemo<DailyPoint[]>(() => {
     const today = new Date();
@@ -125,17 +158,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           return acc + dur;
         }, 0);
 
+      const steps = dailyStepsByDate[key] || 0;
+      const burn = calculateStepsBurn(steps, activeWeight, activeHeight);
+
       days.push({
         date: key,
         label,
         tasksCompleted,
         notesWritten,
         calmMinutes: loggedBreathingMins + sessionWindowMins,
+        steps,
+        caloriesBurned: burn.caloriesBurned,
       });
     }
 
     return days;
-  }, [tasks, notes, eventSessions, calmMinutesByDate, rangeDays]);
+  }, [tasks, notes, eventSessions, calmMinutesByDate, dailyStepsByDate, activeWeight, activeHeight, rangeDays]);
 
   const totals = useMemo(() => {
     const tasksDoneInRange = dailySeries.reduce((sum, d) => sum + d.tasksCompleted, 0);
@@ -498,6 +536,100 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </div>
         </section>
       </div>
+
+      {/* Physical Health & Movement Section */}
+      <section className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/35 dark:border-white/[0.08] p-5 sm:p-7 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium text-[#2E6B48] dark:text-[#9EC5AB] flex items-center gap-1.5">
+              <HeartPulse className="w-4 h-4" />
+              <span>Physical Health &amp; Daily Steps</span>
+            </p>
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[#F1F3F6] mt-0.5">
+              Steps, Calorie Burn &amp; BMI Snapshot
+            </h2>
+          </div>
+
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('health')}
+              className="min-h-[40px] px-4 rounded-2xl bg-[#9EC5AB] hover:bg-[#8DB99C] text-[#0F1115] text-xs font-semibold inline-flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <span>Open Health Monitor</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-2xl bg-[#EAF7EF] dark:bg-[#16251F] border border-[#9EC5AB]/35 p-4">
+            <div className="flex items-center justify-between text-xs text-[#2E6B48] dark:text-[#9EC5AB]">
+              <span>Today’s Steps</span>
+              <Footprints className="w-4 h-4" />
+            </div>
+            <p className="font-mono-tabular text-2xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-1.5">
+              {todaySteps.toLocaleString()}
+            </p>
+            <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
+              Goal: {(healthProfile?.dailyStepGoal || 8000).toLocaleString()} steps
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#FDF1EC] dark:bg-[#261B18] border border-[#F2B8A2]/35 p-4">
+            <div className="flex items-center justify-between text-xs text-[#9A3F26] dark:text-[#F2B8A2]">
+              <span>Calories Burned Today</span>
+              <Flame className="w-4 h-4" />
+            </div>
+            <p className="font-mono-tabular text-2xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-1.5">
+              {todayBurn.caloriesBurned} kcal
+            </p>
+            <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
+              {todayBurn.distanceKm} km · {todayBurn.activeMinutes} active min
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#EDF5FC] dark:bg-[#16222E] border border-[#9BC4E2]/35 p-4">
+            <div className="flex items-center justify-between text-xs text-[#255F8A] dark:text-[#9BC4E2]">
+              <span>Current BMI Index</span>
+              <HeartPulse className="w-4 h-4" />
+            </div>
+            <p className="font-mono-tabular text-2xl font-semibold text-[#111827] dark:text-[#F1F3F6] mt-1.5">
+              {bmiInfo ? bmiInfo.bmi.toFixed(1) : '—'}
+            </p>
+            <p className="text-[11px] text-[#5B6472] dark:text-[#98A2B3] mt-0.5">
+              {bmiInfo
+                ? `${bmiInfo.label} · ${healthProfile?.weightKg} kg`
+                : 'Set weight & height in Health Monitor'}
+            </p>
+          </div>
+        </div>
+
+        <div className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={dailySeries} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid stroke="rgba(148,163,184,0.2)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                stroke="#64748B"
+                tick={{ fill: '#64748B', fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#64748B"
+                tick={{ fill: '#64748B', fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip content={<SanctuaryTooltip />} />
+              <Bar dataKey="steps" name="Steps" fill="#9EC5AB" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="caloriesBurned" name="Calories Burned (kcal)" fill="#F2B8A2" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
     </div>
   );
 };

@@ -43,6 +43,7 @@ public class SanctuaryRingtoneService extends Service {
     private String currentBody = "";
     private String currentRoute = "alarms";
     private int currentSnoozeMinutes = 5;
+    private int currentAutoSnoozeCount = 0;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -77,11 +78,15 @@ public class SanctuaryRingtoneService extends Service {
         currentRoute = nonNull(intent.getStringExtra(SanctuaryNotificationHelper.EXTRA_ROUTE), "alarms");
         currentSnoozeMinutes = intent.getIntExtra(SanctuaryNotificationHelper.EXTRA_SNOOZE_MINUTES, 5);
         if (currentSnoozeMinutes <= 0) currentSnoozeMinutes = 5;
+        currentAutoSnoozeCount = Math.max(
+            0,
+            intent.getIntExtra(SanctuaryNotificationHelper.EXTRA_AUTO_SNOOZE_COUNT, 0)
+        );
 
         String soundId = nonNull(intent.getStringExtra(SanctuaryNotificationHelper.EXTRA_SOUND_ID), "builtin:sanctuary-chime");
         String soundPath = nonNull(intent.getStringExtra(SanctuaryNotificationHelper.EXTRA_SOUND_PATH), "");
 
-        boolean isAlarm = "alarm".equals(currentKind);
+        boolean isAlarmLike = "alarm".equals(currentKind) || "calm".equals(currentKind);
         boolean isReminder = "reminder".equals(currentKind);
         Notification notification = SanctuaryNotificationHelper.buildPlaybackNotification(
             this,
@@ -93,8 +98,8 @@ public class SanctuaryRingtoneService extends Service {
             currentBody,
             currentRoute,
             currentSnoozeMinutes,
-            isAlarm,
-            isAlarm || isReminder
+            isAlarmLike,
+            isAlarmLike || isReminder
         );
 
         try {
@@ -146,8 +151,10 @@ public class SanctuaryRingtoneService extends Service {
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build();
 
+        boolean isAlarmLike = "alarm".equals(kind) || "calm".equals(kind);
+
         if (audioManager != null) {
-            int focusGain = "alarm".equals(kind)
+            int focusGain = isAlarmLike
                 ? AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
                 : AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -167,7 +174,7 @@ public class SanctuaryRingtoneService extends Service {
             }
         }
 
-        boolean shouldLoop = "alarm".equals(kind) || "reminder".equals(kind);
+        boolean shouldLoop = isAlarmLike || "reminder".equals(kind);
 
         try {
             mediaPlayer = new MediaPlayer();
@@ -177,7 +184,7 @@ public class SanctuaryRingtoneService extends Service {
                 mediaPlayer.setDataSource(audioFile.getAbsolutePath());
             } else {
                 Uri fallbackUri = RingtoneManager.getDefaultUri(
-                    "alarm".equals(kind) ? RingtoneManager.TYPE_ALARM : RingtoneManager.TYPE_NOTIFICATION
+                    isAlarmLike ? RingtoneManager.TYPE_ALARM : RingtoneManager.TYPE_NOTIFICATION
                 );
                 if (fallbackUri == null) {
                     fallbackUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
@@ -210,29 +217,45 @@ public class SanctuaryRingtoneService extends Service {
             }
         }
 
-        long maxMs = "alarm".equals(kind)
+        long maxMs = isAlarmLike
             ? ALARM_MAX_MS
             : "reminder".equals(kind)
                 ? REMINDER_MAX_MS
                 : CALM_MAX_MS;
 
         autoStopRunnable = () -> {
-            if ("alarm".equals(currentKind)) {
-                // Auto-snooze after 1 minute of ringing without action
-                SanctuaryActionReceiver.performSnooze(
-                    SanctuaryRingtoneService.this,
-                    currentScheduleId,
-                    currentNotifId,
-                    currentKind,
-                    currentEntityId,
-                    currentTitle,
-                    currentBody,
-                    currentRoute,
-                    currentSnoozeMinutes,
-                    true
-                );
+            boolean alarmKind = "alarm".equals(currentKind) || "calm".equals(currentKind);
+            if (alarmKind) {
+                if (currentAutoSnoozeCount >= SanctuaryNotificationHelper.MAX_AUTO_SNOOZES) {
+                    // Reached default cap of 5 auto-snoozes -> stop permanently without infinite ringing
+                    SanctuaryActionReceiver.performAutoStopExhausted(
+                        SanctuaryRingtoneService.this,
+                        currentScheduleId,
+                        currentNotifId,
+                        currentKind,
+                        currentEntityId,
+                        currentTitle,
+                        currentBody,
+                        currentRoute
+                    );
+                } else {
+                    // Auto-snooze after 1 minute of ringing without action
+                    SanctuaryActionReceiver.performSnooze(
+                        SanctuaryRingtoneService.this,
+                        currentScheduleId,
+                        currentNotifId,
+                        currentKind,
+                        currentEntityId,
+                        currentTitle,
+                        currentBody,
+                        currentRoute,
+                        currentSnoozeMinutes,
+                        true,
+                        currentAutoSnoozeCount + 1
+                    );
+                }
             } else {
-                // Keep reminder / Event Calm notification visible in tray while stopping audio
+                // Keep reminder notification visible in tray while stopping audio
                 stopPlaybackAndRelease();
                 Notification quietCard = SanctuaryNotificationHelper.buildPlaybackNotification(
                     SanctuaryRingtoneService.this,

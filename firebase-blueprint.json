@@ -48,6 +48,98 @@
         }
       },
       "required": ["uid", "displayName", "email", "createdAt", "updatedAt"]
+    },
+    "HealthProfile": {
+      "title": "HealthProfile",
+      "description": "Personal Health Monitor profile, optional cultural metadata, and weight check-in preferences.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "weightKg": {
+          "type": "number",
+          "description": "Current weight in kilograms."
+        },
+        "heightCm": {
+          "type": "number",
+          "description": "Height in centimeters."
+        },
+        "dob": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of birth (YYYY-MM-DD).",
+          "minLength": 10,
+          "maxLength": 10
+        },
+        "biologicalSex": {
+          "type": "string",
+          "enum": ["male", "female", "other"]
+        },
+        "dietPreference": {
+          "type": "string",
+          "enum": ["veg", "non-veg", "both"]
+        },
+        "activityLevel": {
+          "type": "string",
+          "enum": ["sedentary", "light", "moderate", "active"]
+        },
+        "dailyStepGoal": {
+          "type": "number",
+          "description": "Daily target step count."
+        },
+        "targetWeightKg": {
+          "type": "number",
+          "description": "Optional target weight in kilograms."
+        },
+        "sunSign": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "birthStar": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "weightReminderDays": {
+          "type": "number",
+          "description": "Interval in days between weight recheck reminders (default 30)."
+        },
+        "lastWeightLoggedAt": {
+          "type": "string",
+          "format": "date",
+          "minLength": 10,
+          "maxLength": 10
+        },
+        "weightHistory": {
+          "type": "array",
+          "description": "Bounded recent weight check-in entries (max 60)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "weightKg",
+        "heightCm",
+        "dob",
+        "dietPreference",
+        "activityLevel",
+        "dailyStepGoal",
+        "weightReminderDays",
+        "lastWeightLoggedAt",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -56,6 +148,12 @@
         "$ref": "#/entities/UserProfile"
       },
       "description": "Private user account profiles, accessible strictly by the owning authenticated user."
+    },
+    "/users/{userId}/health/{docId}": {
+      "schema": {
+        "$ref": "#/entities/HealthProfile"
+      },
+      "description": "Private Personal Health Monitor profile & history owned strictly by the authenticated user."
     }
   }
 }

@@ -430,6 +430,7 @@ function buildScheduleFingerprint(params: {
     enabled: a.enabled,
     repeatDays: a.repeatDays,
     snoozeMinutes: a.snoozeMinutes || 5,
+    autoSnoozeCount: a.autoSnoozeCount || 0,
     soundId: a.soundId || '',
     soundName: a.soundName || '',
     snoozedUntilDate: a.snoozedUntilDate || '',
@@ -550,6 +551,7 @@ export function syncScheduledNativeNotifications(params: {
               soundName,
               route: 'alarms',
               snoozeMinutes: snoozeMins,
+              autoSnoozeCount: alarm.autoSnoozeCount || 0,
               repeating: false,
               triggerAtMs: snoozeAt.getTime(),
             });
