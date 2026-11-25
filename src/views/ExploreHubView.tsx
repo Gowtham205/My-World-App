@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlarmClock,
   AudioLines,
@@ -24,6 +24,11 @@ import {
 import type { AppRoute } from '../types/sanctuary';
 import { exportLocalBackupJson } from '../lib/storage';
 import { exportToDevicePublicStorage } from '../lib/nativeAudio';
+import {
+  checkGeminiBackendStatus,
+  hasGoogleMapsKey,
+  isNativeWithoutBackend,
+} from '../lib/api';
 
 interface ExploreHubViewProps {
   counts: {
@@ -93,10 +98,23 @@ interface ModuleTile {
   meta: string;
   tone: PastelTone;
   icon: React.ComponentType<{ className?: string }>;
+  futureUpdate?: boolean;
 }
 
 export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNavigate }) => {
   const [exportStatus, setExportStatus] = useState('');
+  const [aiAvailable, setAiAvailable] = useState<boolean>(() => !isNativeWithoutBackend());
+  const mapsAvailable = hasGoogleMapsKey();
+
+  useEffect(() => {
+    let active = true;
+    void checkGeminiBackendStatus().then((res) => {
+      if (active) setAiAvailable(res.available);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const modules: ModuleTile[] = [
     {
@@ -227,9 +245,10 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       route: 'maps',
       title: 'Sanctuary Maps',
       subtitle: 'Search venues, preview calm routes, and send destinations to Event Calm Mode.',
-      meta: 'Places · Routes',
+      meta: mapsAvailable ? 'Places · Routes' : 'Future Update',
       tone: 'sage',
       icon: MapPin,
+      futureUpdate: !mapsAvailable,
     },
     {
       id: 'game',
@@ -245,27 +264,30 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
       route: 'ai-chat',
       title: 'Gemini Companion',
       subtitle: 'Multi-turn thoughtful chat with tone presets and one-tap saving to Notes.',
-      meta: 'Multi-turn · Streaming',
+      meta: aiAvailable ? 'Multi-turn · Streaming' : 'Future Update',
       tone: 'rose',
       icon: MessageSquareHeart,
+      futureUpdate: !aiAvailable,
     },
     {
       id: 'voice-live',
       route: 'voice-live',
       title: 'Live Voice Sanctuary',
       subtitle: 'Real-time bidirectional voice conversations with live transcripts.',
-      meta: 'Live Voice · 24kHz',
+      meta: aiAvailable ? 'Live Voice · 24kHz' : 'Future Update',
       tone: 'sage',
       icon: PhoneCall,
+      futureUpdate: !aiAvailable,
     },
     {
       id: 'transcribe',
       route: 'transcribe',
       title: 'Audio Transcription',
       subtitle: 'Record voice memos or upload audio files to convert speech into Notes.',
-      meta: 'Speech-to-Text',
+      meta: aiAvailable ? 'Speech-to-Text' : 'Future Update',
       tone: 'peach',
       icon: Mic,
+      futureUpdate: !aiAvailable,
     },
   ];
 
@@ -337,7 +359,13 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
                   >
                     <Icon className={`w-5 h-5 ${style.iconText}`} />
                   </div>
-                  <span className="text-xs font-medium text-[#5B6472] dark:text-[#98A2B3] tabular-nums">
+                  <span
+                    className={`text-xs font-medium tabular-nums ${
+                      mod.futureUpdate
+                        ? 'text-[#8A5A12] dark:text-[#EDD59E]'
+                        : 'text-[#5B6472] dark:text-[#98A2B3]'
+                    }`}
+                  >
                     {mod.meta}
                   </span>
                 </div>
@@ -346,6 +374,7 @@ export const ExploreHubView: React.FC<ExploreHubViewProps> = ({ counts, onNaviga
                 </h2>
                 <p className="text-xs text-[#5B6472] dark:text-[#98A2B3] mt-1.5 leading-relaxed">
                   {mod.subtitle}
+                  {mod.futureUpdate ? ' Will be released in a future update.' : ''}
                 </p>
               </div>
             </button>

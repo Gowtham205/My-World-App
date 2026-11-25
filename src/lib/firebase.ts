@@ -118,6 +118,30 @@ export function isEmbeddedMobileWebView(): boolean {
   return isAndroidWebView || isIosWebView || isKnownInAppBrowser;
 }
 
+export function isMobileEnvironment(): boolean {
+  if (isCapacitorNative() || isEmbeddedMobileWebView()) return true;
+  if (typeof navigator !== 'undefined') {
+    const ua = navigator.userAgent || '';
+    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua)) {
+      return true;
+    }
+    if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
+      return true;
+    }
+  }
+  if (typeof window !== 'undefined') {
+    const isStandalonePwa =
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+    if (isStandalonePwa) return true;
+    if (window.innerWidth < 768) return true;
+    if (window.matchMedia?.('(pointer: coarse)').matches && window.innerWidth < 1024) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function signInWithGoogle(): Promise<User> {
   if (isCapacitorNative()) {
     const err = new Error(
@@ -128,7 +152,7 @@ export async function signInWithGoogle(): Promise<User> {
   }
   if (isEmbeddedMobileWebView()) {
     const err = new Error(
-      'Google Sign-In is blocked inside in-app browsers. Open this page in Chrome or Safari, or use Email & Password.'
+      'Google Sign-In is blocked inside in-app browsers. Use Email & Password to sign in.'
     ) as Error & { code?: string };
     err.code = 'auth/in-app-webview-blocked';
     throw err;

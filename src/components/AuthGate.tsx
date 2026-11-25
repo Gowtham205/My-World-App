@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Eye,
   EyeOff,
   Lock,
+  LogIn,
   Mail,
   ShieldCheck,
   Sparkles,
   User as UserIcon,
+  UserPlus,
 } from 'lucide-react';
 import {
-  isCapacitorNative,
-  isEmbeddedMobileWebView,
+  isMobileEnvironment,
   sendResetPasswordEmail,
   signInWithEmail,
   signInWithGoogle,
@@ -26,13 +27,12 @@ function mapAuthError(err: unknown): string {
   const code = (err as { code?: string })?.code || '';
   const rawMessage = err instanceof Error ? err.message : '';
   if (/invalid_request/i.test(rawMessage)) {
-    return 'Google blocked the web sign-in request from this mobile WebView (Error 400: invalid_request). Use Email & Password above, or open the web app in Chrome/Safari.';
+    return 'Google Sign-In is not available in this mobile view. Please use Email & Password above.';
   }
   switch (code) {
     case 'auth/native-webview-google-blocked':
-      return 'Google web sign-in is blocked by Google inside Android APK WebViews (Error 400: invalid_request). Sign in or Create Account with Email & Password above (already used Google on web? Enter your Gmail and tap Forgot password? to set a password).';
     case 'auth/in-app-webview-blocked':
-      return 'Google blocks Sign-In inside in-app browsers. Open this link in Chrome or Safari to use Google Sign-In, or use Email & Password above.';
+      return 'Google Sign-In is not available on mobile right now and will be released in a future update. Please use Email & Password above.';
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
       return 'Sign-in popup was closed before completing. Please try again.';
@@ -41,11 +41,11 @@ function mapAuthError(err: unknown): string {
     case 'auth/unauthorized-domain':
       return 'This domain is not authorized in Firebase Authentication settings.';
     case 'auth/operation-not-allowed':
-      return 'Email/Password sign-in is not enabled yet in Firebase Console (Authentication → Sign-in method → Email/Password). Enable it there to sign in on mobile APK.';
+      return 'Email/Password sign-in is not enabled yet in Firebase Console (Authentication → Sign-in method → Email/Password). Enable it there to sign in on mobile.';
     case 'auth/network-request-failed':
       return 'Network request failed. Please check your mobile internet connection and try again.';
     case 'auth/internal-error':
-      return 'Authentication could not complete in this browser view. Try Email & Password above or open in Chrome/Safari.';
+      return 'Sign-in could not complete in this browser view. Try Email & Password above or open in Chrome/Safari.';
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
     case 'auth/user-not-found':
@@ -72,8 +72,33 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
   const [loadingMethod, setLoadingMethod] = useState<'email' | 'google' | 'reset' | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const isNativeApk = isCapacitorNative();
-  const isInAppWebView = !isNativeApk && isEmbeddedMobileWebView();
+
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const emailInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [hideGoogleAuth, setHideGoogleAuth] = useState<boolean>(() => isMobileEnvironment());
+  const isSignUp = mode === 'signup';
+
+  useEffect(() => {
+    const syncViewport = () => {
+      setHideGoogleAuth(isMobileEnvironment());
+    };
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
+  }, []);
+
+  const switchMode = (nextMode: 'signin' | 'signup') => {
+    setMode(nextMode);
+    setErrorMsg(null);
+    setStatusMsg(null);
+    window.requestAnimationFrame(() => {
+      if (nextMode === 'signup') {
+        nameInputRef.current?.focus();
+      } else {
+        emailInputRef.current?.focus();
+      }
+    });
+  };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,44 +169,46 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#F4F6F8] dark:bg-[#0F1115] text-[#111827] dark:text-[#F1F3F6] flex items-center justify-center p-4 sm:p-8 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
-      <div className="w-full max-w-5xl rounded-3xl bg-white dark:bg-[#171A21] border border-slate-900/[0.10] dark:border-white/[0.08] overflow-hidden grid grid-cols-1 lg:grid-cols-12 items-stretch">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-[#DFEFE6] via-[#E8EFFB] to-[#F5E7F0] dark:from-[#0E151B] dark:via-[#141726] dark:to-[#18131E] text-[#0F172A] dark:text-[#F1F3F6] flex items-center justify-center p-4 sm:p-8 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-5xl rounded-3xl bg-white/95 dark:bg-[#171B26]/95 backdrop-blur-md border border-slate-900/[0.12] dark:border-white/[0.10] shadow-[0_24px_60px_-15px_rgba(30,41,59,0.16)] dark:shadow-[0_24px_60px_-15px_rgba(0,0,0,0.55)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 items-stretch">
         {/* Left Calm Sanctuary Panel */}
-        <div className="lg:col-span-6 relative min-h-[220px] lg:min-h-[560px] flex flex-col justify-between p-7 sm:p-10 bg-gradient-to-br from-[#1C2229] via-[#151920] to-[#111419]">
+        <div className="lg:col-span-6 relative min-h-[210px] lg:min-h-[580px] flex flex-col justify-between p-7 sm:p-10 bg-gradient-to-br from-[#1B3A35] via-[#212A45] to-[#2C213D]">
           <img
             src="/src/assets/images/sanctuary_calm_horizon_1794911112791.jpg"
             alt="Calm twilight hills"
             referrerPolicy="no-referrer"
-            className="absolute inset-0 w-full h-full object-cover opacity-35"
+            className="absolute inset-0 w-full h-full object-cover opacity-40"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#13161C] via-[#13161C]/65 to-[#13161C]/35" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#121A24]/95 via-[#182132]/72 to-[#192D32]/55" />
 
           <div className="relative space-y-2">
-            <p className="text-xs text-[#9EC5AB] tracking-wide">
+            <p className="text-xs font-medium text-[#AEE0C1] tracking-wide">
               Personal Sanctuary · Private &amp; Focused
             </p>
-            <h1 className="font-display text-3xl sm:text-4xl font-medium text-[#F1F3F6] leading-tight text-balance">
+            <h1 className="font-display text-3xl sm:text-4xl font-medium text-white leading-tight text-balance">
               My World
             </h1>
           </div>
 
-          <div className="relative space-y-5 mt-8">
-            <p className="font-display text-xl sm:text-2xl text-[#F1F3F6] leading-snug text-balance">
+          <div className="relative space-y-5 mt-6">
+            <p className="font-display text-xl sm:text-2xl text-[#F8FAFC] leading-snug text-balance">
               A quiet space for your thoughts, schedules, soundscapes, and memories.
             </p>
 
-            <div className="space-y-3 pt-2 border-t border-white/[0.12]">
+            <div className="space-y-3 pt-3 border-t border-white/20">
               <div className="flex items-start gap-3">
-                <Lock className="w-4 h-4 text-[#9EC5AB] mt-0.5 shrink-0" />
-                <p className="text-xs sm:text-sm text-[#D0D5DD] leading-relaxed">
+                <Lock className="w-4 h-4 text-[#AEE0C1] mt-0.5 shrink-0" />
+                <p className="text-xs sm:text-sm text-[#E2E8F0] leading-relaxed">
                   Your notes, tasks, alarms, custom audio, and AES-256 vault remain stored privately
                   on your device.
                 </p>
               </div>
               <div className="flex items-start gap-3">
-                <Sparkles className="w-4 h-4 text-[#BEB4DC] mt-0.5 shrink-0" />
-                <p className="text-xs sm:text-sm text-[#D0D5DD] leading-relaxed">
-                  Sign in with any email address or your Google account to unlock your sanctuary.
+                <Sparkles className="w-4 h-4 text-[#D6CCFA] mt-0.5 shrink-0" />
+                <p className="text-xs sm:text-sm text-[#E2E8F0] leading-relaxed">
+                  {hideGoogleAuth
+                    ? 'Sign in or create a new account using your email address and password to unlock your sanctuary.'
+                    : 'Sign in with any email address or your Google account to unlock your sanctuary.'}
                 </p>
               </div>
             </div>
@@ -189,67 +216,42 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
         </div>
 
         {/* Right Sign In / Create Account Panel */}
-        <div className="lg:col-span-6 p-7 sm:p-10 flex flex-col justify-center space-y-5">
-          <div className="space-y-2">
-            <div
-              role="tablist"
-              aria-label="Account access mode"
-              className="inline-flex p-1 rounded-2xl bg-[#ECEFF3] dark:bg-[#11141A] border border-slate-900/[0.08] dark:border-white/[0.06]"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'signin'}
-                onClick={() => {
-                  setMode('signin');
-                  setErrorMsg(null);
-                  setStatusMsg(null);
-                }}
-                className={`min-h-[40px] px-4 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
-                  mode === 'signin'
-                    ? 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#111827] dark:text-[#F1F3F6]'
-                    : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
+        <div
+          className={`lg:col-span-6 p-6 sm:p-10 flex flex-col justify-center space-y-5 transition-colors ${
+            isSignUp
+              ? 'bg-gradient-to-br from-[#F7F4FD] via-[#FFFFFF] to-[#F3F8FE] dark:from-[#1C1829] dark:via-[#171B26] dark:to-[#161D28]'
+              : 'bg-gradient-to-br from-[#F2FAF5] via-[#FFFFFF] to-[#F3F8FD] dark:from-[#16221E] dark:via-[#171B26] dark:to-[#161D27]'
+          }`}
+        >
+          {/* Screen Header */}
+          <div className="space-y-1">
+              <p
+                className={`text-xs font-semibold ${
+                  isSignUp
+                    ? 'text-[#4E3F80] dark:text-[#C7B8EA]'
+                    : 'text-[#225839] dark:text-[#9EC5AB]'
                 }`}
               >
-                Sign In
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'signup'}
-                onClick={() => {
-                  setMode('signup');
-                  setErrorMsg(null);
-                  setStatusMsg(null);
-                }}
-                className={`min-h-[40px] px-4 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
-                  mode === 'signup'
-                    ? 'bg-[#ECEFF3] dark:bg-[#1D212A] text-[#111827] dark:text-[#F1F3F6]'
-                    : 'text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]'
-                }`}
-              >
-                Create Account
-              </button>
-            </div>
-
-            <h2 className="font-display text-2xl font-medium text-[#111827] dark:text-[#F1F3F6] pt-1">
-              {mode === 'signin' ? 'Welcome back' : 'Create your sanctuary'}
-            </h2>
-            <p className="text-xs sm:text-sm text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
-              {isNativeApk
-                ? mode === 'signin'
-                  ? 'Sign in with your email and password to unlock your mobile sanctuary.'
-                  : 'Create your sanctuary account using your email address and password.'
-                : mode === 'signin'
-                  ? 'Sign in with your email and password, or continue with Google.'
-                  : 'Sign up with any email address or set up instantly using Google.'}
-            </p>
+                {isSignUp ? 'New Account Registration' : 'Existing Account Sign In'}
+              </p>
+              <h2 className="font-display text-2xl font-medium text-[#0F172A] dark:text-[#F8FAFC]">
+                {isSignUp ? 'Create your sanctuary' : 'Welcome back'}
+              </h2>
+              <p className="text-xs sm:text-sm text-[#475569] dark:text-[#CBD5E1] leading-relaxed">
+                {hideGoogleAuth
+                  ? isSignUp
+                    ? 'Fill in your name, email address, and a password to get started.'
+                    : 'Sign in with your email and password to unlock your sanctuary.'
+                  : isSignUp
+                    ? 'Create an account with any email address or set up instantly using Google.'
+                    : 'Sign in with your email and password, or continue with Google.'}
+              </p>
           </div>
 
           {errorMsg && (
             <div
               role="alert"
-              className="rounded-2xl bg-[#F2B8A2]/10 border border-[#F2B8A2]/30 px-4 py-3 text-xs text-[#A6482D] dark:text-[#F2B8A2] leading-relaxed"
+              className="rounded-2xl bg-[#FDECE6] dark:bg-[#2F1E1A] border border-[#E7A68E] dark:border-[#F2B8A2]/40 px-4 py-3 text-xs font-medium text-[#9A3412] dark:text-[#F2B8A2] leading-relaxed"
             >
               {errorMsg}
             </div>
@@ -258,21 +260,25 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
           {statusMsg && (
             <div
               role="status"
-              className="rounded-2xl bg-[#9EC5AB]/10 border border-[#9EC5AB]/30 px-4 py-3 text-xs text-[#2E6B48] dark:text-[#9EC5AB] leading-relaxed"
+              className="rounded-2xl bg-[#EAF7EF] dark:bg-[#192820] border border-[#7EB691] dark:border-[#9EC5AB]/40 px-4 py-3 text-xs font-medium text-[#1F5134] dark:text-[#9EC5AB] leading-relaxed"
             >
               {statusMsg}
             </div>
           )}
 
           <form onSubmit={handleEmailSubmit} className="space-y-3.5">
-            {mode === 'signup' && (
+            {isSignUp && (
               <div>
-                <label htmlFor="auth-name" className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
+                <label
+                  htmlFor="auth-name"
+                  className="block text-xs font-medium text-[#334155] dark:text-[#CBD5E1] mb-1.5"
+                >
                   Your Name
                 </label>
                 <div className="relative">
-                  <UserIcon className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <UserIcon className="w-4 h-4 text-[#475569] dark:text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    ref={nameInputRef}
                     id="auth-name"
                     type="text"
                     required
@@ -280,19 +286,23 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Gowtham"
                     autoComplete="name"
-                    className="w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/60 dark:placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+                    className="w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-white dark:bg-[#1E2330] border border-slate-300 dark:border-white/[0.14] text-sm text-[#0F172A] dark:text-[#F8FAFC] placeholder-[#64748B] dark:placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#4E3F80]/25 focus:border-[#4E3F80] dark:focus:border-[#BEB4DC]"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label htmlFor="auth-email" className="block text-xs text-[#5B6472] dark:text-[#98A2B3] mb-1">
+              <label
+                htmlFor="auth-email"
+                className="block text-xs font-medium text-[#334155] dark:text-[#CBD5E1] mb-1.5"
+              >
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Mail className="w-4 h-4 text-[#475569] dark:text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
+                  ref={emailInputRef}
                   id="auth-email"
                   type="email"
                   required
@@ -300,29 +310,36 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   autoComplete="email"
-                  className="w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/60 dark:placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+                  className={`w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-white dark:bg-[#1E2330] border border-slate-300 dark:border-white/[0.14] text-sm text-[#0F172A] dark:text-[#F8FAFC] placeholder-[#64748B] dark:placeholder-[#94A3B8] focus:outline-none focus:ring-2 ${
+                    isSignUp
+                      ? 'focus:ring-[#4E3F80]/25 focus:border-[#4E3F80] dark:focus:border-[#BEB4DC]'
+                      : 'focus:ring-[#225839]/25 focus:border-[#225839] dark:focus:border-[#9EC5AB]'
+                  }`}
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="auth-password" className="block text-xs text-[#5B6472] dark:text-[#98A2B3]">
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="auth-password"
+                  className="block text-xs font-medium text-[#334155] dark:text-[#CBD5E1]"
+                >
                   Password
                 </label>
-                {mode === 'signin' && (
+                {!isSignUp && (
                   <button
                     type="button"
                     disabled={loadingMethod !== null}
                     onClick={() => void handlePasswordReset()}
-                    className="text-xs text-[#255F8A] dark:text-[#9BC4E2] hover:underline disabled:opacity-50"
+                    className="text-xs font-medium text-[#1B5780] dark:text-[#9BC4E2] hover:underline disabled:opacity-50"
                   >
                     {loadingMethod === 'reset' ? 'Sending...' : 'Forgot password?'}
                   </button>
                 )}
               </div>
               <div className="relative">
-                <Lock className="w-4 h-4 text-[#5B6472] dark:text-[#98A2B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Lock className="w-4 h-4 text-[#475569] dark:text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="auth-password"
                   type={showPassword ? 'text' : 'password'}
@@ -330,15 +347,19 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
                   minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'signup' ? 'At least 6 characters' : 'Enter your password'}
-                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                  className="w-full min-h-[46px] pl-10 pr-11 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/60 dark:placeholder-[#98A2B3]/60 focus:outline-none focus:border-[#9EC5AB]/50"
+                  placeholder={isSignUp ? 'At least 6 characters' : 'Enter your password'}
+                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                  className={`w-full min-h-[46px] pl-10 pr-11 rounded-2xl bg-white dark:bg-[#1E2330] border border-slate-300 dark:border-white/[0.14] text-sm text-[#0F172A] dark:text-[#F8FAFC] placeholder-[#64748B] dark:placeholder-[#94A3B8] focus:outline-none focus:ring-2 ${
+                    isSignUp
+                      ? 'focus:ring-[#4E3F80]/25 focus:border-[#4E3F80] dark:focus:border-[#BEB4DC]'
+                      : 'focus:ring-[#225839]/25 focus:border-[#225839] dark:focus:border-[#9EC5AB]'
+                  }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="w-10 h-10 absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center text-[#5B6472] dark:text-[#98A2B3] hover:text-[#111827] dark:hover:text-[#F1F3F6]"
+                  className="w-10 h-10 absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center text-[#475569] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F8FAFC]"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -348,14 +369,18 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
             <button
               type="submit"
               disabled={loadingMethod !== null}
-              className="w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] disabled:opacity-60 text-[#0F1115] text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+              className={`w-full min-h-[48px] px-5 py-3 rounded-2xl disabled:opacity-60 text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs ${
+                isSignUp
+                  ? 'bg-[#4E3F80] hover:bg-[#3F3269] text-white dark:bg-[#BEB4DC] dark:hover:bg-[#AFA3D4] dark:text-[#0F1115]'
+                  : 'bg-[#225839] hover:bg-[#1A462D] text-white dark:bg-[#9EC5AB] dark:hover:bg-[#8EB89D] dark:text-[#0F1115]'
+              }`}
             >
               <span>
                 {loadingMethod === 'email'
-                  ? mode === 'signin'
+                  ? !isSignUp
                     ? 'Signing In...'
                     : 'Creating Account...'
-                  : mode === 'signin'
+                  : !isSignUp
                     ? 'Sign In with Email'
                     : 'Create Account'}
               </span>
@@ -363,49 +388,75 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
             </button>
           </form>
 
-          {isNativeApk ? (
-            <div className="rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] p-4 space-y-1.5 text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
-              <p className="font-semibold text-[#111827] dark:text-[#F1F3F6]">
-                Mobile App Sign-In Note
+          {/* Clear clickable switch prompt for new/returning users */}
+          <div
+            className={`rounded-2xl px-4 py-3 border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs ${
+              isSignUp
+                ? 'bg-[#ECF7F0] dark:bg-[#16231D] border-[#9EC5AB]/60 dark:border-[#9EC5AB]/30'
+                : 'bg-[#F3EFFC] dark:bg-[#1E1A2E] border-[#BEB4DC]/65 dark:border-[#BEB4DC]/30'
+            }`}
+          >
+            <span className="text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
+              {isSignUp
+                ? 'Already have a My World account?'
+                : "Don't have an account yet? Try signing up and creating an account."}
+            </span>
+            <button
+              type="button"
+              onClick={() => switchMode(isSignUp ? 'signin' : 'signup')}
+              className={`min-h-[40px] px-3.5 py-2 rounded-xl font-semibold whitespace-nowrap shrink-0 self-start sm:self-auto inline-flex items-center gap-2 transition-colors ${
+                isSignUp
+                  ? 'bg-[#225839] hover:bg-[#1A462D] text-white dark:bg-[#9EC5AB] dark:hover:bg-[#8EB89D] dark:text-[#0F1115]'
+                  : 'bg-[#4E3F80] hover:bg-[#3F3269] text-white dark:bg-[#BEB4DC] dark:hover:bg-[#AFA3D4] dark:text-[#0F1115]'
+              }`}
+            >
+              {isSignUp ? (
+                <>
+                  <LogIn className="w-4 h-4 shrink-0" />
+                  <span>Sign In</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4 shrink-0" />
+                  <span>Create Account</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {hideGoogleAuth ? (
+            <div className="rounded-2xl bg-[#FCF5E6] dark:bg-[#241F15] border border-[#EDD59E] dark:border-[#EDD59E]/30 p-4 space-y-1.5 text-xs text-[#334155] dark:text-[#D0D5DD] leading-relaxed">
+              <p className="font-semibold text-[#8A5A12] dark:text-[#EDD59E]">
+                Mobile Sign-In Note · Future Update
               </p>
               <p>
-                Google web popups are blocked by Google inside Android WebViews (causing Error 400:
-                invalid_request). Please use <strong>Email &amp; Password</strong> above.
+                “Continue with Google” is currently disabled on mobile and will be released in a
+                future update. Please use Email &amp; Password above to sign in or create an
+                account.
               </p>
-              <p className="text-[#5B6472] dark:text-[#98A2B3]">
-                Already signed in with Google on the web? Enter that Gmail address above and tap{' '}
+              <p className="text-[#475569] dark:text-[#98A2B3]">
+                Already signed in with Google on desktop? Enter that Gmail address above and tap{' '}
                 <strong>Forgot password?</strong> to set a password for the same account.
               </p>
             </div>
           ) : (
             <>
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-900/[0.08] dark:bg-white/[0.08]" />
-                <span className="text-xs text-[#5B6472] dark:text-[#98A2B3]">or</span>
-                <div className="h-px flex-1 bg-slate-900/[0.08] dark:bg-white/[0.08]" />
+                <div className="h-px flex-1 bg-slate-900/[0.12] dark:bg-white/[0.10]" />
+                <span className="text-xs font-medium text-[#475569] dark:text-[#98A2B3]">or</span>
+                <div className="h-px flex-1 bg-slate-900/[0.12] dark:bg-white/[0.10]" />
               </div>
-
-              {isInAppWebView && (
-                <div
-                  role="status"
-                  className="rounded-2xl bg-[#FCF5E6] dark:bg-[#292316] border border-[#EDD59E]/45 px-4 py-2.5 text-xs text-[#92400E] dark:text-[#EDD59E] leading-relaxed"
-                >
-                  You appear to be inside an in-app browser. Google blocks Sign-In inside embedded
-                  WebViews — open this page in <strong>Chrome</strong> or <strong>Safari</strong>,
-                  or use <strong>Email &amp; Password</strong> above.
-                </div>
-              )}
 
               <button
                 type="button"
                 disabled={loadingMethod !== null}
                 onClick={() => void handleGoogleAuth()}
-                className="w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.08] border border-slate-900/[0.12] dark:border-white/[0.1] disabled:opacity-60 text-[#111827] dark:text-[#F1F3F6] text-sm font-medium flex items-center justify-center gap-3 transition-colors"
+                className="w-full min-h-[48px] px-5 py-3 rounded-2xl bg-[#EBF5FC] dark:bg-[#1A2430] hover:bg-[#DFEFFA] dark:hover:bg-[#212E3D] border border-[#9BC4E2]/70 dark:border-[#9BC4E2]/30 disabled:opacity-60 text-[#0F172A] dark:text-[#F1F3F6] text-sm font-medium flex items-center justify-center gap-3 transition-colors"
               >
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
-                  className="w-4 h-4 shrink-0"
+                  className="w-4 h-4 shrink-0 text-[#1B5780] dark:text-[#9BC4E2]"
                 >
                   <path
                     fill="currentColor"
@@ -431,12 +482,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onSignedIn }) => {
             </>
           )}
 
-          <div className="pt-2 border-t border-slate-900/[0.08] dark:border-white/[0.06] flex items-start gap-2.5 text-xs text-[#5B6472] dark:text-[#98A2B3] leading-relaxed">
-            <ShieldCheck className="w-4 h-4 text-[#2E6B48] dark:text-[#9EC5AB] mt-0.5 shrink-0" />
+          <div className="pt-2 border-t border-slate-900/[0.08] dark:border-white/[0.08] flex items-start gap-2.5 text-xs text-[#475569] dark:text-[#98A2B3] leading-relaxed">
+            <ShieldCheck className="w-4 h-4 text-[#225839] dark:text-[#9EC5AB] mt-0.5 shrink-0" />
             <span>
               Secured by Firebase Authentication.
-              {isNativeApk
-                ? ' Email & Password works directly inside the mobile APK.'
+              {hideGoogleAuth
+                ? ' Email & Password works directly on mobile.'
                 : ' Use Email & Password or Google Sign-In in Chrome/Safari.'}
             </span>
           </div>

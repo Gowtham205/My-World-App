@@ -136,6 +136,7 @@ import { AuthGate } from './components/AuthGate';
 import { EventCheckInOverlay } from './components/EventCheckInOverlay';
 import { NotificationsDrawer } from './components/NotificationsDrawer';
 import { ProfileSettingsDrawer } from './components/ProfileSettingsDrawer';
+import { hasGoogleMapsKey } from './lib/api';
 import {
   auth,
   db,
@@ -3346,10 +3347,14 @@ export function App() {
               onSaveSession={saveEventSession}
               onDeleteSession={deleteEventSession}
               onOpenBreathing={handleOpenBreathing}
-              onOpenOnMap={(venue) => {
-                setMapsInitialQuery(venue);
-                navigateTo('maps');
-              }}
+              onOpenOnMap={
+                hasGoogleMapsKey()
+                  ? (venue) => {
+                      setMapsInitialQuery(venue);
+                      navigateTo('maps');
+                    }
+                  : undefined
+              }
             />
           )}
 

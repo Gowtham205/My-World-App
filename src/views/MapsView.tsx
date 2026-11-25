@@ -25,6 +25,8 @@ import {
 import type { CalendarEventItem, EventCalmSession } from '../types/sanctuary';
 import { createId } from '../lib/storage';
 import { getNowTimeStr, getTodayStr, getTomorrowStr } from '../lib/dateUtils';
+import { hasGoogleMapsKey } from '../lib/api';
+import { FutureFeatureBanner } from '../components/FutureFeatureBanner';
 
 interface MapsViewProps {
   initialDestinationQuery?: string;
@@ -728,16 +730,12 @@ export const MapsView: React.FC<MapsViewProps> = (props) => {
         </p>
       </header>
 
-      {!MAPS_API_KEY ? (
-        <div className="rounded-3xl bg-white dark:bg-[#171A21] border border-[#F2B8A2]/30 p-6 space-y-2">
-          <p className="text-sm font-medium text-[#111827] dark:text-[#F1F3F6]">
-            Google Maps API key not detected in the client environment.
-          </p>
-          <p className="text-xs text-[#5B6472] dark:text-[#98A2B3]">
-            Enable Google Maps in the AI Studio Google Maps panel or ensure{' '}
-            <code className="text-[#255F8A] dark:text-[#9BC4E2]">VITE_GOOGLE_MAPS_API_KEY</code> is available.
-          </p>
-        </div>
+      {!hasGoogleMapsKey() ? (
+        <FutureFeatureBanner
+          title="Sanctuary Maps — Coming in a Future Update"
+          description="In-app interactive map previews and route planning are not yet enabled in this version and will be released in a future update."
+          note="Tip: You can still open turn-by-turn directions directly in your device's Google Maps app from any Event Calm Mode venue."
+        />
       ) : (
         <APIProvider
           apiKey={MAPS_API_KEY}

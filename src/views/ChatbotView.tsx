@@ -8,11 +8,16 @@ import {
   Trash2,
   SlidersHorizontal,
 } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
-import { getApiUrl } from '../lib/api';
+import {
+  checkGeminiBackendStatus,
+  getApiUrl,
+  isNativeWithoutBackend,
+  type BackendAvailability,
+} from '../lib/api';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { FutureFeatureBanner } from '../components/FutureFeatureBanner';
 import { ModernSelect } from '../components/ModernSelect';
 
 interface ChatMessage {
@@ -79,8 +84,22 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<BackendAvailability>(() => ({
+    available: !isNativeWithoutBackend(),
+    reason: isNativeWithoutBackend() ? 'mobile-not-connected' : undefined,
+  }));
 
   const threadEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void checkGeminiBackendStatus().then((res) => {
+      if (active) setBackendStatus(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -103,10 +122,9 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
     historyForRequest: { role: 'user' | 'model'; text: string }[],
     assistantId: string
   ) => {
-    const configuredBackend = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-    if (Capacitor.isNativePlatform() && !configuredBackend) {
+    if (isNativeWithoutBackend()) {
       throw new Error(
-        'Gemini Companion needs a connected My World server to respond from the standalone mobile app. It works automatically when opened from the hosted web app.'
+        'Gemini Companion is not enabled in this standalone mobile build and will be released in a future update.'
       );
     }
 
@@ -215,7 +233,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
   const handleSend = async (e?: React.FormEvent, overrideText?: string) => {
     e?.preventDefault();
     const text = (overrideText ?? input).trim();
-    if (!text || isStreaming) return;
+    if (!text || isStreaming || !backendStatus.available) return;
 
     setErrorMsg(null);
     setSavedNotice(null);
@@ -406,6 +424,18 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
         </section>
       )}
 
+      {!backendStatus.available && (
+        <FutureFeatureBanner
+          title={
+            backendStatus.reason === 'mobile-not-connected'
+              ? 'Mobile App Support — Coming in a Future Update'
+              : 'Gemini Companion — Coming in a Future Update'
+          }
+          description="AI companion conversations are not yet enabled in this mobile/standalone build and will be released in a future update."
+          note="Your saved local conversations remain readable, copyable, and exportable to Personal Notes."
+        />
+      )}
+
       {errorMsg && (
         <div
           role="alert"
@@ -447,8 +477,9 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
                   <button
                     key={prompt}
                     type="button"
+                    disabled={!backendStatus.available}
                     onClick={() => setInput(prompt)}
-                    className="px-3.5 py-2 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] border border-slate-900/[0.08] dark:border-white/[0.06] text-xs text-[#334155] dark:text-[#D0D5DD] text-left"
+                    className="px-3.5 py-2 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] hover:bg-slate-900/[0.06] dark:hover:bg-white/[0.06] disabled:opacity-45 border border-slate-900/[0.08] dark:border-white/[0.06] text-xs text-[#334155] dark:text-[#D0D5DD] text-left"
                   >
                     {prompt}
                   </button>
@@ -517,6 +548,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
           <textarea
             rows={1}
             value={input}
+            disabled={!backendStatus.available}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -524,12 +556,16 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onSaveToNote }) => {
                 void handleSend();
               }
             }}
-            placeholder="Share what is on your mind..."
-            className="flex-1 min-h-[44px] max-h-32 px-4 py-2.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/70 dark:placeholder-[#98A2B3]/70 resize-none focus:outline-none focus:border-[#BEB4DC]/50"
+            placeholder={
+              backendStatus.available
+                ? 'Share what is on your mind...'
+                : 'Coming in a future update...'
+            }
+            className="flex-1 min-h-[44px] max-h-32 px-4 py-2.5 rounded-2xl bg-[#ECEFF3] dark:bg-[#1D212A] border border-slate-900/[0.10] dark:border-white/[0.08] text-sm text-[#111827] dark:text-[#F1F3F6] placeholder-[#5B6472]/70 dark:placeholder-[#98A2B3]/70 resize-none focus:outline-none focus:border-[#BEB4DC]/50 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={isStreaming || !input.trim()}
+            disabled={!backendStatus.available || isStreaming || !input.trim()}
             className="min-w-[48px] min-h-[44px] px-4 rounded-2xl bg-[#BEB4DC] hover:bg-[#AFA3D4] disabled:opacity-40 text-[#0F1115] text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
           >
             <Send className="w-4 h-4" />

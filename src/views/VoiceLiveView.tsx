@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpen, Mic, MicOff, Phone, PhoneOff, Volume2 } from 'lucide-react';
 import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
-import { getLiveWsUrl } from '../lib/api';
+import {
+  checkGeminiBackendStatus,
+  getLiveWsUrl,
+  isNativeWithoutBackend,
+  type BackendAvailability,
+} from '../lib/api';
+import { FutureFeatureBanner } from '../components/FutureFeatureBanner';
 import { ModernSelect } from '../components/ModernSelect';
 
 interface TranscriptEntry {
@@ -59,6 +65,10 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [backendStatus, setBackendStatus] = useState<BackendAvailability>(() => ({
+    available: !isNativeWithoutBackend(),
+    reason: isNativeWithoutBackend() ? 'mobile-not-connected' : undefined,
+  }));
 
   // Refs for real-time audio callbacks (prevents stale closures)
   const wsRef = useRef<WebSocket | null>(null);
@@ -76,6 +86,16 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
   useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
+
+  useEffect(() => {
+    let active = true;
+    void checkGeminiBackendStatus().then((res) => {
+      if (active) setBackendStatus(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const stopQueuedPlayback = useCallback(() => {
     activeSourcesRef.current.forEach((src) => {
@@ -227,7 +247,7 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
   }, []);
 
   const startLiveSession = async () => {
-    if (status !== 'idle') return;
+    if (status !== 'idle' || !backendStatus.available) return;
     setErrorMsg(null);
     setSavedNotice(null);
     setStatus('connecting');
@@ -386,6 +406,14 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
         )}
       </header>
 
+      {!backendStatus.available && (
+        <FutureFeatureBanner
+          title="Live Voice Sanctuary — Coming in a Future Update"
+          description="Real-time voice conversations are not yet enabled in this build and will be released in a future update."
+          note="This feature is planned for a future release once cloud voice hosting is enabled."
+        />
+      )}
+
       {errorMsg && (
         <div
           role="alert"
@@ -456,11 +484,12 @@ export const VoiceLiveView: React.FC<VoiceLiveViewProps> = ({ onSaveToNote }) =>
             {status === 'idle' ? (
               <button
                 type="button"
+                disabled={!backendStatus.available}
                 onClick={() => void startLiveSession()}
-                className="flex-1 min-h-[48px] px-5 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] text-[#0F1115] text-sm font-semibold inline-flex items-center justify-center gap-2"
+                className="flex-1 min-h-[48px] px-5 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] disabled:opacity-40 text-[#0F1115] text-sm font-semibold inline-flex items-center justify-center gap-2"
               >
                 <Phone className="w-4 h-4" />
-                Start Voice Session
+                {backendStatus.available ? 'Start Voice Session' : 'Coming in Future Update'}
               </button>
             ) : (
               <>

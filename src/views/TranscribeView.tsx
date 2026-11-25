@@ -10,7 +10,13 @@ import {
 } from 'lucide-react';
 import type { PersonalNote } from '../types/sanctuary';
 import { createId } from '../lib/storage';
-import { getApiUrl } from '../lib/api';
+import {
+  checkGeminiBackendStatus,
+  getApiUrl,
+  isNativeWithoutBackend,
+  type BackendAvailability,
+} from '../lib/api';
+import { FutureFeatureBanner } from '../components/FutureFeatureBanner';
 
 interface TranscribeViewProps {
   onSaveToNote: (note: PersonalNote) => Promise<void>;
@@ -63,6 +69,10 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [backendStatus, setBackendStatus] = useState<BackendAvailability>(() => ({
+    available: !isNativeWithoutBackend(),
+    reason: isNativeWithoutBackend() ? 'mobile-not-connected' : undefined,
+  }));
   const [history, setHistory] = useState<TranscriptionHistoryItem[]>(() => {
     try {
       const raw = localStorage.getItem(HISTORY_KEY);
@@ -76,6 +86,16 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void checkGeminiBackendStatus().then((res) => {
+      if (active) setBackendStatus(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -164,7 +184,7 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
   };
 
   const handleTranscribe = async () => {
-    if (!audioBlob || isTranscribing) return;
+    if (!audioBlob || isTranscribing || !backendStatus.available) return;
     setErrorMsg(null);
     setSavedNotice(null);
     setIsTranscribing(true);
@@ -264,6 +284,14 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
         </p>
       </header>
 
+      {!backendStatus.available && (
+        <FutureFeatureBanner
+          title="Audio Transcription — Coming in a Future Update"
+          description="Speech-to-text transcription is not yet enabled in this build and will be released in a future update."
+          note="Any previously saved local transcripts below can still be viewed, copied, or saved to Notes."
+        />
+      )}
+
       {errorMsg && (
         <div
           role="alert"
@@ -352,11 +380,15 @@ export const TranscribeView: React.FC<TranscribeViewProps> = ({ onSaveToNote }) 
 
           <button
             type="button"
-            disabled={!audioBlob || recording || isTranscribing}
+            disabled={!backendStatus.available || !audioBlob || recording || isTranscribing}
             onClick={() => void handleTranscribe()}
             className="w-full min-h-[48px] px-5 rounded-2xl bg-[#9EC5AB] hover:bg-[#8EB89D] disabled:opacity-40 text-[#0F1115] text-sm font-semibold transition-colors"
           >
-            {isTranscribing ? 'Transcribing Audio...' : 'Transcribe Audio'}
+            {!backendStatus.available
+              ? 'Coming in Future Update'
+              : isTranscribing
+                ? 'Transcribing Audio...'
+                : 'Transcribe Audio'}
           </button>
         </section>
 
