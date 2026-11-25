@@ -23,6 +23,7 @@ public class MainActivity extends BridgeActivity {
     private static final String KEY_IS_DARK = "is_dark";
     private static final int LIGHT_BAR_BG = Color.parseColor("#F2F6F3");
     private static final int DARK_BAR_BG = Color.parseColor("#10131C");
+    private Boolean lastImeVisible = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -43,9 +44,23 @@ public class MainActivity extends BridgeActivity {
                     WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
                 );
                 Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
-                int bottomInset = Math.max(systemBars.bottom, ime.bottom);
+                boolean imeVisible =
+                    windowInsets.isVisible(WindowInsetsCompat.Type.ime()) &&
+                    ime.bottom > systemBars.bottom;
+                int bottomInset = imeVisible ? ime.bottom : systemBars.bottom;
                 v.setPadding(systemBars.left, systemBars.top, systemBars.right, bottomInset);
-                return WindowInsetsCompat.CONSUMED;
+                notifyWebViewKeyboardState(imeVisible);
+
+                // Zero out consumed systemBars and IME insets instead of returning CONSUMED
+                // so Chromium WebView >= 139 does not double-shrink its visual viewport.
+                return new WindowInsetsCompat.Builder(windowInsets)
+                    .setInsets(
+                        WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout(),
+                        Insets.NONE
+                    )
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)
+                    .setVisible(WindowInsetsCompat.Type.ime(), false)
+                    .build();
             });
             ViewCompat.requestApplyInsets(contentRoot);
         }
@@ -62,6 +77,21 @@ public class MainActivity extends BridgeActivity {
         }
 
         handleRouteIntent(getIntent());
+    }
+
+    private void notifyWebViewKeyboardState(boolean visible) {
+        if (lastImeVisible != null && lastImeVisible == visible) {
+            return;
+        }
+        lastImeVisible = visible;
+        if (getBridge() == null || getBridge().getWebView() == null) {
+            return;
+        }
+        final WebView webView = getBridge().getWebView();
+        final String js =
+            "try{document.documentElement.classList.toggle('keyboard-open'," + visible + ");" +
+            "window.dispatchEvent(new CustomEvent('sanctuary-keyboard',{detail:{open:" + visible + "}}));}catch(e){}";
+        webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
     @Override

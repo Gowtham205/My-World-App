@@ -217,3 +217,12 @@
   }
 }
 
+/* Hide mobile bottom navigation cleanly whenever the on-screen keyboard is open */
+html.keyboard-open .mobile-bottom-nav {
+  display: none !important;
+}
+
+html.keyboard-open .mobile-main-content {
+  padding-bottom: 1rem !important;
+}
+

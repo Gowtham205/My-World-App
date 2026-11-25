@@ -312,6 +312,7 @@ export function App() {
   const [inboxNotifications, setInboxNotifications] = useState<AppNotificationItem[]>(() =>
     getNotificationHistory()
   );
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   // Local-first state hydrated from IndexedDB
   const [notes, setNotes] = useState<PersonalNote[]>([]);
@@ -548,6 +549,123 @@ export function App() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Detect soft keyboard open/close (Android native IME events + mobile browser visualViewport/focus)
+  useEffect(() => {
+    const isTextEditable = (el: EventTarget | null): el is HTMLElement => {
+      if (!(el instanceof HTMLElement)) return false;
+      if (el.isContentEditable) return true;
+      if (el.tagName === 'TEXTAREA') {
+        return !(el as HTMLTextAreaElement).readOnly && !(el as HTMLTextAreaElement).disabled;
+      }
+      if (el.tagName === 'INPUT') {
+        const inputEl = el as HTMLInputElement;
+        if (inputEl.readOnly || inputEl.disabled) return false;
+        const type = (inputEl.type || 'text').toLowerCase();
+        return ![
+          'checkbox',
+          'radio',
+          'file',
+          'range',
+          'color',
+          'button',
+          'submit',
+          'reset',
+          'hidden',
+        ].includes(type);
+      }
+      return false;
+    };
+
+    let baseHeight = window.visualViewport?.height || window.innerHeight;
+    let blurTimer: number | null = null;
+    let scrollTimer: number | null = null;
+
+    const applyKeyboardState = (open: boolean) => {
+      setIsKeyboardOpen(open);
+      document.documentElement.classList.toggle('keyboard-open', open);
+    };
+
+    const handleNativeKeyboard = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ open?: boolean }>).detail;
+      const open = Boolean(detail?.open);
+      if (blurTimer) {
+        window.clearTimeout(blurTimer);
+        blurTimer = null;
+      }
+      applyKeyboardState(open);
+      if (open && isTextEditable(document.activeElement)) {
+        const active = document.activeElement;
+        if (scrollTimer) window.clearTimeout(scrollTimer);
+        scrollTimer = window.setTimeout(() => {
+          active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 90);
+      }
+    };
+
+    const handleViewportResize = () => {
+      const mobileScreen = Capacitor.isNativePlatform() || window.innerWidth < 1024;
+      if (!mobileScreen) {
+        applyKeyboardState(false);
+        return;
+      }
+      const currentHeight = window.visualViewport?.height || window.innerHeight;
+      if (currentHeight > baseHeight) {
+        baseHeight = currentHeight;
+      }
+      const heightDiff = baseHeight - currentHeight;
+      if (heightDiff > 120) {
+        applyKeyboardState(true);
+      } else if (heightDiff < 60 && !isTextEditable(document.activeElement)) {
+        applyKeyboardState(false);
+      } else if (heightDiff < 60 && !Capacitor.isNativePlatform()) {
+        applyKeyboardState(false);
+      }
+    };
+
+    const handleFocusIn = (ev: FocusEvent) => {
+      const mobileScreen = Capacitor.isNativePlatform() || window.innerWidth < 1024;
+      if (!mobileScreen) return;
+      if (isTextEditable(ev.target)) {
+        if (blurTimer) {
+          window.clearTimeout(blurTimer);
+          blurTimer = null;
+        }
+        applyKeyboardState(true);
+        const targetEl = ev.target;
+        if (scrollTimer) window.clearTimeout(scrollTimer);
+        scrollTimer = window.setTimeout(() => {
+          targetEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 120);
+      }
+    };
+
+    const handleFocusOut = () => {
+      if (blurTimer) window.clearTimeout(blurTimer);
+      blurTimer = window.setTimeout(() => {
+        if (!isTextEditable(document.activeElement)) {
+          applyKeyboardState(false);
+        }
+      }, 120);
+    };
+
+    window.addEventListener('sanctuary-keyboard', handleNativeKeyboard);
+    window.visualViewport?.addEventListener('resize', handleViewportResize);
+    window.addEventListener('resize', handleViewportResize);
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      if (blurTimer) window.clearTimeout(blurTimer);
+      if (scrollTimer) window.clearTimeout(scrollTimer);
+      window.removeEventListener('sanctuary-keyboard', handleNativeKeyboard);
+      window.visualViewport?.removeEventListener('resize', handleViewportResize);
+      window.removeEventListener('resize', handleViewportResize);
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+      document.documentElement.classList.remove('keyboard-open');
+    };
+  }, []);
 
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [emailVerificationSent, setEmailVerificationSent] = useState(false);
@@ -3041,7 +3159,11 @@ export function App() {
       </aside>
 
       {/* Main Content Canvas */}
-      <main className="flex-1 min-w-0 pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-12">
+      <main
+        className={`mobile-main-content flex-1 min-w-0 lg:pb-12 ${
+          isKeyboardOpen ? 'pb-4' : 'pb-[calc(5.75rem+env(safe-area-inset-bottom))]'
+        }`}
+      >
         <div className="max-w-6xl mx-auto pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-6 lg:pt-8 pb-6 lg:pb-8 pl-[max(0.875rem,env(safe-area-inset-left))] pr-[max(0.875rem,env(safe-area-inset-right))] sm:px-6 lg:px-10">
           {/* Mobile Account & Navigation Header (non-sticky, respects safe areas & fits any screen width) */}
           <div className="mb-4 lg:hidden flex items-center justify-between gap-2 min-w-0">
@@ -3423,10 +3545,12 @@ export function App() {
       </main>
       </div>
 
-      {/* Mobile Fixed 5-Tab Bottom Navigation Bar with safe-area padding & flexible width */}
+      {/* Mobile Fixed 5-Tab Bottom Navigation Bar (hidden automatically while keyboard is open) */}
       <nav
         aria-label="Bottom Navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 min-h-[64px] bg-[#FAFDFB]/92 dark:bg-[#131722]/92 backdrop-blur-md border-t border-slate-900/[0.08] dark:border-white/[0.08] grid grid-cols-5 items-stretch pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] transition-colors shadow-[0_-4px_20px_rgba(15,23,42,0.05)]"
+        className={`mobile-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-40 min-h-[64px] bg-[#FAFDFB]/92 dark:bg-[#131722]/92 backdrop-blur-md border-t border-slate-900/[0.08] dark:border-white/[0.08] ${
+          isKeyboardOpen ? 'hidden' : 'grid'
+        } grid-cols-5 items-stretch pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] transition-colors shadow-[0_-4px_20px_rgba(15,23,42,0.05)]`}
       >
         {PRIMARY_TABS.map((tab) => {
           const Icon = tab.icon;
@@ -3514,7 +3638,11 @@ export function App() {
       {activeReminderNotice && (
         <div
           role="status"
-          className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/50 p-4 shadow-xl space-y-3"
+          className={`fixed ${
+            isKeyboardOpen
+              ? 'bottom-3'
+              : 'bottom-[calc(5.25rem+env(safe-area-inset-bottom))]'
+          } lg:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-white dark:bg-[#171A21] border border-[#9EC5AB]/50 p-4 shadow-xl space-y-3`}
         >
           <div className="min-w-0">
             <p className="text-xs text-[#2E6B48] dark:text-[#9EC5AB] font-medium flex items-center gap-1.5">

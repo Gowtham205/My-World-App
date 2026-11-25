@@ -18,6 +18,9 @@ const config: CapacitorConfig = {
       smallIcon: 'ic_stat_sanctuary',
       iconColor: '#9EC5AB',
     },
+    SystemBars: {
+      insetsHandling: 'disable',
+    },
   },
 };
 
